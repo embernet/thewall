@@ -5,6 +5,9 @@ import { agentRegistry } from './registry';
 import { registerBuiltInAgents } from './built-in';
 import { embed, vectorToBlob } from '@/utils/embedding-service';
 import { loadGraph, clearGraph } from '@/graph/graph-service';
+import { registerBuiltInTools } from '@/tools';
+import { registerBuiltInMethodologies } from '@/methodologies';
+import { registerBuiltInPersonas } from '@/personas';
 import type { AgentContext } from './base';
 import type { Card } from '@/types';
 
@@ -27,6 +30,9 @@ export function initOrchestrator(): void {
   initialised = true;
 
   registerBuiltInAgents();
+  registerBuiltInTools();
+  registerBuiltInMethodologies();
+  registerBuiltInPersonas();
 
   // Load knowledge graph for current session
   const store = useSessionStore.getState();

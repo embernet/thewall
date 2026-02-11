@@ -3,6 +3,8 @@ import {
   exportSessionToFile,
   exportSessionMarkdown,
   exportSessionCSV,
+  exportSessionHTML,
+  exportSessionObsidian,
 } from '@/utils/export';
 
 // ---------------------------------------------------------------------------
@@ -55,6 +57,24 @@ export default function ExportMenu({ onClose }: ExportMenuProps) {
       desc: 'Spreadsheet-compatible tabular format.',
       fn: () => {
         exportSessionCSV(state);
+        onClose();
+      },
+    },
+    {
+      icon: '\uD83C\uDF10',
+      label: 'Export as HTML',
+      desc: 'Self-contained styled HTML file with dark/light mode support.',
+      fn: () => {
+        exportSessionHTML(state);
+        onClose();
+      },
+    },
+    {
+      icon: '\uD83D\uDC8E',
+      label: 'Export for Obsidian',
+      desc: 'Markdown with YAML frontmatter, [[wiki-links]], and #tags.',
+      fn: () => {
+        exportSessionObsidian(state);
         onClose();
       },
     },

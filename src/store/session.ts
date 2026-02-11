@@ -1,4 +1,7 @@
 import { create } from 'zustand';
+import { temporal } from 'zundo';
+import type { TemporalState } from 'zundo';
+import type { StoreApi } from 'zustand';
 import type {
   Session,
   Column,
@@ -105,7 +108,7 @@ const initialState: Pick<
 /*  Store                                                              */
 /* ------------------------------------------------------------------ */
 
-export const useSessionStore = create<SessionState>((set, get) => ({
+export const useSessionStore = create<SessionState>()(temporal((set, get) => ({
   ...initialState,
 
   // ── INIT: replace entire state, switch view to session ──
@@ -276,4 +279,25 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       speakerColors: {},
       saveStatus: 'idle' as SaveStatus,
     })),
+}), {
+  // Only track card/column data changes for undo/redo, not transient UI state
+  partialize: (state) => ({
+    cards: state.cards,
+    columns: state.columns,
+  }),
+  limit: 50,
 }));
+
+// Expose temporal store for keyboard shortcuts
+export const useTemporalStore = <T>(
+  selector: (state: TemporalState<Pick<SessionState, 'cards' | 'columns'>>) => T,
+) => {
+  const store = useSessionStore.temporal as StoreApi<TemporalState<Pick<SessionState, 'cards' | 'columns'>>>;
+  return selector(store.getState());
+};
+
+// Direct access for non-React code (e.g., keyboard handler)
+useTemporalStore.getState = () => {
+  const store = useSessionStore.temporal as StoreApi<TemporalState<Pick<SessionState, 'cards' | 'columns'>>>;
+  return store.getState();
+};

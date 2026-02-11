@@ -14,6 +14,7 @@ import { uid, now, mid } from '@/utils/ids';
 import { COL_TYPES, SPEAKER_COLORS } from '@/types';
 import { initOrchestrator, destroyOrchestrator } from '@/agents/orchestrator';
 import { workerPool } from '@/agents/worker-pool';
+import { useKeyboard } from '@/hooks/useKeyboard';
 import type { Card, Column as ColumnType, SessionIndexEntry, SimConfig, AgentTask } from '@/types';
 
 export default function App() {
@@ -24,6 +25,8 @@ export default function App() {
     setView, setSpeakerColors, setSaveStatus, goToLauncher,
     toggleColumnVisibility, toggleColumnCollapsed,
   } = store;
+
+  useKeyboard();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);

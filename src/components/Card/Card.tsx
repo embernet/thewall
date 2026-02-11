@@ -2,6 +2,8 @@ import { useState } from 'react';
 import type { Card as CardType, ColumnType } from '@/types';
 import { SOURCE_BADGES } from '@/types';
 import { fmtTime } from '@/utils/ids';
+import ContextMenu, { useContextMenu } from '@/components/ContextMenu/ContextMenu';
+import type { MenuItem } from '@/components/ContextMenu/ContextMenu';
 
 // ---------------------------------------------------------------------------
 // Highlight border color lookup (dynamic -- must remain inline styles)
@@ -41,6 +43,7 @@ export default function Card({
   const [editing, setEditing] = useState(false);
   const [txt, setTxt] = useState(card.content);
   const [hov, setHov] = useState(false);
+  const { menu, show: showMenu, close: closeMenu } = useContextMenu();
 
   const badge = SOURCE_BADGES[card.source] || SOURCE_BADGES.user;
   const borderColor = HIGHLIGHT_COLORS[card.highlightedBy] || 'transparent';
@@ -61,6 +64,16 @@ export default function Card({
       id={`card-${card.id}`}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
+      onContextMenu={(e) => {
+        const items: MenuItem[] = [
+          { label: 'Copy', icon: '\uD83D\uDCCB', onClick: () => navigator.clipboard?.writeText(card.content) },
+          { label: 'Edit', icon: '\u270F\uFE0F', onClick: () => { setTxt(card.content); setEditing(true); } },
+          { label: card.highlightedBy === 'user' || card.highlightedBy === 'both' ? 'Remove Highlight' : 'Highlight', icon: '\u2B50', onClick: () => onHighlight(card.id) },
+          { label: '', icon: '', separator: true, onClick: () => {} },
+          ...(colType !== 'trash' ? [{ label: 'Delete', icon: '\uD83D\uDDD1\uFE0F', danger: true, onClick: () => onDelete(card.id) }] : []),
+        ];
+        showMenu(e, items);
+      }}
       className="bg-wall-surface rounded-lg px-2.5 py-2 mb-1.5 transition-all duration-150"
       style={{
         border: `1px solid ${highlighted ? borderColor : '#1e293b'}`,
@@ -212,6 +225,9 @@ export default function Card({
           ))}
         </div>
       )}
+
+      {/* Context menu */}
+      {menu && <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={closeMenu} />}
     </div>
   );
 }
