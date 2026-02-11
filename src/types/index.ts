@@ -19,6 +19,8 @@ export type ColumnType =
   | 'claims'
   | 'gaps'
   | 'actions'
+  | 'alternatives'
+  | 'deep_research'
   | 'inquiry'
   | 'agent_queue'
   | 'highlights'
@@ -335,6 +337,11 @@ export interface ElectronDbApi {
   // API Usage
   logApiUsage: (usage: ApiUsageRecord) => Promise<void>;
 
+  // Embeddings
+  storeEmbedding: (cardId: string, blob: ArrayBuffer) => Promise<void>;
+  getEmbedding: (cardId: string) => Promise<ArrayBuffer | null>;
+  getEmbeddings: (sessionId: string) => Promise<{ id: string; embedding: ArrayBuffer }[]>;
+
   // Bulk operations
   importSession: (data: SessionExport) => Promise<boolean>;
   exportSession: (sessionId: string) => Promise<SessionExport | null>;
@@ -369,6 +376,8 @@ export const COL_TYPES: readonly ColumnMeta[] = [
   { type: 'claims',      title: 'Claims',         icon: '\uD83D\uDCCC',       color: '#14b8a6' },
   { type: 'gaps',        title: 'Gaps & Risks',   icon: '\u26A0\uFE0F',       color: '#f97316' },
   { type: 'actions',     title: 'Actions',        icon: '\u2705',             color: '#22c55e' },
+  { type: 'alternatives', title: 'Alternatives',  icon: '\uD83D\uDD00',       color: '#0ea5e9' },
+  { type: 'deep_research', title: 'Deep Research', icon: '\uD83D\uDD2C',      color: '#7c3aed' },
   { type: 'inquiry',     title: 'Inquiry',        icon: '\uD83D\uDD2E',       color: '#06b6d4' },
   { type: 'agent_queue', title: 'Agent Queue',    icon: '\u26A1',             color: '#eab308' },
   { type: 'highlights',  title: 'Highlights',     icon: '\u2B50',             color: '#fbbf24' },

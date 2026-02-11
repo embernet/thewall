@@ -302,6 +302,24 @@ export function registerDbHandlers() {
       );
   });
 
+  // ── Embeddings ──
+
+  ipcMain.handle('db:storeEmbedding', (_e, cardId: string, blob: ArrayBuffer) => {
+    db().prepare('UPDATE cards SET embedding = ? WHERE id = ?').run(Buffer.from(blob), cardId);
+  });
+
+  ipcMain.handle('db:getEmbedding', (_e, cardId: string) => {
+    const row = db().prepare('SELECT embedding FROM cards WHERE id = ?').get(cardId) as any;
+    return row?.embedding || null;
+  });
+
+  ipcMain.handle('db:getEmbeddings', (_e, sessionId: string) => {
+    const rows = db()
+      .prepare('SELECT id, embedding FROM cards WHERE session_id = ? AND embedding IS NOT NULL')
+      .all(sessionId) as any[];
+    return rows.map((r: any) => ({ id: r.id, embedding: r.embedding }));
+  });
+
   // ── Bulk Import/Export ──
 
   ipcMain.handle('db:importSession', (_e, data: any) => {

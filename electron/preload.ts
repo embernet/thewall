@@ -35,6 +35,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // API Usage
     logApiUsage: (usage: any) => ipcRenderer.invoke('db:logApiUsage', usage),
 
+    // Embeddings
+    storeEmbedding: (cardId: string, blob: ArrayBuffer) =>
+      ipcRenderer.invoke('db:storeEmbedding', cardId, blob),
+    getEmbedding: (cardId: string) => ipcRenderer.invoke('db:getEmbedding', cardId),
+    getEmbeddings: (sessionId: string) => ipcRenderer.invoke('db:getEmbeddings', sessionId),
+
     // Bulk operations
     importSession: (data: any) => ipcRenderer.invoke('db:importSession', data),
     exportSession: (sessionId: string) => ipcRenderer.invoke('db:exportSession', sessionId),

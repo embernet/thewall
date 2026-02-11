@@ -9,16 +9,17 @@ import ExportMenu from '@/components/ExportMenu/ExportMenu';
 import TopBar from './TopBar';
 import StatusBar from './StatusBar';
 import { askClaude } from '@/utils/llm';
-import { findSimilar } from '@/utils/embeddings';
 import { uid, now, mid } from '@/utils/ids';
-import { AGENT_DEFINITIONS, COL_TYPES, SPEAKER_COLORS } from '@/types';
+import { COL_TYPES, SPEAKER_COLORS } from '@/types';
+import { initOrchestrator, destroyOrchestrator } from '@/agents/orchestrator';
+import { workerPool } from '@/agents/worker-pool';
 import type { Card, Column as ColumnType, SessionIndexEntry, SimConfig, AgentTask } from '@/types';
 
 export default function App() {
   const store = useSessionStore();
   const {
     view, session, columns, cards, audio, agentBusy, agentTasks, speakerColors,
-    init, addCard, setAudio, setAgentBusy, addAgentTask, updateAgentTask,
+    init, addCard, setAudio,
     setView, setSpeakerColors, setSaveStatus, goToLauncher,
     toggleColumnVisibility, toggleColumnCollapsed,
   } = store;
@@ -94,203 +95,13 @@ export default function App() {
     prevCardLen.current = len;
   }, [cards.length, session?.id, cards, setSaveStatus]);
 
-  // ── Agent Processing ──
-  const runAgents = useCallback(async (text: string, sessionId: string, cols: ColumnType[]) => {
-    if (!text?.trim()) return;
-    const ideasCol = cols.find(c => c.type === 'ideas');
-    const newAgentCards: (Card & { colType: string; colTitle: string; colIcon: string; colColor: string })[] = [];
-
-    // Find transcript source cards for linking
-    const tcol = cols.find(c => c.type === 'transcript');
-    const tMeta = COL_TYPES.find(ct => ct.type === 'transcript')!;
-    const allTranscript = tcol ? cardsRef.current.filter(c => c.columnId === tcol.id && !c.isDeleted) : [];
-    const batchLines = text.split('\n').filter(l => l.trim());
-    const sourceTranscriptCards = allTranscript.filter(tc => {
-      return batchLines.some(line => {
-        const clean = line.replace(/^[^:]+:\s*/, '');
-        return tc.content === clean || tc.content.includes(clean) || clean.includes(tc.content);
-      });
-    }).slice(-6);
-    const transcriptLinks = sourceTranscriptCards.map(tc => ({
-      id: tc.id,
-      label: (tc.speaker ? tc.speaker + ': ' : '') + tc.content.slice(0, 50),
-      icon: tMeta.icon,
-      color: (tMeta.color) + '80',
-    }));
-
-    const tasks = AGENT_DEFINITIONS.map(async agent => {
-      const col = cols.find(c => c.type === agent.col);
-      if (!col) return;
-      const taskId = uid();
-      const promptText = agent.prompt(text);
-      const startedAt = Date.now();
-      setAgentBusy(agent.col, true);
-      addAgentTask({
-        id: taskId, agentName: agent.name, agentKey: agent.key, status: 'running',
-        createdAt: now(), cardsCreated: 0, inputText: text, prompt: promptText,
-        systemPrompt: agent.sys, sessionId,
-      });
-      try {
-        const result = await askClaude(agent.sys, promptText);
-        const duration = Date.now() - startedAt;
-        if (!result) {
-          updateAgentTask(taskId, { status: 'failed', error: 'No response from Claude API.', completedAt: now(), duration });
-          return;
-        }
-        const bullets = result.split('\n').map(l => l.replace(/^[•\-*]\s*/, '').trim()).filter(l => l.length > 5);
-        let created = 0;
-        for (const b of bullets) {
-          const existing = cardsRef.current.filter(c => c.columnId === col.id);
-          const last = existing[existing.length - 1];
-          const cardId = uid();
-          let bulletLinks = [...transcriptLinks];
-          if (sourceTranscriptCards.length > 1) {
-            const best = findSimilar(b, sourceTranscriptCards, 2);
-            if (best.length > 0) {
-              bulletLinks = best.map(r => ({
-                id: r.card.id,
-                label: (r.card.speaker ? r.card.speaker + ': ' : '') + r.card.content.slice(0, 50),
-                icon: tMeta.icon,
-                color: (tMeta.color) + '80',
-              }));
-            }
-          }
-          const card: Card = {
-            id: cardId, columnId: col.id, sessionId, content: b, source: 'agent',
-            sourceAgentName: agent.name, sourceCardIds: bulletLinks, aiTags: [], userTags: [],
-            highlightedBy: 'none', isDeleted: false, createdAt: now(), updatedAt: now(),
-            sortOrder: last ? mid(last.sortOrder) : 'n',
-          };
-          addCard(card);
-          const colMeta = COL_TYPES.find(ct => ct.type === agent.col);
-          newAgentCards.push({
-            ...card, colType: agent.col, colTitle: col.title,
-            colIcon: colMeta?.icon || '📌', colColor: colMeta?.color || '#64748b',
-          });
-          created++;
-        }
-        updateAgentTask(taskId, { status: 'completed', cardsCreated: created, completedAt: now(), duration, resultPreview: result.slice(0, 500) });
-      } catch (e: any) {
-        updateAgentTask(taskId, { status: 'failed', error: e?.message || String(e), completedAt: now(), duration: Date.now() - startedAt });
-      }
-      setAgentBusy(agent.col, false);
-    });
-    await Promise.allSettled(tasks);
-
-    // ── Ideas Agent (second pass) ──
-    if (!ideasCol || newAgentCards.length === 0) return;
-    const gapCards = newAgentCards.filter(c => c.colType === 'gaps');
-    const questionCards = newAgentCards.filter(c => c.colType === 'questions');
-    const claimCards = newAgentCards.filter(c => c.colType === 'claims');
-    const actionCards = newAgentCards.filter(c => c.colType === 'actions');
-    const conceptCards = newAgentCards.filter(c => c.colType === 'concepts');
-
-    const sections: string[] = [];
-    if (gapCards.length) sections.push('GAPS & RISKS (suggest how to address each):\n' + gapCards.map(c => '- ' + c.content).join('\n'));
-    if (questionCards.length) sections.push('QUESTIONS (suggest possible answers or approaches):\n' + questionCards.map(c => '- ' + c.content).join('\n'));
-    if (claimCards.length) sections.push('CLAIMS (suggest how to verify or build on each):\n' + claimCards.map(c => '- ' + c.content).join('\n'));
-    if (actionCards.length) sections.push('ACTION ITEMS (suggest better or additional approaches):\n' + actionCards.map(c => '- ' + c.content).join('\n'));
-    if (conceptCards.length) sections.push('KEY CONCEPTS (suggest applications or explorations):\n' + conceptCards.map(c => '- ' + c.content).join('\n'));
-    if (sections.length === 0) return;
-
-    const ideasTaskId = uid();
-    const ideasSys = 'You are a creative problem-solver and idea generator. Given analysis from a meeting, generate actionable ideas. For each idea, start the line with the NUMBER of the source item it addresses (from the numbered list below), then a pipe |, then the idea. Format: NUMBER|idea text. One idea per line. Be specific and actionable. Generate 2-5 ideas total.';
-
-    const numberedItems: { num: number; card: typeof newAgentCards[0] }[] = [];
-    let itemIdx = 1;
-    const allSourceCards = [...gapCards, ...questionCards, ...claimCards, ...actionCards, ...conceptCards];
-    const numberedList = allSourceCards.map(c => {
-      const n = itemIdx++;
-      numberedItems.push({ num: n, card: c });
-      return n + '. [' + c.colType.toUpperCase() + '] ' + c.content;
-    }).join('\n');
-
-    const ideasPrompt = 'Here are findings from a meeting analysis. Generate ideas to address them.\n\n' + numberedList;
-
-    setAgentBusy('ideas', true);
-    addAgentTask({
-      id: ideasTaskId, agentName: 'Idea Generator', agentKey: 'ideas', status: 'running',
-      createdAt: now(), cardsCreated: 0, inputText: numberedList, prompt: ideasPrompt,
-      systemPrompt: ideasSys, sessionId,
-    });
-
-    try {
-      const result = await askClaude(ideasSys, ideasPrompt);
-      if (!result) {
-        updateAgentTask(ideasTaskId, { status: 'failed', error: 'No response', completedAt: now() });
-        setAgentBusy('ideas', false);
-        return;
-      }
-      const lines = result.split('\n').map(l => l.replace(/^[•\-*]\s*/, '').trim()).filter(l => l.length > 5);
-      let created = 0;
-      for (const line of lines) {
-        const pipeIdx = line.indexOf('|');
-        let sourceNum: number | null = null;
-        let ideaText = line;
-        if (pipeIdx > 0 && pipeIdx < 5) {
-          const numStr = line.slice(0, pipeIdx).replace(/[^0-9]/g, '');
-          sourceNum = parseInt(numStr, 10);
-          ideaText = line.slice(pipeIdx + 1).trim();
-        }
-        if (!ideaText || ideaText.length < 5) continue;
-
-        const sourceLinks: Card['sourceCardIds'] = [];
-        if (sourceNum && numberedItems.length > 0) {
-          const src = numberedItems.find(ni => ni.num === sourceNum);
-          if (src) {
-            sourceLinks.push({ id: src.card.id, label: src.card.content.slice(0, 50), icon: src.card.colIcon, color: src.card.colColor + '80' });
-          }
-        }
-        if (sourceLinks.length === 0 && allSourceCards.length > 0) {
-          const best = findSimilar(ideaText, allSourceCards, 1);
-          if (best.length > 0 && best[0].score > 0.1) {
-            const src = best[0].card as typeof newAgentCards[0];
-            sourceLinks.push({ id: src.id, label: src.content.slice(0, 50), icon: src.colIcon, color: src.colColor + '80' });
-          }
-        }
-
-        const existing = cardsRef.current.filter(c => c.columnId === ideasCol.id);
-        const last = existing[existing.length - 1];
-        addCard({
-          id: uid(), columnId: ideasCol.id, sessionId, content: ideaText, source: 'agent',
-          sourceAgentName: 'Idea Generator', sourceCardIds: sourceLinks, aiTags: [], userTags: [],
-          highlightedBy: 'none', isDeleted: false, createdAt: now(), updatedAt: now(),
-          sortOrder: last ? mid(last.sortOrder) : 'n',
-        });
-        created++;
-      }
-      updateAgentTask(ideasTaskId, { status: 'completed', cardsCreated: created, completedAt: now(), resultPreview: result.slice(0, 500) });
-    } catch (e: any) {
-      updateAgentTask(ideasTaskId, { status: 'failed', error: e?.message || String(e), completedAt: now() });
-    }
-    setAgentBusy('ideas', false);
-  }, [addCard, setAgentBusy, addAgentTask, updateAgentTask]);
-
-  // ── Watch transcript for agent triggers ──
-  const transcriptBuf = useRef<string[]>([]);
-  const agentTmr = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const scheduleAgents = useCallback((text: string) => {
-    if (!session?.id || !columns) return;
-    transcriptBuf.current.push(text);
-    if (agentTmr.current) clearTimeout(agentTmr.current);
-    agentTmr.current = setTimeout(() => {
-      const batch = transcriptBuf.current.join('\n');
-      transcriptBuf.current = [];
-      if (batch.trim()) runAgents(batch, session.id, columns);
-    }, 4000);
-  }, [session?.id, columns, runAgents]);
-
-  const lastTC = useRef(0);
+  // ── Agent Orchestrator ──
   useEffect(() => {
-    if (!columns || simRunning) return;
-    const tcol = columns.find(c => c.type === 'transcript');
-    if (!tcol) return;
-    const tCards = cards.filter(c => c.columnId === tcol.id && !c.isDeleted);
-    if (tCards.length > lastTC.current) {
-      tCards.slice(lastTC.current).forEach(c => scheduleAgents(c.content));
+    if (view === 'session' && session?.id) {
+      initOrchestrator();
     }
-    lastTC.current = tCards.length;
-  }, [cards.length, columns, simRunning, scheduleAgents, cards]);
+    return () => { destroyOrchestrator(); };
+  }, [view, session?.id]);
 
   // ── Speech Recognition ──
   const addTranscriptCard = useCallback((text: string, speaker?: string) => {
@@ -521,7 +332,6 @@ export default function App() {
     const tcol = s.columns.find(c => c.type === 'transcript');
     if (!tcol) { setSimRunning(false); if (timerIv.current) clearInterval(timerIv.current); return; }
 
-    let batch: string[] = [];
     for (let i = 0; i < lines.length; i++) {
       if (simAbort.current) break;
       const ci = lines[i].indexOf(':');
@@ -537,18 +347,13 @@ export default function App() {
         sourceCardIds: [], aiTags: [], userTags: [], highlightedBy: 'none', isDeleted: false,
         createdAt: now(), updatedAt: now(), sortOrder: last ? mid(last.sortOrder) : 'n',
       });
-      batch.push(speaker + ': ' + text);
-      if (batch.length >= 3 || i === lines.length - 1) {
-        const bt = batch.join('\n');
-        batch = [];
-        runAgents(bt, s.session.id, s.columns);
-      }
+      // Orchestrator auto-triggers via card:created events from addCard
       await new Promise(r => setTimeout(r, 1200 + Math.random() * 1200));
     }
     setSimRunning(false);
     if (timerIv.current) clearInterval(timerIv.current);
     setAudio({ level: 0, elapsed: Date.now() - timerStart.current! });
-  }, [init, setSpeakerColors, setAudio, addCard, runAgents]);
+  }, [init, setSpeakerColors, setAudio, addCard]);
 
   // ── Navigate to source card ──
   const navigateToCard = useCallback((cardId: string) => {
@@ -568,52 +373,10 @@ export default function App() {
     }, 100);
   }, [cards, columns, toggleColumnVisibility, toggleColumnCollapsed]);
 
-  // ── Retry failed agent task ──
-  const retryTask = useCallback(async (task: AgentTask) => {
-    if (!session?.id || !columns) return;
-    const agent = AGENT_DEFINITIONS.find(a => a.key === task.agentKey);
-    const col = columns.find(c => c.type === (agent?.col || task.agentKey));
-    if (!col) return;
-
-    const taskId = uid();
-    const promptText = (task as any).editedPrompt ? task.prompt! : (agent ? agent.prompt(task.inputText || '') : task.prompt!);
-    const sysPrompt = task.systemPrompt || agent?.sys || 'You are a helpful assistant.';
-    const startedAt = Date.now();
-
-    setAgentBusy(col.type, true);
-    addAgentTask({
-      id: taskId, agentName: task.agentName + ((task as any).editedPrompt ? ' (edited)' : '') + ' ↻',
-      agentKey: task.agentKey, status: 'running', createdAt: now(), cardsCreated: 0,
-      inputText: task.inputText, prompt: promptText, systemPrompt: sysPrompt, sessionId: session.id,
-    });
-
-    try {
-      const result = await askClaude(sysPrompt, promptText);
-      const duration = Date.now() - startedAt;
-      if (!result) {
-        updateAgentTask(taskId, { status: 'failed', error: 'No response on retry.', completedAt: now(), duration });
-        setAgentBusy(col.type, false);
-        return;
-      }
-      const bullets = result.split('\n').map(l => l.replace(/^[•\-*]\s*/, '').trim()).filter(l => l.length > 5);
-      let created = 0;
-      for (const b of bullets) {
-        const existing = cardsRef.current.filter(c => c.columnId === col.id);
-        const last = existing[existing.length - 1];
-        addCard({
-          id: uid(), columnId: col.id, sessionId: session.id, content: b, source: 'agent',
-          sourceAgentName: task.agentName + ' ↻', sourceCardIds: [], aiTags: [], userTags: [],
-          highlightedBy: 'none', isDeleted: false, createdAt: now(), updatedAt: now(),
-          sortOrder: last ? mid(last.sortOrder) : 'n',
-        });
-        created++;
-      }
-      updateAgentTask(taskId, { status: 'completed', cardsCreated: created, completedAt: now(), duration, resultPreview: result.slice(0, 500) });
-    } catch (e: any) {
-      updateAgentTask(taskId, { status: 'failed', error: e?.message || String(e), completedAt: now(), duration: Date.now() - startedAt });
-    }
-    setAgentBusy(col.type, false);
-  }, [session?.id, columns, setAgentBusy, addAgentTask, updateAgentTask, addCard]);
+  // ── Retry failed agent task (delegates to worker pool) ──
+  const retryTask = useCallback((task: AgentTask) => {
+    workerPool.retry(task.id);
+  }, []);
 
   const handleStopSim = useCallback(() => {
     simAbort.current = true;

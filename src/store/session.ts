@@ -10,6 +10,7 @@ import type {
   SessionMode,
   HighlightState,
 } from '@/types';
+import { bus } from '@/events/bus';
 
 /* ------------------------------------------------------------------ */
 /*  Highlight toggle map: none->user, user->none, ai->both, both->ai  */
@@ -104,7 +105,7 @@ const initialState: Pick<
 /*  Store                                                              */
 /* ------------------------------------------------------------------ */
 
-export const useSessionStore = create<SessionState>((set) => ({
+export const useSessionStore = create<SessionState>((set, get) => ({
   ...initialState,
 
   // ── INIT: replace entire state, switch view to session ──
@@ -122,29 +123,36 @@ export const useSessionStore = create<SessionState>((set) => ({
     })),
 
   // ── SET_MODE ──
-  setMode: (mode) =>
+  setMode: (mode) => {
     set((state) => ({
       session: state.session ? { ...state.session, mode } : state.session,
-    })),
+    }));
+    bus.emit('session:modeChanged', { mode });
+  },
 
   // ── ADD_CARD ──
-  addCard: (card) =>
+  addCard: (card) => {
     set((state) => ({
       cards: [...state.cards, card],
-    })),
+    }));
+    bus.emit('card:created', { card });
+  },
 
   // ── UPDATE_CARD: partial update by id, refresh updatedAt ──
-  updateCard: (id, updates) =>
+  updateCard: (id, updates) => {
     set((state) => ({
       cards: state.cards.map((c) =>
         c.id === id
           ? { ...c, ...updates, updatedAt: new Date().toISOString() }
           : c,
       ),
-    })),
+    }));
+    const card = get().cards.find((c) => c.id === id);
+    if (card) bus.emit('card:updated', { card });
+  },
 
   // ── DELETE_CARD: move card to the trash column ──
-  deleteCard: (id) =>
+  deleteCard: (id) => {
     set((state) => {
       const trashCol = state.columns.find((c) => c.type === 'trash');
       if (!trashCol) return state;
@@ -153,7 +161,9 @@ export const useSessionStore = create<SessionState>((set) => ({
           c.id === id ? { ...c, columnId: trashCol.id, isDeleted: true } : c,
         ),
       };
-    }),
+    });
+    bus.emit('card:deleted', { cardId: id });
+  },
 
   // ── MOVE_CARD: re-parent card to a new column ──
   moveCard: (cardId, columnId, sortOrder) =>
@@ -215,18 +225,28 @@ export const useSessionStore = create<SessionState>((set) => ({
     })),
 
   // ── ADD_TASK: append agent task ──
-  addAgentTask: (task) =>
+  addAgentTask: (task) => {
     set((state) => ({
       agentTasks: [...state.agentTasks, task],
-    })),
+    }));
+    bus.emit('agent:started', { taskId: task.id, agentKey: task.agentKey });
+  },
 
   // ── UPD_TASK: update specific agent task by id ──
-  updateAgentTask: (id, updates) =>
+  updateAgentTask: (id, updates) => {
     set((state) => ({
       agentTasks: state.agentTasks.map((t) =>
         t.id === id ? { ...t, ...updates } : t,
       ),
-    })),
+    }));
+    if (updates.status === 'completed') {
+      const task = get().agentTasks.find((t) => t.id === id);
+      if (task) bus.emit('agent:completed', { taskId: id, agentKey: task.agentKey, cardsCreated: task.cardsCreated });
+    } else if (updates.status === 'failed') {
+      const task = get().agentTasks.find((t) => t.id === id);
+      if (task) bus.emit('agent:failed', { taskId: id, agentKey: task.agentKey, error: task.error || 'unknown' });
+    }
+  },
 
   // ── SET_VIEW ──
   setView: (view) => set(() => ({ view })),
