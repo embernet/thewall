@@ -41,6 +41,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getEmbedding: (cardId: string) => ipcRenderer.invoke('db:getEmbedding', cardId),
     getEmbeddings: (sessionId: string) => ipcRenderer.invoke('db:getEmbeddings', sessionId),
 
+    // Knowledge Graph
+    getGraphNodes: (sessionId: string) => ipcRenderer.invoke('db:getGraphNodes', sessionId),
+    getGraphEdges: (sessionId: string) => ipcRenderer.invoke('db:getGraphEdges', sessionId),
+    createGraphNode: (node: any) => ipcRenderer.invoke('db:createGraphNode', node),
+    createGraphEdge: (edge: any) => ipcRenderer.invoke('db:createGraphEdge', edge),
+    deleteGraphNode: (nodeId: string) => ipcRenderer.invoke('db:deleteGraphNode', nodeId),
+
     // Bulk operations
     importSession: (data: any) => ipcRenderer.invoke('db:importSession', data),
     exportSession: (sessionId: string) => ipcRenderer.invoke('db:exportSession', sessionId),

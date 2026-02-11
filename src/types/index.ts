@@ -342,6 +342,13 @@ export interface ElectronDbApi {
   getEmbedding: (cardId: string) => Promise<ArrayBuffer | null>;
   getEmbeddings: (sessionId: string) => Promise<{ id: string; embedding: ArrayBuffer }[]>;
 
+  // Knowledge Graph
+  getGraphNodes: (sessionId: string) => Promise<KnowledgeGraphNode[]>;
+  getGraphEdges: (sessionId: string) => Promise<KnowledgeGraphEdge[]>;
+  createGraphNode: (node: KnowledgeGraphNode) => Promise<void>;
+  createGraphEdge: (edge: KnowledgeGraphEdge) => Promise<void>;
+  deleteGraphNode: (nodeId: string) => Promise<void>;
+
   // Bulk operations
   importSession: (data: SessionExport) => Promise<boolean>;
   exportSession: (sessionId: string) => Promise<SessionExport | null>;

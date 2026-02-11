@@ -6,6 +6,7 @@ import InquiryColumn from '@/components/Column/InquiryColumn';
 import AgentQueueColumn from '@/components/Column/AgentQueueColumn';
 import SettingsPanel from '@/components/SettingsPanel/SettingsPanel';
 import ExportMenu from '@/components/ExportMenu/ExportMenu';
+import KnowledgeGraph from '@/components/KnowledgeGraph/KnowledgeGraph';
 import TopBar from './TopBar';
 import StatusBar from './StatusBar';
 import { askClaude } from '@/utils/llm';
@@ -26,6 +27,7 @@ export default function App() {
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [graphOpen, setGraphOpen] = useState(false);
   const [simRunning, setSimRunning] = useState(false);
   const [sessions, setSessions] = useState<SessionIndexEntry[]>([]);
 
@@ -420,6 +422,7 @@ export default function App() {
         onToggleRecord={toggleRecord}
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenExport={() => setExportOpen(true)}
+        onToggleGraph={() => setGraphOpen(o => !o)}
       />
 
       <div className="flex-1 flex overflow-x-auto">
@@ -466,6 +469,7 @@ export default function App() {
 
       <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       {exportOpen && <ExportMenu onClose={() => setExportOpen(false)} />}
+      <KnowledgeGraph open={graphOpen} onClose={() => setGraphOpen(false)} />
 
       <style>{`@keyframes pulse{0%,100%{transform:scale(1);opacity:0.5;}50%{transform:scale(1.3);opacity:0;}}`}</style>
     </div>

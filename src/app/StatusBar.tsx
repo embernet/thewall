@@ -47,7 +47,7 @@ export default function StatusBar({ simRunning }: StatusBarProps) {
 
       <div className="flex-1" />
 
-      <span>Phase 4 &mdash; Persistence + Embeddings</span>
+      <span>The Wall &mdash; v0.1.0</span>
     </div>
   );
 }

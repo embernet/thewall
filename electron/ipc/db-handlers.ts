@@ -320,6 +320,74 @@ export function registerDbHandlers() {
     return rows.map((r: any) => ({ id: r.id, embedding: r.embedding }));
   });
 
+  // ── Knowledge Graph ──
+
+  ipcMain.handle('db:getGraphNodes', (_e, sessionId: string) => {
+    const rows = db()
+      .prepare('SELECT * FROM knowledge_graph_nodes WHERE session_id = ? ORDER BY created_at')
+      .all(sessionId) as any[];
+    return rows.map((r: any) => ({
+      id: r.id,
+      label: r.label,
+      type: r.type,
+      metadata: safeJsonParse(r.metadata, {}),
+      sessionId: r.session_id,
+      createdAt: r.created_at,
+    }));
+  });
+
+  ipcMain.handle('db:getGraphEdges', (_e, sessionId: string) => {
+    const rows = db()
+      .prepare('SELECT * FROM knowledge_graph_edges WHERE session_id = ?')
+      .all(sessionId) as any[];
+    return rows.map((r: any) => ({
+      id: r.id,
+      sourceId: r.source_id,
+      targetId: r.target_id,
+      relationship: r.relationship,
+      weight: r.weight ?? 1,
+      sessionId: r.session_id,
+    }));
+  });
+
+  ipcMain.handle('db:createGraphNode', (_e, node: any) => {
+    db()
+      .prepare(
+        `INSERT OR IGNORE INTO knowledge_graph_nodes (id, label, type, metadata, session_id, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        node.id,
+        node.label,
+        node.type || 'concept',
+        JSON.stringify(node.metadata || {}),
+        node.sessionId || null,
+        node.createdAt || new Date().toISOString()
+      );
+  });
+
+  ipcMain.handle('db:createGraphEdge', (_e, edge: any) => {
+    db()
+      .prepare(
+        `INSERT OR IGNORE INTO knowledge_graph_edges (id, source_id, target_id, relationship, weight, session_id)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        edge.id,
+        edge.sourceId,
+        edge.targetId,
+        edge.relationship,
+        edge.weight ?? 1,
+        edge.sessionId || null
+      );
+  });
+
+  ipcMain.handle('db:deleteGraphNode', (_e, nodeId: string) => {
+    const d = db();
+    d.prepare('DELETE FROM knowledge_graph_edges WHERE source_id = ? OR target_id = ?').run(nodeId, nodeId);
+    d.prepare('DELETE FROM knowledge_graph_nodes WHERE id = ?').run(nodeId);
+  });
+
   // ── Bulk Import/Export ──
 
   ipcMain.handle('db:importSession', (_e, data: any) => {

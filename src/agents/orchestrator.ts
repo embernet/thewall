@@ -4,6 +4,7 @@ import { workerPool } from './worker-pool';
 import { agentRegistry } from './registry';
 import { registerBuiltInAgents } from './built-in';
 import { embed, vectorToBlob } from '@/utils/embedding-service';
+import { loadGraph, clearGraph } from '@/graph/graph-service';
 import type { AgentContext } from './base';
 import type { Card } from '@/types';
 
@@ -27,6 +28,14 @@ export function initOrchestrator(): void {
 
   registerBuiltInAgents();
 
+  // Load knowledge graph for current session
+  const store = useSessionStore.getState();
+  if (store.session?.id) {
+    loadGraph(store.session.id).catch(e =>
+      console.warn('Failed to load knowledge graph:', e)
+    );
+  }
+
   // Listen for new transcript cards
   bus.on('card:created', handleCardCreated);
 
@@ -40,6 +49,7 @@ export function destroyOrchestrator(): void {
   bus.off('agent:completed', handleAgentCompleted);
   if (debounceTimer) clearTimeout(debounceTimer);
   transcriptBuf = [];
+  clearGraph();
   initialised = false;
 }
 

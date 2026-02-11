@@ -15,6 +15,7 @@ interface TopBarProps {
   onToggleRecord: () => void;
   onOpenSettings: () => void;
   onOpenExport: () => void;
+  onToggleGraph: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -33,6 +34,7 @@ export default function TopBar({
   onToggleRecord,
   onOpenSettings,
   onOpenExport,
+  onToggleGraph,
 }: TopBarProps) {
   const session = useSessionStore((s) => s.session);
   const cards = useSessionStore((s) => s.cards);
@@ -170,6 +172,15 @@ export default function TopBar({
 
       {/* ── Spacer ── */}
       <div className="flex-1" />
+
+      {/* ── Knowledge Graph toggle ── */}
+      <button
+        onClick={onToggleGraph}
+        className="cursor-pointer rounded-md border border-wall-muted bg-wall-border px-2 py-[3px] text-[10px] font-semibold text-purple-400 hover:bg-wall-muted"
+        title="Knowledge Graph"
+      >
+        {'\uD83D\uDD78\uFE0F'} Graph
+      </button>
 
       {/* ── Quick save ── */}
       <button
