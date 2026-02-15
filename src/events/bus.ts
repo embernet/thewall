@@ -1,5 +1,5 @@
 import mitt from 'mitt';
-import type { Card, AgentTask, SessionMode } from '@/types';
+import type { Card, AgentTask, SessionMode, ApiKeyStatus, QueuePauseReason } from '@/types';
 
 // ---------------------------------------------------------------------------
 // Event definitions
@@ -17,6 +17,8 @@ export type AppEvents = {
   'session:goalChanged': { goal: string };
   'graph:nodeAdded': { nodeId: string; label: string; type: string };
   'graph:edgeAdded': { edgeId: string; sourceId: string; targetId: string; relationship: string };
+  'api:statusChanged': { status: ApiKeyStatus };
+  'queue:pauseChanged': { reason: QueuePauseReason };
 };
 
 // ---------------------------------------------------------------------------

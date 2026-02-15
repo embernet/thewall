@@ -12,6 +12,7 @@ import type {
   SaveStatus,
   SessionMode,
   HighlightState,
+  QueuePauseReason,
 } from '@/types';
 import { bus } from '@/events/bus';
 
@@ -40,6 +41,7 @@ export interface SessionState {
   agentTasks: AgentTask[];
   speakerColors: Record<string, string>;
   saveStatus: SaveStatus;
+  queuePauseReason: QueuePauseReason;
 
   /* actions */
   init: (state: {
@@ -68,6 +70,7 @@ export interface SessionState {
   setView: (view: AppView) => void;
   setSpeakerColors: (colors: Record<string, string>) => void;
   setSaveStatus: (status: SaveStatus) => void;
+  setQueuePaused: (reason: QueuePauseReason) => void;
   goToLauncher: () => void;
 }
 
@@ -86,6 +89,7 @@ const initialState: Pick<
   | 'agentTasks'
   | 'speakerColors'
   | 'saveStatus'
+  | 'queuePauseReason'
 > = {
   view: 'launcher',
   session: null,
@@ -102,6 +106,7 @@ const initialState: Pick<
   agentTasks: [],
   speakerColors: {},
   saveStatus: 'idle',
+  queuePauseReason: null,
 };
 
 /* ------------------------------------------------------------------ */
@@ -260,6 +265,12 @@ export const useSessionStore = create<SessionState>()(temporal((set, get) => ({
   // ── SET_SAVE_STATUS ──
   setSaveStatus: (status) => set(() => ({ saveStatus: status })),
 
+  // ── SET_QUEUE_PAUSED ──
+  setQueuePaused: (reason) => {
+    set(() => ({ queuePauseReason: reason }));
+    bus.emit('queue:pauseChanged', { reason });
+  },
+
   // ── GO_TO_LAUNCHER: reset session state and return to launcher view ──
   goToLauncher: () =>
     set(() => ({
@@ -278,6 +289,7 @@ export const useSessionStore = create<SessionState>()(temporal((set, get) => ({
       agentTasks: [],
       speakerColors: {},
       saveStatus: 'idle' as SaveStatus,
+      queuePauseReason: null,
     })),
 }), {
   // Only track card/column data changes for undo/redo, not transient UI state

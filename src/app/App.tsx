@@ -9,7 +9,10 @@ import ExportMenu from '@/components/ExportMenu/ExportMenu';
 import KnowledgeGraph from '@/components/KnowledgeGraph/KnowledgeGraph';
 import TopBar from './TopBar';
 import StatusBar from './StatusBar';
-import { askClaude } from '@/utils/llm';
+import { askClaude, loadChatConfig, validateApiKey, getApiKey } from '@/utils/llm';
+import { loadEmbeddingConfig, getEmbeddingProvider } from '@/utils/embedding-service';
+import type { ApiKeyStatus, EmbeddingProvider } from '@/types';
+import { bus } from '@/events/bus';
 import { uid, now, mid } from '@/utils/ids';
 import { COL_TYPES, SPEAKER_COLORS } from '@/types';
 import { initOrchestrator, destroyOrchestrator } from '@/agents/orchestrator';
@@ -33,6 +36,8 @@ export default function App() {
   const [graphOpen, setGraphOpen] = useState(false);
   const [simRunning, setSimRunning] = useState(false);
   const [sessions, setSessions] = useState<SessionIndexEntry[]>([]);
+  const [apiKeyStatus, setApiKeyStatus] = useState<ApiKeyStatus>('unchecked');
+  const [embeddingProvider, setEmbeddingProvider] = useState<EmbeddingProvider>('local');
 
   const cardsRef = useRef<Card[]>([]);
   const simAbort = useRef(false);
@@ -46,6 +51,44 @@ export default function App() {
   const animFrameRef = useRef<number | null>(null);
 
   useEffect(() => { cardsRef.current = cards; }, [cards]);
+
+  // ── Broadcast API status changes to the event bus (auto-pauses agent queue) ──
+  useEffect(() => {
+    bus.emit('api:statusChanged', { status: apiKeyStatus });
+  }, [apiKeyStatus]);
+
+  // ── Load API configs from encrypted DB on startup, validate chat key ──
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      // Load chat config from DB
+      try {
+        const hasKey = await loadChatConfig();
+        if (cancelled) return;
+        if (hasKey) {
+          setApiKeyStatus('checking');
+          try {
+            const result = await validateApiKey();
+            if (!cancelled) setApiKeyStatus(result);
+          } catch (e) {
+            console.warn('API key validation failed:', e);
+            if (!cancelled) setApiKeyStatus('invalid');
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load chat config:', e);
+        if (!cancelled) setApiKeyStatus('invalid');
+      }
+      // Load embedding config from DB
+      try {
+        await loadEmbeddingConfig();
+        if (!cancelled) setEmbeddingProvider(getEmbeddingProvider());
+      } catch (e) {
+        console.warn('Failed to load embedding config:', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Load sessions index ──
   const loadSessions = useCallback(async () => {
@@ -426,6 +469,7 @@ export default function App() {
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenExport={() => setExportOpen(true)}
         onToggleGraph={() => setGraphOpen(o => !o)}
+        apiKeyStatus={apiKeyStatus}
       />
 
       <div className="flex-1 flex overflow-x-auto">
@@ -468,7 +512,7 @@ export default function App() {
         })}
       </div>
 
-      <StatusBar simRunning={simRunning} />
+      <StatusBar simRunning={simRunning} embeddingProvider={embeddingProvider} />
 
       <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       {exportOpen && <ExportMenu onClose={() => setExportOpen(false)} />}

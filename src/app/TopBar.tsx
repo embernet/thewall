@@ -1,9 +1,13 @@
 import { useState } from 'react';
 import { MODE_COLORS } from '@/types';
-import type { SessionMode } from '@/types';
+import type { SessionMode, ApiKeyStatus, QueuePauseReason } from '@/types';
+import { SLOT_PROVIDERS } from '@/utils/providers';
+import { getChatProvider } from '@/utils/llm';
 import { useSessionStore } from '@/store/session';
+import { workerPool } from '@/agents/worker-pool';
 import { exportSessionToFile } from '@/utils/export';
 import { fmtTime } from '@/utils/ids';
+import { setModel, getModel } from '@/utils/llm';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -16,6 +20,7 @@ interface TopBarProps {
   onOpenSettings: () => void;
   onOpenExport: () => void;
   onToggleGraph: () => void;
+  apiKeyStatus: ApiKeyStatus;
 }
 
 // ---------------------------------------------------------------------------
@@ -28,6 +33,17 @@ const MODES: SessionMode[] = ['silent', 'active', 'sidekick'];
 // Component
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Status color for API key
+// ---------------------------------------------------------------------------
+
+const STATUS_COLORS: Record<ApiKeyStatus, string> = {
+  unchecked: '#3b82f6', // blue
+  checking:  '#3b82f6', // blue
+  valid:     '#22c55e', // green
+  invalid:   '#ef4444', // red
+};
+
 export default function TopBar({
   simRunning,
   onStopSim,
@@ -35,6 +51,7 @@ export default function TopBar({
   onOpenSettings,
   onOpenExport,
   onToggleGraph,
+  apiKeyStatus,
 }: TopBarProps) {
   const session = useSessionStore((s) => s.session);
   const cards = useSessionStore((s) => s.cards);
@@ -44,13 +61,38 @@ export default function TopBar({
   const saveStatus = useSessionStore((s) => s.saveStatus);
   const speakerColors = useSessionStore((s) => s.speakerColors);
   const columns = useSessionStore((s) => s.columns);
+  const queuePauseReason = useSessionStore((s) => s.queuePauseReason);
 
   const setTitle = useSessionStore((s) => s.setTitle);
   const setMode = useSessionStore((s) => s.setMode);
   const goToLauncher = useSessionStore((s) => s.goToLauncher);
   const setSaveStatus = useSessionStore((s) => s.setSaveStatus);
+  const setQueuePaused = useSessionStore((s) => s.setQueuePaused);
 
   const [editTitle, setEditTitle] = useState(false);
+  const [selectedModel, setSelectedModel] = useState(getModel());
+
+  // Derived pause state
+  const isQueuePaused = queuePauseReason !== null;
+  const isAutoPaused = queuePauseReason === 'api_not_ready' || queuePauseReason === 'api_invalid';
+
+  const PAUSE_LABELS: Record<NonNullable<QueuePauseReason>, string> = {
+    api_not_ready: 'Waiting for API',
+    api_invalid:   'API unavailable',
+    user:          'User paused',
+  };
+
+  const toggleUserPause = () => {
+    if (queuePauseReason === 'user') {
+      // Unpause
+      setQueuePaused(null);
+      workerPool.setPaused(false);
+    } else if (!isAutoPaused) {
+      // Pause
+      setQueuePaused('user');
+      workerPool.setPaused(true);
+    }
+  };
 
   if (!session) return null;
 
@@ -120,6 +162,45 @@ export default function TopBar({
         ))}
       </div>
 
+      {/* ── Model selector ── */}
+      <div className="flex items-center gap-1">
+        <div
+          className="h-[7px] w-[7px] rounded-full"
+          style={{
+            backgroundColor: STATUS_COLORS[apiKeyStatus],
+            boxShadow: apiKeyStatus === 'checking' ? '0 0 4px #3b82f6' : 'none',
+            animation: apiKeyStatus === 'checking' ? 'pulse 1.5s ease-in-out infinite' : 'none',
+          }}
+          title={
+            apiKeyStatus === 'unchecked' ? 'API key not checked'
+              : apiKeyStatus === 'checking' ? 'Verifying API key...'
+              : apiKeyStatus === 'valid' ? 'API key valid'
+              : 'API key invalid'
+          }
+        />
+        <select
+          value={selectedModel}
+          onChange={(e) => {
+            const id = e.target.value;
+            setSelectedModel(id);
+            setModel(id);
+          }}
+          className="cursor-pointer appearance-none rounded-md border border-wall-muted bg-wall-border px-2 py-[2px] pr-5 text-[10px] font-semibold outline-none"
+          style={{
+            color: STATUS_COLORS[apiKeyStatus],
+            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2364748b'/%3E%3C/svg%3E")`,
+            backgroundRepeat: 'no-repeat',
+            backgroundPosition: 'right 6px center',
+          }}
+        >
+          {(SLOT_PROVIDERS.find(s => s.slot === 'chat')?.providers.find(p => p.id === getChatProvider())?.models ?? []).map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
       {/* ── Sim status ── */}
       {simRunning && (
         <div className="flex items-center gap-1 rounded-md border border-red-900/30 bg-red-900/10 px-[7px] py-0.5">
@@ -142,6 +223,16 @@ export default function TopBar({
           <div className="h-[5px] w-[5px] animate-pulse-slow rounded-full bg-red-500" />
           <span className="font-mono text-[9px] text-red-300">
             REC {fmtTime(audio?.elapsed || 0)}
+          </span>
+        </div>
+      )}
+
+      {/* ── Queue pause info banner ── */}
+      {isQueuePaused && (
+        <div className="flex items-center gap-1.5 rounded-md border border-amber-700/30 bg-amber-900/15 px-2 py-0.5">
+          <span className="text-[10px]">{isAutoPaused ? '\u23F8\uFE0F' : '\u270B'}</span>
+          <span className="text-[9px] font-medium text-amber-300">
+            {PAUSE_LABELS[queuePauseReason!]}
           </span>
         </div>
       )}
@@ -169,6 +260,27 @@ export default function TopBar({
           )}
         </div>
       )}
+
+      {/* ── Queue pause toggle button ── */}
+      <button
+        onClick={toggleUserPause}
+        disabled={isAutoPaused}
+        className="cursor-pointer rounded-md border px-2 py-[3px] text-[10px] font-semibold disabled:cursor-not-allowed disabled:opacity-40"
+        style={{
+          borderColor: isQueuePaused ? '#b45309' : '#374151',
+          backgroundColor: isQueuePaused ? (isAutoPaused ? '#451a03' : '#78350f') : '#1e293b',
+          color: isQueuePaused ? '#fbbf24' : '#64748b',
+        }}
+        title={
+          isAutoPaused
+            ? `Queue auto-paused: ${PAUSE_LABELS[queuePauseReason!]}`
+            : isQueuePaused
+              ? 'Resume agent queue'
+              : 'Pause agent queue'
+        }
+      >
+        {isQueuePaused ? '\u25B6 Resume' : '\u23F8 Pause'} Queue
+      </button>
 
       {/* ── Spacer ── */}
       <div className="flex-1" />

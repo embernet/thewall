@@ -35,6 +35,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // API Usage
     logApiUsage: (usage: any) => ipcRenderer.invoke('db:logApiUsage', usage),
 
+    // API Key Management
+    getApiKeyConfigs: () => ipcRenderer.invoke('db:getApiKeyConfigs'),
+    setApiKeyConfig: (slot: string, provider: string, modelId: string, rawKey: string) =>
+      ipcRenderer.invoke('db:setApiKeyConfig', slot, provider, modelId, rawKey),
+    getDecryptedKey: (slot: string) => ipcRenderer.invoke('db:getDecryptedKey', slot),
+    deleteApiKeyConfig: (slot: string) => ipcRenderer.invoke('db:deleteApiKeyConfig', slot),
+
     // Embeddings
     storeEmbedding: (cardId: string, blob: ArrayBuffer) =>
       ipcRenderer.invoke('db:storeEmbedding', cardId, blob),

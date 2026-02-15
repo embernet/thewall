@@ -36,6 +36,11 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
+      // graphology imports Node's 'events' — point it at the browser polyfill
+      events: 'events',
     },
+  },
+  optimizeDeps: {
+    include: ['events', 'graphology'],
   },
 });

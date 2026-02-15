@@ -102,7 +102,7 @@ export abstract class BaseAgent {
     const sys = this.systemPrompt(ctx);
     const usr = this.userPrompt(ctx);
     const raw = await askClaude(sys, usr);
-    if (!raw) return { cards: [], raw: '' };
+    if (!raw) throw new Error('LLM returned no response — check API key and network.');
     const cards = this.parseOutput(raw, ctx);
     return { cards, raw };
   }

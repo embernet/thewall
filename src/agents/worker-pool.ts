@@ -58,10 +58,26 @@ export class WorkerPool {
   /** Agent ids disabled by the circuit breaker. */
   private disabledAgents: Set<string> = new Set();
 
+  /** When true, the queue won't dequeue new tasks (in-flight tasks finish). */
+  private _paused = false;
+
   readonly config: WorkerPoolConfig;
 
   constructor(config?: Partial<WorkerPoolConfig>) {
     this.config = { ...DEFAULT_CONFIG, ...config };
+  }
+
+  /** Whether the pool is currently paused. */
+  get paused(): boolean {
+    return this._paused;
+  }
+
+  /**
+   * Pause the queue: in-flight tasks finish, but no new tasks are dequeued.
+   */
+  setPaused(paused: boolean): void {
+    this._paused = paused;
+    if (!paused) this.processQueue();
   }
 
   // --------------------------------------------------------------------------
@@ -251,8 +267,10 @@ export class WorkerPool {
 
   /**
    * Dequeue and execute tasks up to the concurrency limit.
+   * Respects the paused flag -- won't start new tasks while paused.
    */
   private processQueue(): void {
+    if (this._paused) return;
     while (this.running.size < this.config.concurrency && this.queue.length > 0) {
       const task = this.queue.shift()!;
       this.running.set(task.id, task);

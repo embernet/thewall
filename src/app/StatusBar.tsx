@@ -1,4 +1,5 @@
 import { MODE_COLORS } from '@/types';
+import type { EmbeddingProvider } from '@/types';
 import { useSessionStore } from '@/store/session';
 
 // ---------------------------------------------------------------------------
@@ -7,13 +8,14 @@ import { useSessionStore } from '@/store/session';
 
 interface StatusBarProps {
   simRunning: boolean;
+  embeddingProvider: EmbeddingProvider;
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export default function StatusBar({ simRunning }: StatusBarProps) {
+export default function StatusBar({ simRunning, embeddingProvider }: StatusBarProps) {
   const session = useSessionStore((s) => s.session);
   const cards = useSessionStore((s) => s.cards);
   const agentBusy = useSessionStore((s) => s.agentBusy);
@@ -44,6 +46,18 @@ export default function StatusBar({ simRunning }: StatusBarProps) {
           {'\u25CF'} {runningAgents} agent{runningAgents > 1 ? 's' : ''} working
         </span>
       )}
+
+      {/* ── Embedding provider indicator ── */}
+      <span
+        className="flex items-center gap-1"
+        title={embeddingProvider === 'openai' ? 'Using OpenAI text-embedding-3-small' : 'Using local TF-IDF embeddings'}
+      >
+        <span
+          className="inline-block h-[5px] w-[5px] rounded-full"
+          style={{ backgroundColor: embeddingProvider === 'openai' ? '#22c55e' : '#64748b' }}
+        />
+        Embeddings: {embeddingProvider === 'openai' ? 'OpenAI' : 'Local'}
+      </span>
 
       <div className="flex-1" />
 

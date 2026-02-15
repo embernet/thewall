@@ -1,7 +1,12 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow } from 'electron';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { initDatabase, getDatabase } from './ipc/database';
 import { registerDbHandlers } from './ipc/db-handlers';
+
+// ESM polyfill for __dirname (not available in ES modules)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -42,6 +47,7 @@ app.whenReady().then(() => {
   const userDataPath = app.getPath('userData');
   initDatabase(userDataPath);
   registerDbHandlers();
+
   createWindow();
 });
 

@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron';
+import { ipcMain, safeStorage } from 'electron';
 import { getDatabase } from './database';
 
 export function registerDbHandlers() {
@@ -386,6 +386,81 @@ export function registerDbHandlers() {
     const d = db();
     d.prepare('DELETE FROM knowledge_graph_edges WHERE source_id = ? OR target_id = ?').run(nodeId, nodeId);
     d.prepare('DELETE FROM knowledge_graph_nodes WHERE id = ?').run(nodeId);
+  });
+
+  // ── API Key Management ──
+
+  ipcMain.handle('db:getApiKeyConfigs', () => {
+    const d = db();
+    // Ensure the api_keys table exists
+    d.exec(`
+      CREATE TABLE IF NOT EXISTS api_keys (
+        slot TEXT PRIMARY KEY,
+        provider TEXT NOT NULL,
+        model_id TEXT NOT NULL,
+        encrypted_key BLOB,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    const rows = d.prepare('SELECT slot, provider, model_id, encrypted_key FROM api_keys').all() as any[];
+    return rows.map((r: any) => ({
+      slot: r.slot,
+      provider: r.provider,
+      modelId: r.model_id,
+      hasKey: !!r.encrypted_key,
+    }));
+  });
+
+  ipcMain.handle('db:setApiKeyConfig', (_e, slot: string, provider: string, modelId: string, rawKey: string) => {
+    let encryptedKey: Buffer | null = null;
+    if (rawKey) {
+      if (safeStorage.isEncryptionAvailable()) {
+        encryptedKey = safeStorage.encryptString(rawKey);
+      } else {
+        // Fallback: store as plain UTF-8 buffer (not ideal but functional)
+        console.warn('safeStorage encryption not available — storing key as plaintext');
+        encryptedKey = Buffer.from(rawKey, 'utf-8');
+      }
+    }
+    const d = db();
+    // Ensure the api_keys table exists (in case migration hasn't run yet)
+    d.exec(`
+      CREATE TABLE IF NOT EXISTS api_keys (
+        slot TEXT PRIMARY KEY,
+        provider TEXT NOT NULL,
+        model_id TEXT NOT NULL,
+        encrypted_key BLOB,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    d.prepare(
+      `INSERT INTO api_keys (slot, provider, model_id, encrypted_key, updated_at)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(slot) DO UPDATE SET
+         provider = excluded.provider,
+         model_id = excluded.model_id,
+         encrypted_key = COALESCE(excluded.encrypted_key, api_keys.encrypted_key),
+         updated_at = excluded.updated_at`
+    ).run(slot, provider, modelId, encryptedKey, new Date().toISOString());
+  });
+
+  ipcMain.handle('db:getDecryptedKey', (_e, slot: string) => {
+    const row = db().prepare('SELECT encrypted_key FROM api_keys WHERE slot = ?').get(slot) as any;
+    if (!row?.encrypted_key) return '';
+    try {
+      if (safeStorage.isEncryptionAvailable()) {
+        return safeStorage.decryptString(row.encrypted_key);
+      }
+      // Fallback: stored as plain UTF-8
+      return row.encrypted_key.toString('utf-8');
+    } catch (e) {
+      console.warn('Failed to decrypt API key for slot', slot, e);
+      return '';
+    }
+  });
+
+  ipcMain.handle('db:deleteApiKeyConfig', (_e, slot: string) => {
+    db().prepare('DELETE FROM api_keys WHERE slot = ?').run(slot);
   });
 
   // ── Bulk Import/Export ──

@@ -208,4 +208,19 @@ const migrations: Migration[] = [
       DROP TABLE IF EXISTS sessions;
     `,
   },
+  {
+    name: '002_api_keys',
+    up: `
+      CREATE TABLE api_keys (
+        slot TEXT PRIMARY KEY,
+        provider TEXT NOT NULL,
+        model_id TEXT NOT NULL,
+        encrypted_key BLOB,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `,
+    down: `
+      DROP TABLE IF EXISTS api_keys;
+    `,
+  },
 ];

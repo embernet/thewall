@@ -301,6 +301,24 @@ export interface SourceBadge {
 }
 
 // ----------------------------------------------------------------------------
+// API Key Management
+// ----------------------------------------------------------------------------
+
+/** Functional slot — each capability has its own provider/model/key. */
+export type ApiSlot = 'chat' | 'embeddings' | 'image_gen';
+
+/** Supported API providers. */
+export type ApiProvider = 'anthropic' | 'openai' | 'voyage' | 'google' | 'local';
+
+/** Renderer-safe config: no raw key, just whether one exists. */
+export interface ApiKeyConfig {
+  slot: ApiSlot;
+  provider: ApiProvider;
+  modelId: string;
+  hasKey: boolean;
+}
+
+// ----------------------------------------------------------------------------
 // Electron IPC -- Database API
 // ----------------------------------------------------------------------------
 
@@ -337,6 +355,12 @@ export interface ElectronDbApi {
   // API Usage
   logApiUsage: (usage: ApiUsageRecord) => Promise<void>;
 
+  // API Key Management
+  getApiKeyConfigs: () => Promise<ApiKeyConfig[]>;
+  setApiKeyConfig: (slot: ApiSlot, provider: ApiProvider, modelId: string, rawKey: string) => Promise<void>;
+  getDecryptedKey: (slot: ApiSlot) => Promise<string>;
+  deleteApiKeyConfig: (slot: ApiSlot) => Promise<void>;
+
   // Embeddings
   storeEmbedding: (cardId: string, blob: ArrayBuffer) => Promise<void>;
   getEmbedding: (cardId: string) => Promise<ArrayBuffer | null>;
@@ -355,9 +379,44 @@ export interface ElectronDbApi {
   exportAllSessions: () => Promise<BackupExport>;
 }
 
+export type EmbeddingProvider = 'openai' | 'local';
+
 export interface ElectronAPI {
   db: ElectronDbApi;
 }
+
+// ---------------------------------------------------------------------------
+// Model Configuration
+// ---------------------------------------------------------------------------
+
+export type ModelId = 'claude-sonnet-4-20250514' | 'claude-opus-4-20250918';
+
+export interface ModelOption {
+  id: ModelId;
+  label: string;
+  inputCost: number;   // per token in USD
+  outputCost: number;  // per token in USD
+}
+
+export const MODEL_OPTIONS: readonly ModelOption[] = [
+  {
+    id: 'claude-sonnet-4-20250514',
+    label: 'Sonnet 4.5',
+    inputCost: 3.0 / 1_000_000,
+    outputCost: 15.0 / 1_000_000,
+  },
+  {
+    id: 'claude-opus-4-20250918',
+    label: 'Opus 4.6',
+    inputCost: 15.0 / 1_000_000,
+    outputCost: 75.0 / 1_000_000,
+  },
+] as const;
+
+export type ApiKeyStatus = 'unchecked' | 'checking' | 'valid' | 'invalid';
+
+/** Reason the agent queue is paused. `null` means the queue is running. */
+export type QueuePauseReason = 'api_not_ready' | 'api_invalid' | 'user' | null;
 
 // ----------------------------------------------------------------------------
 // Window Augmentation

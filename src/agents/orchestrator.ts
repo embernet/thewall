@@ -9,7 +9,7 @@ import { registerBuiltInTools } from '@/tools';
 import { registerBuiltInMethodologies } from '@/methodologies';
 import { registerBuiltInPersonas } from '@/personas';
 import type { AgentContext } from './base';
-import type { Card } from '@/types';
+import type { Card, ApiKeyStatus } from '@/types';
 
 // ---------------------------------------------------------------------------
 // Orchestrator
@@ -47,12 +47,16 @@ export function initOrchestrator(): void {
 
   // Listen for agent completions → trigger second-pass agents (Ideas)
   bus.on('agent:completed', handleAgentCompleted);
+
+  // Listen for API status changes → auto-pause/resume the queue
+  bus.on('api:statusChanged', handleApiStatusChanged);
 }
 
 /** Tear down listeners (e.g. when returning to launcher). */
 export function destroyOrchestrator(): void {
   bus.off('card:created', handleCardCreated);
   bus.off('agent:completed', handleAgentCompleted);
+  bus.off('api:statusChanged', handleApiStatusChanged);
   if (debounceTimer) clearTimeout(debounceTimer);
   transcriptBuf = [];
   clearGraph();
@@ -62,6 +66,35 @@ export function destroyOrchestrator(): void {
 // ---------------------------------------------------------------------------
 // Internal handlers
 // ---------------------------------------------------------------------------
+
+/**
+ * Auto-pause / auto-resume the agent queue based on API readiness.
+ * Only overrides when the current pause reason is API-related (or null).
+ * If the user manually paused, API changes don't touch it.
+ */
+function handleApiStatusChanged({ status }: { status: ApiKeyStatus }): void {
+  const store = useSessionStore.getState();
+  const currentReason = store.queuePauseReason;
+
+  if (status === 'valid') {
+    // Resume only if we were the ones who paused it
+    if (currentReason === 'api_not_ready' || currentReason === 'api_invalid') {
+      store.setQueuePaused(null);
+      workerPool.setPaused(false);
+    }
+  } else if (status === 'invalid') {
+    if (currentReason !== 'user') {
+      store.setQueuePaused('api_invalid');
+      workerPool.setPaused(true);
+    }
+  } else {
+    // 'unchecked' | 'checking' — API not ready yet
+    if (currentReason !== 'user') {
+      store.setQueuePaused('api_not_ready');
+      workerPool.setPaused(true);
+    }
+  }
+}
 
 function handleCardCreated({ card }: { card: Card }): void {
   // Compute and store embedding for every card (async, fire-and-forget)
