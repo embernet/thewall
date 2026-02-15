@@ -4,7 +4,7 @@ class RequirementFinderAgent extends BaseAgent {
   readonly id = 'requirement-finder';
   readonly name = 'Requirement Finder';
   readonly description = 'Extract explicit and implicit requirements from the discussion';
-  readonly targetColumn = 'notes';
+  readonly targetColumn = 'observations';
   readonly priority = 5;
 
   systemPrompt(_ctx: AgentContext): string {

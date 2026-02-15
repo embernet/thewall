@@ -12,6 +12,7 @@ export type SessionStatus = 'draft' | 'active' | 'paused' | 'ended' | 'archived'
 
 export type ColumnType =
   | 'transcript'
+  | 'observations'
   | 'notes'
   | 'concepts'
   | 'ideas'
@@ -434,9 +435,10 @@ declare global {
 
 /** All column types with their display metadata, in default sort order. */
 export const COL_TYPES: readonly ColumnMeta[] = [
-  { type: 'transcript',  title: 'Transcript',    icon: '\uD83C\uDF99\uFE0F', color: '#ef4444' },
-  { type: 'notes',       title: 'Notes',         icon: '\uD83D\uDCDD',       color: '#6366f1' },
-  { type: 'concepts',    title: 'Key Concepts',  icon: '\uD83D\uDCA1',       color: '#8b5cf6' },
+  { type: 'transcript',    title: 'Transcript',    icon: '\uD83C\uDF99\uFE0F', color: '#ef4444' },
+  { type: 'observations', title: 'Observations',  icon: '\uD83D\uDD0D',       color: '#6366f1' },
+  { type: 'notes',        title: 'Notes',         icon: '\uD83D\uDCDD',       color: '#8b9cf6' },
+  { type: 'concepts',     title: 'Key Concepts',  icon: '\uD83D\uDCA1',       color: '#8b5cf6' },
   { type: 'ideas',       title: 'Ideas',         icon: '\uD83E\uDDE0',       color: '#a855f7' },
   { type: 'questions',   title: 'Questions',      icon: '\u2753',             color: '#ec4899' },
   { type: 'claims',      title: 'Claims',         icon: '\uD83D\uDCCC',       color: '#14b8a6' },

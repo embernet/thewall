@@ -7,7 +7,7 @@ class KnowledgeManagerAgent extends BaseAgent {
   readonly id = 'knowledge-manager';
   readonly name = 'Knowledge Manager';
   readonly description = 'Extract entities, relationships, and connections for the knowledge graph';
-  readonly targetColumn = 'notes';
+  readonly targetColumn = 'observations';
   readonly priority = 6;
 
   systemPrompt(_ctx: AgentContext): string {
@@ -74,7 +74,7 @@ Output 2-5 relationships. Only output in the specified format. No explanations.`
 
     return cardLines.map(content => ({
       content,
-      columnType: this.targetColumn as 'notes',
+      columnType: this.targetColumn as 'observations',
     }));
   }
 }

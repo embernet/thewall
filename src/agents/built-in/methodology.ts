@@ -4,7 +4,7 @@ class MethodologyAgent extends BaseAgent {
   readonly id = 'methodology';
   readonly name = 'Methodology Agent';
   readonly description = 'Shell agent activated by the methodology system at runtime';
-  readonly targetColumn = 'notes';
+  readonly targetColumn = 'observations';
   readonly priority = 5;
   readonly triggersOnTranscript = false;
 

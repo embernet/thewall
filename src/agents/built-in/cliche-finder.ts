@@ -4,7 +4,7 @@ class ClicheFinderAgent extends BaseAgent {
   readonly id = 'cliche-finder';
   readonly name = 'Cliche Finder';
   readonly description = 'Flag cliches, buzzwords, and jargon that might hide lack of substance';
-  readonly targetColumn = 'notes';
+  readonly targetColumn = 'observations';
   readonly priority = 2;
 
   systemPrompt(_ctx: AgentContext): string {

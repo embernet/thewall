@@ -4,7 +4,7 @@ class CoachAgent extends BaseAgent {
   readonly id = 'coach';
   readonly name = 'Coach';
   readonly description = 'Provide coaching guidance and Socratic questions';
-  readonly targetColumn = 'notes';
+  readonly targetColumn = 'observations';
   readonly priority = 3;
 
   systemPrompt(_ctx: AgentContext): string {

@@ -4,7 +4,7 @@ class RefinerAgent extends BaseAgent {
   readonly id = 'refiner';
   readonly name = 'Refiner';
   readonly description = 'Improve and refine ideas from the discussion';
-  readonly targetColumn = 'notes';
+  readonly targetColumn = 'observations';
   readonly priority = 3;
 
   systemPrompt(_ctx: AgentContext): string {

@@ -223,4 +223,15 @@ const migrations: Migration[] = [
       DROP TABLE IF EXISTS api_keys;
     `,
   },
+  {
+    name: '003_rename_notes_to_observations',
+    up: `
+      UPDATE columns SET type = 'observations', title = 'Observations'
+        WHERE type = 'notes';
+    `,
+    down: `
+      UPDATE columns SET type = 'notes', title = 'Notes'
+        WHERE type = 'observations';
+    `,
+  },
 ];

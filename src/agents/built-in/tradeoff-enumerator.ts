@@ -4,7 +4,7 @@ class TradeoffEnumeratorAgent extends BaseAgent {
   readonly id = 'tradeoff-enumerator';
   readonly name = 'Trade-off Enumerator';
   readonly description = 'Identify trade-offs between different options and approaches';
-  readonly targetColumn = 'notes';
+  readonly targetColumn = 'observations';
   readonly priority = 3;
 
   systemPrompt(_ctx: AgentContext): string {

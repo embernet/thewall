@@ -4,7 +4,7 @@ class RhetoricGeneratorAgent extends BaseAgent {
   readonly id = 'rhetoric-generator';
   readonly name = 'Rhetoric Generator';
   readonly description = 'Generate persuasive arguments and rhetorical frameworks';
-  readonly targetColumn = 'notes';
+  readonly targetColumn = 'observations';
   readonly priority = 3;
 
   systemPrompt(_ctx: AgentContext): string {

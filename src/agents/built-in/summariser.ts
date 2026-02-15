@@ -4,7 +4,7 @@ class SummariserAgent extends BaseAgent {
   readonly id = 'summariser';
   readonly name = 'Summariser';
   readonly description = 'Create concise summaries of key points discussed';
-  readonly targetColumn = 'notes';
+  readonly targetColumn = 'observations';
   readonly priority = 3;
 
   systemPrompt(_ctx: AgentContext): string {

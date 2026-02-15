@@ -4,7 +4,7 @@ class ThinkerAgent extends BaseAgent {
   readonly id = 'thinker';
   readonly name = 'Thinker';
   readonly description = 'Provide deeper philosophical or strategic reflection';
-  readonly targetColumn = 'notes';
+  readonly targetColumn = 'observations';
   readonly priority = 3;
 
   systemPrompt(_ctx: AgentContext): string {

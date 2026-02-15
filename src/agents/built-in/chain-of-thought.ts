@@ -4,7 +4,7 @@ class ChainOfThoughtAgent extends BaseAgent {
   readonly id = 'chain-of-thought';
   readonly name = 'Chain of Thought Reasoner';
   readonly description = 'Apply step-by-step logical reasoning to key topics';
-  readonly targetColumn = 'notes';
+  readonly targetColumn = 'observations';
   readonly priority = 5;
 
   systemPrompt(_ctx: AgentContext): string {

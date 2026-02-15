@@ -4,7 +4,7 @@ class ConstraintFinderAgent extends BaseAgent {
   readonly id = 'constraint-finder';
   readonly name = 'Constraint Finder';
   readonly description = 'Identify constraints, limitations, and boundaries discussed or implied';
-  readonly targetColumn = 'notes';
+  readonly targetColumn = 'observations';
   readonly priority = 4;
 
   systemPrompt(_ctx: AgentContext): string {

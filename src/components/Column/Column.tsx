@@ -7,6 +7,7 @@ import { fmtTime } from '@/utils/ids';
 import Card from '@/components/Card/Card';
 import AudioVisualizer from './AudioVisualizer';
 import TranscriptInput from './TranscriptInput';
+import { askClaude } from '@/utils/llm';
 
 interface ColumnProps {
   column: ColumnType;
@@ -45,6 +46,31 @@ const Column: React.FC<ColumnProps> = ({
   const speakerColors = useSessionStore((s) => s.speakerColors);
 
   const isBusy = agentBusy?.[column.type];
+
+  const [summary, setSummary] = useState<string | null>(null);
+  const [summaryOpen, setSummaryOpen] = useState(true);
+  const [summarizing, setSummarizing] = useState(false);
+
+  const handleSummarize = async () => {
+    if (summarizing || cards.length === 0) return;
+    setSummarizing(true);
+    try {
+      const cardTexts = cards
+        .filter((c) => !c.isDeleted)
+        .map((c) => c.content)
+        .join('\n---\n');
+      const result = await askClaude(
+        `You are a concise summarizer. Summarize the following cards from a "${column.title}" column in 2-4 sentences. Focus on key themes and insights.`,
+        cardTexts,
+      );
+      setSummary(result);
+      setSummaryOpen(true);
+    } catch (e) {
+      console.error('Summary failed:', e);
+    } finally {
+      setSummarizing(false);
+    }
+  };
 
   useEffect(() => {
     if (cards.length > prevLen.current)
@@ -167,6 +193,16 @@ const Column: React.FC<ColumnProps> = ({
                 className="cursor-pointer rounded border-none bg-red-900 px-1.5 py-0.5 text-[9px] text-red-300"
               >
                 Empty
+              </button>
+            )}
+            {column.type !== 'trash' && column.type !== 'transcript' && cards.length > 0 && (
+              <button
+                onClick={handleSummarize}
+                disabled={summarizing}
+                className="cursor-pointer border-none bg-transparent text-[11px] text-wall-subtle hover:text-amber-400"
+                title="Summarize cards"
+              >
+                {summarizing ? '\u23F3' : '\u2728'}
               </button>
             )}
             <button
@@ -303,6 +339,46 @@ const Column: React.FC<ColumnProps> = ({
           </div>
         )}
       </div>
+
+      {/* ── Summary panel ── */}
+      {summary && (
+        <div className="mx-2 mt-1.5 rounded-md border border-amber-800/40 bg-amber-950/30 px-2.5 py-2">
+          <div className="mb-1 flex items-center justify-between">
+            <span className="text-[9px] font-semibold uppercase tracking-wide text-amber-400">
+              Summary
+            </span>
+            <div className="flex gap-1">
+              <button
+                onClick={handleSummarize}
+                disabled={summarizing}
+                className="cursor-pointer border-none bg-transparent text-[9px] text-amber-500 hover:text-amber-300"
+                title="Regenerate"
+              >
+                {summarizing ? '\u23F3' : '\uD83D\uDD04'}
+              </button>
+              <button
+                onClick={() => setSummaryOpen((o) => !o)}
+                className="cursor-pointer border-none bg-transparent text-[9px] text-amber-500 hover:text-amber-300"
+                title={summaryOpen ? 'Collapse' : 'Expand'}
+              >
+                {summaryOpen ? '\u25B2' : '\u25BC'}
+              </button>
+              <button
+                onClick={() => setSummary(null)}
+                className="cursor-pointer border-none bg-transparent text-[9px] text-amber-500 hover:text-amber-300"
+                title="Dismiss"
+              >
+                {'\u2715'}
+              </button>
+            </div>
+          </div>
+          {summaryOpen && (
+            <p className="m-0 text-[11px] leading-relaxed text-amber-200/80">
+              {summary}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* ── Card list ── */}
       <div
