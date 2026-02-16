@@ -243,4 +243,42 @@ const migrations: Migration[] = [
       -- SQLite doesn't support DROP COLUMN easily; ignore
     `,
   },
+  {
+    name: '005_agent_config',
+    up: `
+      CREATE TABLE IF NOT EXISTS agent_configs (
+        agent_id TEXT PRIMARY KEY,
+        enabled INTEGER DEFAULT 1,
+        system_prompt TEXT,
+        user_prompt TEXT,
+        priority INTEGER,
+        target_column TEXT,
+        trigger_on_transcript INTEGER,
+        input_columns TEXT,
+        tool_ids TEXT,
+        updated_at TEXT DEFAULT (datetime('now'))
+      );
+
+      CREATE TABLE IF NOT EXISTS custom_agents (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT,
+        system_prompt TEXT NOT NULL,
+        user_prompt TEXT NOT NULL,
+        target_column TEXT NOT NULL,
+        priority INTEGER DEFAULT 5,
+        trigger_on_transcript INTEGER DEFAULT 1,
+        depends_on TEXT,
+        input_columns TEXT,
+        tool_ids TEXT,
+        enabled INTEGER DEFAULT 1,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+      );
+    `,
+    down: `
+      DROP TABLE IF EXISTS custom_agents;
+      DROP TABLE IF EXISTS agent_configs;
+    `,
+  },
 ];

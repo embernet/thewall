@@ -14,26 +14,8 @@ import { bus } from '@/events/bus';
 interface SettingsPanelProps {
   open: boolean;
   onClose: () => void;
+  onOpenAgentConfig?: () => void;
 }
-
-// ---------------------------------------------------------------------------
-// Agent definitions displayed in the settings panel.
-// ---------------------------------------------------------------------------
-
-const AGENT_DEFINITIONS: { key: string; col: string; name: string; description?: string }[] = [
-  { key: 'concepts', col: 'concepts', name: 'Concept Extractor' },
-  { key: 'questions', col: 'questions', name: 'Questioner' },
-  { key: 'claims', col: 'claims', name: 'Claim Identifier' },
-  { key: 'gaps', col: 'gaps', name: 'Gap Finder' },
-  { key: 'actions', col: 'actions', name: 'Action Tracker' },
-  {
-    key: 'ideas',
-    col: 'ideas',
-    name: 'Idea Generator',
-    description:
-      'Runs as a second pass after other agents, generating actionable ideas from their findings',
-  },
-];
 
 // ---------------------------------------------------------------------------
 // Per-slot state
@@ -70,7 +52,7 @@ function mkSlotState(slotDef: SlotDef, config?: ApiKeyConfig): SlotState {
 
 type SettingsTab = 'columns' | 'agents' | 'api keys';
 
-export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
+export default function SettingsPanel({ open, onClose, onOpenAgentConfig }: SettingsPanelProps) {
   const [tab, setTab] = useState<SettingsTab>('columns');
 
   // API Key slot states
@@ -239,18 +221,19 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
         )}
 
         {/* Agents tab */}
-        {tab === 'agents' &&
-          AGENT_DEFINITIONS.map((a) => (
-            <div key={a.key} className="border-b border-wall-border py-2">
-              <span className="text-xs font-semibold text-wall-text">{a.name}</span>
-              <span className="ml-1.5 text-[10px] text-wall-text-dim">
-                {'\u2192'} {a.col}
-              </span>
-              {a.description && (
-                <div className="mt-0.5 text-[10px] text-wall-subtle">{a.description}</div>
-              )}
+        {tab === 'agents' && (
+          <div className="py-4 text-center">
+            <div className="text-xs text-wall-text-dim mb-3">
+              Configure agents, edit prompts, manage triggers, and create custom agents.
             </div>
-          ))}
+            <button
+              onClick={() => { onOpenAgentConfig?.(); onClose(); }}
+              className="cursor-pointer rounded-md border border-indigo-500 bg-indigo-950 px-4 py-2 text-xs font-semibold text-indigo-300 hover:bg-indigo-900"
+            >
+              {'\uD83E\uDD16'} Open Agent Configuration
+            </button>
+          </div>
+        )}
 
         {/* API Keys tab */}
         {tab === 'api keys' && (

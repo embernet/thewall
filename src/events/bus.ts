@@ -20,6 +20,7 @@ export type AppEvents = {
   'api:statusChanged': { status: ApiKeyStatus };
   'queue:pauseChanged': { reason: QueuePauseReason };
   'document:viewChunks': { docCardId: string; highlightChunkId?: string };
+  'agentConfig:changed': Record<string, never>;
 };
 
 // ---------------------------------------------------------------------------

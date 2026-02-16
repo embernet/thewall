@@ -265,7 +265,7 @@ export default function App() {
   // ── Agent Orchestrator ──
   useEffect(() => {
     if (view === 'session' && session?.id) {
-      initOrchestrator();
+      initOrchestrator().catch(e => console.warn('Orchestrator init failed:', e));
     }
     return () => { destroyOrchestrator(); };
   }, [view, session?.id]);
@@ -748,7 +748,7 @@ export default function App() {
 
       <StatusBar simRunning={simRunning} embeddingProvider={embeddingProvider} />
 
-      <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} onOpenAgentConfig={() => setAgentConfigOpen(true)} />
       {exportOpen && <ExportMenu onClose={() => setExportOpen(false)} />}
       <KnowledgeGraph open={graphOpen} onClose={() => setGraphOpen(false)} />
       <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} onNavigate={navigateToCard} />

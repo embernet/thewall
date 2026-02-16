@@ -492,6 +492,115 @@ export function registerDbHandlers() {
     db().prepare('DELETE FROM api_keys WHERE slot = ?').run(slot);
   });
 
+  // ── Agent Configuration ──
+
+  ipcMain.handle('db:getAgentConfigs', () => {
+    const rows = db().prepare('SELECT * FROM agent_configs').all() as any[];
+    return rows.map((r: any) => ({
+      agentId: r.agent_id,
+      enabled: r.enabled !== 0,
+      systemPrompt: r.system_prompt ?? null,
+      userPrompt: r.user_prompt ?? null,
+      priority: r.priority ?? null,
+      targetColumn: r.target_column ?? null,
+      triggerOnTranscript: r.trigger_on_transcript != null ? !!r.trigger_on_transcript : null,
+      inputColumns: safeJsonParse(r.input_columns, null),
+      toolIds: safeJsonParse(r.tool_ids, null),
+      updatedAt: r.updated_at,
+    }));
+  });
+
+  ipcMain.handle('db:saveAgentConfig', (_e, agentId: string, config: any) => {
+    db().prepare(
+      `INSERT INTO agent_configs (agent_id, enabled, system_prompt, user_prompt, priority, target_column, trigger_on_transcript, input_columns, tool_ids, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(agent_id) DO UPDATE SET
+         enabled = excluded.enabled,
+         system_prompt = excluded.system_prompt,
+         user_prompt = excluded.user_prompt,
+         priority = excluded.priority,
+         target_column = excluded.target_column,
+         trigger_on_transcript = excluded.trigger_on_transcript,
+         input_columns = excluded.input_columns,
+         tool_ids = excluded.tool_ids,
+         updated_at = excluded.updated_at`
+    ).run(
+      agentId,
+      config.enabled !== undefined ? (config.enabled ? 1 : 0) : 1,
+      config.systemPrompt ?? null,
+      config.userPrompt ?? null,
+      config.priority ?? null,
+      config.targetColumn ?? null,
+      config.triggerOnTranscript != null ? (config.triggerOnTranscript ? 1 : 0) : null,
+      config.inputColumns ? JSON.stringify(config.inputColumns) : null,
+      config.toolIds ? JSON.stringify(config.toolIds) : null,
+      new Date().toISOString()
+    );
+  });
+
+  ipcMain.handle('db:deleteAgentConfig', (_e, agentId: string) => {
+    db().prepare('DELETE FROM agent_configs WHERE agent_id = ?').run(agentId);
+  });
+
+  ipcMain.handle('db:getCustomAgents', () => {
+    const rows = db().prepare('SELECT * FROM custom_agents ORDER BY name').all() as any[];
+    return rows.map((r: any) => ({
+      id: r.id,
+      name: r.name,
+      description: r.description || '',
+      systemPrompt: r.system_prompt,
+      userPrompt: r.user_prompt,
+      targetColumn: r.target_column,
+      priority: r.priority ?? 5,
+      triggerOnTranscript: !!r.trigger_on_transcript,
+      dependsOn: safeJsonParse(r.depends_on, []),
+      inputColumns: safeJsonParse(r.input_columns, []),
+      toolIds: safeJsonParse(r.tool_ids, []),
+      enabled: r.enabled !== 0,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+    }));
+  });
+
+  ipcMain.handle('db:saveCustomAgent', (_e, agent: any) => {
+    db().prepare(
+      `INSERT INTO custom_agents (id, name, description, system_prompt, user_prompt, target_column, priority, trigger_on_transcript, depends_on, input_columns, tool_ids, enabled, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         name = excluded.name,
+         description = excluded.description,
+         system_prompt = excluded.system_prompt,
+         user_prompt = excluded.user_prompt,
+         target_column = excluded.target_column,
+         priority = excluded.priority,
+         trigger_on_transcript = excluded.trigger_on_transcript,
+         depends_on = excluded.depends_on,
+         input_columns = excluded.input_columns,
+         tool_ids = excluded.tool_ids,
+         enabled = excluded.enabled,
+         updated_at = excluded.updated_at`
+    ).run(
+      agent.id,
+      agent.name,
+      agent.description || '',
+      agent.systemPrompt,
+      agent.userPrompt,
+      agent.targetColumn,
+      agent.priority ?? 5,
+      agent.triggerOnTranscript ? 1 : 0,
+      JSON.stringify(agent.dependsOn || []),
+      JSON.stringify(agent.inputColumns || []),
+      JSON.stringify(agent.toolIds || []),
+      agent.enabled !== false ? 1 : 0,
+      agent.createdAt || new Date().toISOString(),
+      new Date().toISOString()
+    );
+  });
+
+  ipcMain.handle('db:deleteCustomAgent', (_e, id: string) => {
+    db().prepare('DELETE FROM custom_agents WHERE id = ?').run(id);
+  });
+
   // ── Bulk Import/Export ──
 
   ipcMain.handle('db:importSession', (_e, data: any) => {

@@ -74,7 +74,7 @@ export {
   methodology,
 };
 
-const builtInAgents = [
+export const builtInAgents = [
   conceptExtractor,
   questioner,
   claimIdentifier,

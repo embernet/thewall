@@ -63,6 +63,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // File processing (Context column)
     processContextFile: () => ipcRenderer.invoke('file:processContextFile'),
+
+    // Agent Configuration
+    getAgentConfigs: () => ipcRenderer.invoke('db:getAgentConfigs'),
+    saveAgentConfig: (agentId: string, config: any) =>
+      ipcRenderer.invoke('db:saveAgentConfig', agentId, config),
+    deleteAgentConfig: (agentId: string) => ipcRenderer.invoke('db:deleteAgentConfig', agentId),
+    getCustomAgents: () => ipcRenderer.invoke('db:getCustomAgents'),
+    saveCustomAgent: (agent: any) => ipcRenderer.invoke('db:saveCustomAgent', agent),
+    deleteCustomAgent: (id: string) => ipcRenderer.invoke('db:deleteCustomAgent', id),
   },
 
   // Shell utilities

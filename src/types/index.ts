@@ -241,6 +241,42 @@ export interface KnowledgeGraphEdge {
 }
 
 // ----------------------------------------------------------------------------
+// Agent Configuration (user overrides for built-in + custom agents)
+// ----------------------------------------------------------------------------
+
+/** Persisted override for a built-in agent. NULL fields = use default. */
+export interface AgentConfigOverride {
+  agentId: string;
+  enabled: boolean;
+  systemPrompt: string | null;
+  userPrompt: string | null;
+  priority: number | null;
+  targetColumn: string | null;
+  triggerOnTranscript: boolean | null;
+  inputColumns: string[] | null;
+  toolIds: string[] | null;
+  updatedAt: string;
+}
+
+/** A user-created custom agent stored in the database. */
+export interface CustomAgentConfig {
+  id: string;
+  name: string;
+  description: string;
+  systemPrompt: string;
+  userPrompt: string;
+  targetColumn: string;
+  priority: number;
+  triggerOnTranscript: boolean;
+  dependsOn: string[];
+  inputColumns: string[];
+  toolIds: string[];
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ----------------------------------------------------------------------------
 // Assets
 // ----------------------------------------------------------------------------
 
@@ -405,6 +441,14 @@ export interface ElectronDbApi {
 
   // File processing (Context column)
   processContextFile: () => Promise<FileChunk[]>;
+
+  // Agent Configuration
+  getAgentConfigs: () => Promise<AgentConfigOverride[]>;
+  saveAgentConfig: (agentId: string, config: Partial<AgentConfigOverride>) => Promise<void>;
+  deleteAgentConfig: (agentId: string) => Promise<void>;
+  getCustomAgents: () => Promise<CustomAgentConfig[]>;
+  saveCustomAgent: (agent: CustomAgentConfig) => Promise<void>;
+  deleteCustomAgent: (id: string) => Promise<void>;
 }
 
 export type EmbeddingProvider = 'openai' | 'local';

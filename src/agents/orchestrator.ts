@@ -2,7 +2,7 @@ import { bus } from '@/events/bus';
 import { useSessionStore } from '@/store/session';
 import { workerPool } from './worker-pool';
 import { agentRegistry } from './registry';
-import { registerBuiltInAgents } from './built-in';
+import { loadAgentConfigs, applyAgentConfigs } from './config-loader';
 import { embed, vectorToBlob } from '@/utils/embedding-service';
 import { loadGraph, clearGraph } from '@/graph/graph-service';
 import { registerBuiltInTools } from '@/tools';
@@ -25,11 +25,12 @@ let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 let initialised = false;
 
 /** Initialise the orchestrator: register built-in agents, wire bus listeners. */
-export function initOrchestrator(): void {
+export async function initOrchestrator(): Promise<void> {
   if (initialised) return;
   initialised = true;
 
-  registerBuiltInAgents();
+  // Load agent configs from DB (wraps built-in agents with user overrides)
+  await loadAgentConfigs();
   registerBuiltInTools();
   registerBuiltInMethodologies();
   registerBuiltInPersonas();
@@ -50,6 +51,9 @@ export function initOrchestrator(): void {
 
   // Listen for API status changes → auto-pause/resume the queue
   bus.on('api:statusChanged', handleApiStatusChanged);
+
+  // Listen for agent config changes → hot-reload
+  bus.on('agentConfig:changed', handleAgentConfigChanged);
 }
 
 /** Tear down listeners (e.g. when returning to launcher). */
@@ -57,6 +61,7 @@ export function destroyOrchestrator(): void {
   bus.off('card:created', handleCardCreated);
   bus.off('agent:completed', handleAgentCompleted);
   bus.off('api:statusChanged', handleApiStatusChanged);
+  bus.off('agentConfig:changed', handleAgentConfigChanged);
   if (debounceTimer) clearTimeout(debounceTimer);
   transcriptBuf = [];
   clearGraph();
@@ -66,6 +71,12 @@ export function destroyOrchestrator(): void {
 // ---------------------------------------------------------------------------
 // Internal handlers
 // ---------------------------------------------------------------------------
+
+function handleAgentConfigChanged(): void {
+  applyAgentConfigs().catch(e =>
+    console.warn('Failed to reload agent configs:', e)
+  );
+}
 
 /**
  * Auto-pause / auto-resume the agent queue based on API readiness.
