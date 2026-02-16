@@ -6,9 +6,12 @@ class SolutionFinderAgent extends BaseAgent {
   readonly description = 'Propose practical solutions to problems and gaps identified';
   readonly targetColumn = 'ideas';
   readonly priority = 4;
+  readonly maxTokens = 800;
+  readonly inputSummary = 'All cards from Gaps column as numbered list';
+  readonly agentType: '2nd-pass' = '2nd-pass';
 
   readonly triggersOnTranscript = false;
-  readonly dependsOn = ['gaps', 'problem-finder'];
+  readonly dependsOn = ['gaps'];
 
   shouldActivate(ctx: AgentContext): boolean {
     if (ctx.previousOutput) return true;

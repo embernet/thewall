@@ -6,6 +6,9 @@ class ClaimChallengerAgent extends BaseAgent {
   readonly description = 'Generate counter-arguments and alternative perspectives for claims';
   readonly targetColumn = 'claims';
   readonly priority = 4;
+  readonly maxTokens = 800;
+  readonly inputSummary = 'All cards from Claims column as numbered list';
+  readonly agentType: '2nd-pass' = '2nd-pass';
 
   readonly triggersOnTranscript = false;
   readonly dependsOn = ['claims'];

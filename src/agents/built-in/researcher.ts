@@ -6,9 +6,10 @@ class ResearcherAgent extends BaseAgent {
   readonly description = 'Identify topics needing deeper research or fact-checking';
   readonly targetColumn = 'deep_research';
   readonly priority = 5;
+  readonly maxTokens = 500;
 
   systemPrompt(_ctx: AgentContext): string {
-    return 'Identify topics that need deeper research or fact-checking. Suggest specific research questions and potential sources. Output 1-3 items, each on a new line starting with •.';
+    return 'Identify topics that need deeper research or fact-checking. Suggest specific research questions and potential sources. Output 1-2 items, each on a new line starting with \u2022. Check the SIMILAR EXISTING ITEMS above (if any) and avoid duplicating what is already captured.';
   }
 
   userPrompt(ctx: AgentContext): string {

@@ -6,6 +6,9 @@ class ClaimVerifierAgent extends BaseAgent {
   readonly description = 'Fact-check and verify claims from the meeting';
   readonly targetColumn = 'claims';
   readonly priority = 5;
+  readonly maxTokens = 800;
+  readonly inputSummary = 'All cards from Claims column as numbered list';
+  readonly agentType: '2nd-pass' = '2nd-pass';
 
   readonly triggersOnTranscript = false;
   readonly dependsOn = ['claims'];

@@ -5,10 +5,11 @@ class QuestionerAgent extends BaseAgent {
   readonly name = 'Questioner';
   readonly description = 'Generate probing questions from meeting discussion';
   readonly targetColumn = 'questions';
-  readonly priority = 6;
+  readonly priority = 7;
+  readonly maxTokens = 300;
 
   systemPrompt(_ctx: AgentContext): string {
-    return 'Generate probing questions from meeting discussion. Output 1-2 questions, each on a new line starting with \u2022. Only bullets.';
+    return 'Generate probing questions that challenge or deepen the discussion. Output 1-2 questions, each on a new line starting with \u2022. Check the SIMILAR EXISTING ITEMS above (if any) and avoid restating what is already captured.';
   }
 
   userPrompt(ctx: AgentContext): string {

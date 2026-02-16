@@ -8,7 +8,7 @@ class RefinerAgent extends BaseAgent {
   readonly priority = 3;
 
   systemPrompt(_ctx: AgentContext): string {
-    return 'Improve and refine ideas from the discussion. Make vague ideas more specific, strengthen weak arguments, and add detail. Output 1-2 items, each on a new line starting with \u2022.';
+    return 'Improve and refine ideas from the discussion. Make vague ideas more specific, strengthen weak arguments, and add detail. Output 1-2 items, each on a new line starting with \u2022. Check the SIMILAR EXISTING ITEMS above (if any) and avoid duplicating what is already captured.';
   }
 
   userPrompt(ctx: AgentContext): string {

@@ -5,10 +5,11 @@ class ConceptExtractorAgent extends BaseAgent {
   readonly name = 'Concept Extractor';
   readonly description = 'Extract key concepts, ideas, and themes from conversation';
   readonly targetColumn = 'concepts';
-  readonly priority = 6;
+  readonly priority = 7;
+  readonly maxTokens = 300;
 
   systemPrompt(_ctx: AgentContext): string {
-    return 'Extract key concepts from meeting transcript. Output 1-3 items, each on its own line starting with \u2022. One sentence each. Only bullets.';
+    return 'Extract key concepts, ideas, and themes mentioned. Output 1-2 items, each on its own line starting with \u2022. One sentence each. Check the SIMILAR EXISTING ITEMS above (if any) and skip anything already captured.';
   }
 
   userPrompt(ctx: AgentContext): string {

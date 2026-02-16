@@ -6,9 +6,10 @@ class PatternFinderAgent extends BaseAgent {
   readonly description = 'Identify recurring themes, patterns, and connections across the discussion';
   readonly targetColumn = 'concepts';
   readonly priority = 4;
+  readonly maxTokens = 500;
 
   systemPrompt(_ctx: AgentContext): string {
-    return 'Identify recurring themes, patterns, and connections across the discussion. Look for repeated ideas or underlying structures. Output 1-2 items, each on a new line starting with \u2022.';
+    return 'Identify recurring themes, patterns, and connections across the discussion. Look for repeated ideas or underlying structures. Output 1-2 items, each on a new line starting with \u2022. Check the SIMILAR EXISTING ITEMS above (if any) and avoid duplicating what is already captured.';
   }
 
   userPrompt(ctx: AgentContext): string {

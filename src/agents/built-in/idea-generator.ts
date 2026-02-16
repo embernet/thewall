@@ -6,6 +6,9 @@ class IdeaGeneratorAgent extends BaseAgent {
   readonly description = 'Generate actionable ideas from meeting analysis';
   readonly targetColumn = 'ideas';
   readonly priority = 4;
+  readonly maxTokens = 800;
+  readonly inputSummary = 'All cards from dependent columns (concepts, questions, claims, gaps, actions) as numbered list';
+  readonly agentType: '2nd-pass' = '2nd-pass';
 
   readonly triggersOnTranscript = false;
   readonly dependsOn = ['concepts', 'questions', 'claims', 'gaps', 'actions'];

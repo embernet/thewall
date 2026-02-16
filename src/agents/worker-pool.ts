@@ -6,6 +6,8 @@ import type { AgentTask, AgentTaskStatus, Card } from '@/types';
 import { v4 as uuid } from 'uuid';
 import { BaseAgent, AgentContext, AgentResult } from './base';
 import { agentRegistry } from './registry';
+import { AGENT_RELEVANCE } from './relevance-map';
+import { deduplicateResults, findSimilarExisting } from './dedup-gate';
 import { useSessionStore } from '@/store/session';
 import { bus } from '@/events/bus';
 
@@ -134,13 +136,35 @@ export class WorkerPool {
     const agents = agentRegistry.listByPriority();
     const ids: string[] = [];
 
+    // Congestion control: when queue is backed up, skip low-priority agents
+    const congested = this.queue.length > 10;
+
     for (const agent of agents) {
       if (this.isAgentDisabled(agent.id)) continue;
       if (!agent.shouldActivate(context)) continue;
+
+      // Congestion control: skip low-priority agents when queue is backed up
+      if (congested && agent.priority < 4) continue;
+
+      // Relevance gate: skip agents whose topics don't match the batch
+      if (context.relevanceTags && AGENT_RELEVANCE[agent.id]) {
+        const agentTopics = AGENT_RELEVANCE[agent.id];
+        if (!agentTopics.some(t => context.relevanceTags!.has(t))) continue;
+      }
+
       ids.push(this.submit(agent, context));
     }
 
     return ids;
+  }
+
+  /**
+   * Update the concurrency limit at runtime (from sidebar slider).
+   * Clamped to [1, 20].
+   */
+  setConcurrency(n: number): void {
+    (this.config as { concurrency: number }).concurrency = Math.max(1, Math.min(20, n));
+    this.processQueue();
   }
 
   /**
@@ -299,11 +323,38 @@ export class WorkerPool {
     store.setAgentBusy(task.agent.id, true);
 
     try {
-      // 2. Execute the agent
+      // 2. Pre-LLM similarity search — find most relevant existing cards
+      //    Only for 1st-pass (transcript-triggered) agents. 2nd-pass agents
+      //    already have full context via previousOutput.
+      if (task.agent.triggersOnTranscript && task.context.recentTranscript) {
+        try {
+          const similarCards = await findSimilarExisting(
+            task.context.recentTranscript,
+            task.agent.targetColumn,
+            5,    // topK
+            0.4,  // minScore — show topically related, not just near-dupes
+          );
+          task.context.similarExistingCards = similarCards;
+        } catch (e) {
+          console.warn('Pre-LLM similarity search failed, proceeding without:', e);
+          // Graceful fallback: agent runs without similarity context
+        }
+      }
+
+      // 3. Execute the agent
       const result = await task.agent.execute(task.context);
 
-      // 3. Success path
-      const cardsCreated = this.createCards(result, task);
+      // 4. Deduplication gate: filter out semantically similar cards
+      const threshold = task.agent.dedupThreshold ?? 0.85;
+      const dedupedCards = await deduplicateResults(
+        result.cards,
+        task.agent.targetColumn,
+        threshold,
+      );
+      const dedupedResult: AgentResult = { ...result, cards: dedupedCards };
+
+      // 5. Success path
+      const cardsCreated = this.createCards(dedupedResult, task);
       const duration = Date.now() - startTime;
 
       store.updateAgentTask(task.id, {

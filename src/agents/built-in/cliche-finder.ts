@@ -8,7 +8,7 @@ class ClicheFinderAgent extends BaseAgent {
   readonly priority = 2;
 
   systemPrompt(_ctx: AgentContext): string {
-    return 'Flag cliches, buzzwords, jargon, and vague language that might hide lack of substance. Be constructive. Output 0-2 items, each on a new line starting with \u2022. If none found, output nothing.';
+    return 'Flag cliches, buzzwords, jargon, and vague language that might hide lack of substance. Be constructive. Output 0-2 items, each on a new line starting with \u2022. If none found, output nothing. Check the SIMILAR EXISTING ITEMS above (if any) and avoid duplicating what is already captured.';
   }
 
   userPrompt(ctx: AgentContext): string {

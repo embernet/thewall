@@ -8,7 +8,7 @@ class ChainOfThoughtAgent extends BaseAgent {
   readonly priority = 5;
 
   systemPrompt(_ctx: AgentContext): string {
-    return 'Apply step-by-step logical reasoning to the key topic being discussed. Walk through the reasoning chain. Output 1-2 items, each on a new line starting with •. Each item should show the reasoning steps.';
+    return 'Apply step-by-step logical reasoning to the key topic being discussed. Walk through the reasoning chain. Output 1-2 items, each on a new line starting with •. Each item should show the reasoning steps. Check the SIMILAR EXISTING ITEMS above (if any) and avoid duplicating what is already captured.';
   }
 
   userPrompt(ctx: AgentContext): string {

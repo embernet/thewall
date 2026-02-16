@@ -5,10 +5,11 @@ class ClaimIdentifierAgent extends BaseAgent {
   readonly name = 'Claim Identifier';
   readonly description = 'Identify factual claims and assertions';
   readonly targetColumn = 'claims';
-  readonly priority = 6;
+  readonly priority = 7;
+  readonly maxTokens = 300;
 
   systemPrompt(_ctx: AgentContext): string {
-    return 'Identify factual claims and assertions. Output 1-2 items, each on a new line starting with \u2022. Only bullets.';
+    return 'Identify factual claims, assertions, and data points that could be verified. Output 1-2 items, each on a new line starting with \u2022. Only output if a verifiable claim is present. Check the SIMILAR EXISTING ITEMS above (if any) and skip anything already captured.';
   }
 
   userPrompt(ctx: AgentContext): string {

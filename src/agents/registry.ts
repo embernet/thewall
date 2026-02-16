@@ -36,6 +36,21 @@ class AgentRegistry {
     );
   }
 
+  /** Get agents grouped by their target column type. */
+  listGroupedByColumn(): Map<string, BaseAgent[]> {
+    const grouped = new Map<string, BaseAgent[]>();
+    for (const agent of this.agents.values()) {
+      const col = agent.targetColumn;
+      if (!grouped.has(col)) grouped.set(col, []);
+      grouped.get(col)!.push(agent);
+    }
+    // Sort each group by priority (highest first)
+    for (const agents of grouped.values()) {
+      agents.sort((a, b) => b.priority - a.priority);
+    }
+    return grouped;
+  }
+
   clear(): void {
     this.agents.clear();
   }

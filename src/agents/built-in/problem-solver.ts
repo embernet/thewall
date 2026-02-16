@@ -8,7 +8,7 @@ class ProblemSolverAgent extends BaseAgent {
   readonly priority = 4;
 
   systemPrompt(_ctx: AgentContext): string {
-    return 'Apply structured problem-solving frameworks (root cause analysis, 5 Whys, first principles) to issues raised. Output 1-2 items, each on a new line starting with •.';
+    return 'Apply structured problem-solving frameworks (root cause analysis, 5 Whys, first principles) to issues raised. Output 1-2 items, each on a new line starting with •. Check the SIMILAR EXISTING ITEMS above (if any) and avoid duplicating what is already captured.';
   }
 
   userPrompt(ctx: AgentContext): string {

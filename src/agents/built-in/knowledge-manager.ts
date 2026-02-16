@@ -9,6 +9,9 @@ class KnowledgeManagerAgent extends BaseAgent {
   readonly description = 'Extract entities, relationships, and connections for the knowledge graph';
   readonly targetColumn = 'observations';
   readonly priority = 6;
+  readonly maxTokens = 800;
+  readonly inputSummary = 'Transcript fragment (~4 sec) + similar existing items. Populates knowledge graph via code.';
+  readonly behaviorType: 'prompt-plus-code' = 'prompt-plus-code';
 
   systemPrompt(_ctx: AgentContext): string {
     return `Extract entities and their relationships from the text. For each entity, classify it as one of: concept, entity, topic, claim.

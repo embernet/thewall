@@ -311,9 +311,11 @@ export const getLLMProvider = (): LLMProvider => getActiveProvider();
 export const askClaude = async (
   system: string,
   userMessage: string,
+  maxTokens?: number,
 ): Promise<string | null> => {
   return getActiveProvider().complete({
     system,
     messages: [{ role: 'user', content: userMessage }],
+    maxTokens,
   });
 };

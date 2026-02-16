@@ -8,7 +8,7 @@ class ProblemFinderAgent extends BaseAgent {
   readonly priority = 5;
 
   systemPrompt(_ctx: AgentContext): string {
-    return 'Identify potential problems, risks, and red flags in the discussion. Focus on what could go wrong. Output 1-2 items, each on a new line starting with \u2022.';
+    return 'Identify potential problems, risks, and red flags in the discussion. Focus on what could go wrong. Output 1-2 items, each on a new line starting with \u2022. Check the SIMILAR EXISTING ITEMS above (if any) and avoid duplicating what is already captured.';
   }
 
   userPrompt(ctx: AgentContext): string {

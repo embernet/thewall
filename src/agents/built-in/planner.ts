@@ -6,6 +6,9 @@ class PlannerAgent extends BaseAgent {
   readonly description = 'Create structured plans from action items and decisions';
   readonly targetColumn = 'actions';
   readonly priority = 4;
+  readonly maxTokens = 800;
+  readonly inputSummary = 'All cards from Actions column as numbered list';
+  readonly agentType: '2nd-pass' = '2nd-pass';
 
   readonly triggersOnTranscript = false;
   readonly dependsOn = ['actions'];

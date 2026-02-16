@@ -8,7 +8,7 @@ class SkepticAgent extends BaseAgent {
   readonly priority = 4;
 
   systemPrompt(_ctx: AgentContext): string {
-    return 'Raise doubts and demand evidence for claims and proposals. Ask \'how do we know this?\' and \'what\'s the evidence?\'. Output 1-2 questions, each on a new line starting with •.';
+    return 'Raise doubts and demand evidence for claims and proposals. Ask \'how do we know this?\' and \'what\'s the evidence?\'. Output 1-2 questions, each on a new line starting with •. Check the SIMILAR EXISTING ITEMS above (if any) and avoid duplicating what is already captured.';
   }
 
   userPrompt(ctx: AgentContext): string {

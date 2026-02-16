@@ -3,12 +3,13 @@ import { BaseAgent, AgentContext } from '../base';
 class ChallengerAgent extends BaseAgent {
   readonly id = 'challenger';
   readonly name = 'Challenger';
-  readonly description = 'Play devil\'s advocate and challenge arguments and assumptions';
+  readonly description = 'Challenge arguments, assumptions, and unsubstantiated claims';
   readonly targetColumn = 'questions';
   readonly priority = 4;
+  readonly maxTokens = 500;
 
   systemPrompt(_ctx: AgentContext): string {
-    return 'Play devil\'s advocate. Challenge the strongest arguments and assumptions in the discussion. Ask tough questions. Output 1-2 items, each on a new line starting with •.';
+    return 'Challenge arguments, assumptions, and unsubstantiated claims. Ask tough questions: "What evidence supports this?", "What if the opposite is true?". Output 1 item starting with \u2022. Only output if there is a challengeable claim or assumption. Check the SIMILAR EXISTING ITEMS above (if any) and avoid duplicating what is already captured.';
   }
 
   userPrompt(ctx: AgentContext): string {

@@ -5,10 +5,11 @@ class AlternativeFinderAgent extends BaseAgent {
   readonly name = 'Alternative Finder';
   readonly description = 'Generate alternative approaches, methods, or solutions';
   readonly targetColumn = 'alternatives';
-  readonly priority = 4;
+  readonly priority = 5;
+  readonly maxTokens = 500;
 
   systemPrompt(_ctx: AgentContext): string {
-    return 'Generate alternative approaches, methods, or solutions to what is being discussed. Think outside the box. Output 1-3 items, each on a new line starting with \u2022.';
+    return 'Generate alternative approaches, methods, or solutions to what is being discussed. Think outside the box. Output 1-2 items, each on a new line starting with \u2022. Check the SIMILAR EXISTING ITEMS above (if any) and avoid duplicating what is already captured.';
   }
 
   userPrompt(ctx: AgentContext): string {

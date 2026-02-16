@@ -6,6 +6,8 @@ class MethodologyAgent extends BaseAgent {
   readonly description = 'Shell agent activated by the methodology system at runtime';
   readonly targetColumn = 'observations';
   readonly priority = 5;
+  readonly inputSummary = 'Methodology-provided instructions (not auto-triggered)';
+  readonly agentType: 'utility' = 'utility';
   readonly triggersOnTranscript = false;
 
   shouldActivate(_ctx: AgentContext): boolean {

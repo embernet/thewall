@@ -8,7 +8,7 @@ class RequirementFinderAgent extends BaseAgent {
   readonly priority = 5;
 
   systemPrompt(_ctx: AgentContext): string {
-    return 'Extract explicit and implicit requirements from the discussion. Include constraints, needs, and must-haves. Output 1-2 items, each on a new line starting with \u2022.';
+    return 'Extract explicit and implicit requirements from the discussion. Include constraints, needs, and must-haves. Output 1-2 items, each on a new line starting with \u2022. Check the SIMILAR EXISTING ITEMS above (if any) and avoid duplicating what is already captured.';
   }
 
   userPrompt(ctx: AgentContext): string {
