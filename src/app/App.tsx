@@ -4,9 +4,15 @@ import Launcher from '@/components/Launcher/Launcher';
 import Column from '@/components/Column/Column';
 import InquiryColumn from '@/components/Column/InquiryColumn';
 import AgentQueueColumn from '@/components/Column/AgentQueueColumn';
+import ContextColumn from '@/components/Column/ContextColumn';
+import ColumnSidebar from '@/components/ColumnSidebar/ColumnSidebar';
 import SettingsPanel from '@/components/SettingsPanel/SettingsPanel';
 import ExportMenu from '@/components/ExportMenu/ExportMenu';
 import KnowledgeGraph from '@/components/KnowledgeGraph/KnowledgeGraph';
+import SearchOverlay from '@/components/SearchOverlay/SearchOverlay';
+import NotificationToast from '@/components/NotificationToast/NotificationToast';
+import CostDashboard from '@/components/CostDashboard/CostDashboard';
+import AgentConfig from '@/components/AgentConfig/AgentConfig';
 import TopBar from './TopBar';
 import StatusBar from './StatusBar';
 import { askClaude, loadChatConfig, validateApiKey, getApiKey } from '@/utils/llm';
@@ -18,6 +24,7 @@ import { COL_TYPES, SPEAKER_COLORS } from '@/types';
 import { initOrchestrator, destroyOrchestrator } from '@/agents/orchestrator';
 import { workerPool } from '@/agents/worker-pool';
 import { useKeyboard } from '@/hooks/useKeyboard';
+import { isChunkCard, getParentDocId, getFileName } from '@/utils/document-cards';
 import type { Card, Column as ColumnType, SessionIndexEntry, SimConfig, AgentTask } from '@/types';
 
 export default function App() {
@@ -27,13 +34,26 @@ export default function App() {
     init, addCard, setAudio,
     setView, setSpeakerColors, setSaveStatus, goToLauncher,
     toggleColumnVisibility, toggleColumnCollapsed,
+    setColumnVisible, updateColumnOrder, addColumn, removeColumn,
+    linkCards,
   } = store;
 
-  useKeyboard();
+  const searchCb = useMemo(() => ({
+    onSearch: () => setSearchOpen(o => !o),
+    onEscape: () => setLinkingFrom(null),
+  }), []);
+  useKeyboard(searchCb);
 
+  const [sidebarOpen, setSidebarOpen] = useState(() =>
+    localStorage.getItem('wall:sidebar') !== 'closed',
+  );
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [graphOpen, setGraphOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [costOpen, setCostOpen] = useState(false);
+  const [agentConfigOpen, setAgentConfigOpen] = useState(false);
+  const [linkingFrom, setLinkingFrom] = useState<string | null>(null);
   const [simRunning, setSimRunning] = useState(false);
   const [sessions, setSessions] = useState<SessionIndexEntry[]>([]);
   const [apiKeyStatus, setApiKeyStatus] = useState<ApiKeyStatus>('unchecked');
@@ -51,6 +71,11 @@ export default function App() {
   const animFrameRef = useRef<number | null>(null);
 
   useEffect(() => { cardsRef.current = cards; }, [cards]);
+
+  // Persist sidebar open/closed to localStorage
+  useEffect(() => {
+    localStorage.setItem('wall:sidebar', sidebarOpen ? 'open' : 'closed');
+  }, [sidebarOpen]);
 
   // ── Broadcast API status changes to the event bus (auto-pauses agent queue) ──
   useEffect(() => {
@@ -108,6 +133,22 @@ export default function App() {
     if (view === 'launcher') loadSessions();
   }, [view, loadSessions]);
 
+  // ── Persist column visibility/order/collapsed/config changes to DB ──
+  const prevColStateRef = useRef<string>('');
+  useEffect(() => {
+    if (!session?.id || !window.electronAPI) return;
+    const serialized = JSON.stringify(
+      columns.map((c) => ({ id: c.id, visible: c.visible, collapsed: c.collapsed, sortOrder: c.sortOrder, config: c.config })),
+    );
+    if (serialized === prevColStateRef.current) return;
+    prevColStateRef.current = serialized;
+    for (const col of columns) {
+      window.electronAPI.db
+        .updateColumn(col.id, { visible: col.visible, collapsed: col.collapsed, sortOrder: col.sortOrder, config: col.config })
+        .catch(console.error);
+    }
+  }, [columns, session?.id]);
+
   // ── Auto-save to SQLite ──
   useEffect(() => {
     if (!session?.id || view !== 'session' || !window.electronAPI) return;
@@ -142,6 +183,84 @@ export default function App() {
     }
     prevCardLen.current = len;
   }, [cards.length, session?.id, cards, setSaveStatus]);
+
+  // ── Persist card updates and deletes ──
+  useEffect(() => {
+    if (!session?.id || !window.electronAPI) return;
+
+    const handleUpdate = ({ card }: { card: Card }) => {
+      window.electronAPI.db
+        .updateCard(card.id, {
+          content: card.content,
+          highlightedBy: card.highlightedBy,
+          isDeleted: card.isDeleted,
+          columnId: card.columnId,
+          sortOrder: card.sortOrder,
+          aiTags: card.aiTags,
+          userTags: card.userTags,
+          sourceCardIds: card.sourceCardIds,
+          pinned: card.pinned,
+        })
+        .catch(console.error);
+    };
+
+    const handleDelete = ({ cardId }: { cardId: string }) => {
+      const card = cardsRef.current.find((c) => c.id === cardId);
+      if (card) {
+        window.electronAPI.db
+          .updateCard(cardId, { isDeleted: true, columnId: card.columnId })
+          .catch(console.error);
+      }
+    };
+
+    bus.on('card:updated', handleUpdate);
+    bus.on('card:deleted', handleDelete);
+    return () => {
+      bus.off('card:updated', handleUpdate);
+      bus.off('card:deleted', handleDelete);
+    };
+  }, [session?.id]);
+
+  // ── Document chunk column creation (listen for viewChunks events) ──
+  useEffect(() => {
+    const handler = ({ docCardId }: { docCardId: string; highlightChunkId?: string }) => {
+      if (!session?.id) return;
+      // Check if a chunk column for this document already exists
+      const existing = columns.find(
+        (c) => c.config?.docCardId === docCardId && c.config?.ephemeral,
+      );
+      if (existing) {
+        // Make sure it's visible
+        if (!existing.visible) setColumnVisible(existing.id, true);
+        if (existing.collapsed) toggleColumnCollapsed(existing.id);
+        return;
+      }
+      // Find the document card to get the file name
+      const docCard = cards.find((c) => c.id === docCardId);
+      const fileName = docCard ? getFileName(docCard) || 'Document' : 'Document';
+      const truncName = fileName.length > 20 ? fileName.slice(0, 20) + '...' : fileName;
+      // Place it right after the context column
+      const ctxCol = columns.find((c) => c.type === 'context');
+      const afterSort = ctxCol?.sortOrder || 'b';
+      const chunkCol: ColumnType = {
+        id: uid(),
+        sessionId: session.id,
+        type: 'context',
+        title: '\uD83D\uDCC4 ' + truncName,
+        sortOrder: afterSort + 'a',
+        visible: true,
+        collapsed: false,
+        config: { docCardId, ephemeral: true },
+      };
+      addColumn(chunkCol);
+      // Persist to DB
+      if (window.electronAPI) {
+        window.electronAPI.db.createColumn(chunkCol).catch(console.error);
+      }
+    };
+    bus.on('document:viewChunks', handler);
+    return () => { bus.off('document:viewChunks', handler); };
+  }, [session?.id, columns, cards, setColumnVisible, toggleColumnCollapsed, addColumn]);
 
   // ── Agent Orchestrator ──
   useEffect(() => {
@@ -321,6 +440,15 @@ export default function App() {
     const sessionRow = await window.electronAPI.db.getSession(id);
     if (!sessionRow) { alert('Could not load session.'); return; }
     const cols = await window.electronAPI.db.getColumns(id);
+    // Backfill context column for existing sessions
+    if (!cols.some(c => c.type === 'context')) {
+      const contextCol: ColumnType = {
+        id: uid(), sessionId: id, type: 'context', title: 'Context',
+        sortOrder: 'bb', visible: true, collapsed: false,
+      };
+      await window.electronAPI.db.createColumn(contextCol);
+      cols.push(contextCol);
+    }
     const cardRows = await window.electronAPI.db.getCards(id);
     init({
       session: {
@@ -407,9 +535,37 @@ export default function App() {
   const navigateToCard = useCallback((cardId: string) => {
     const card = cards.find(c => c.id === cardId);
     if (!card) return;
-    const col = columns.find(c => c.id === card.columnId);
-    if (col && !col.visible) toggleColumnVisibility(col.id);
-    if (col && col.collapsed) toggleColumnCollapsed(col.id);
+
+    // If it's a chunk card, ensure its chunk column exists
+    const parentDocId = getParentDocId(card);
+    if (parentDocId) {
+      const chunkCol = columns.find(
+        (c) => c.config?.docCardId === parentDocId && c.config?.ephemeral,
+      );
+      if (!chunkCol) {
+        // Create the chunk column, then scroll after it renders
+        bus.emit('document:viewChunks', { docCardId: parentDocId, highlightChunkId: cardId });
+        setTimeout(() => {
+          const el = document.getElementById('card-' + cardId);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.style.outline = '2px solid #a855f7';
+            el.style.outlineOffset = '2px';
+            setTimeout(() => { el.style.outline = 'none'; el.style.outlineOffset = '0'; }, 2000);
+          }
+        }, 300);
+        return;
+      }
+      // Chunk column exists — make sure it's visible
+      if (!chunkCol.visible) setColumnVisible(chunkCol.id, true);
+      if (chunkCol.collapsed) toggleColumnCollapsed(chunkCol.id);
+    } else {
+      // Normal card — ensure its column is visible
+      const col = columns.find(c => c.id === card.columnId);
+      if (col && !col.visible) toggleColumnVisibility(col.id);
+      if (col && col.collapsed) toggleColumnCollapsed(col.id);
+    }
+
     setTimeout(() => {
       const el = document.getElementById('card-' + cardId);
       if (el) {
@@ -419,7 +575,26 @@ export default function App() {
         setTimeout(() => { el.style.outline = 'none'; el.style.outlineOffset = '0'; }, 2000);
       }
     }, 100);
-  }, [cards, columns, toggleColumnVisibility, toggleColumnCollapsed]);
+  }, [cards, columns, toggleColumnVisibility, toggleColumnCollapsed, setColumnVisible]);
+
+  // ── Card linking ──
+  const startLinking = useCallback((cardId: string) => {
+    setLinkingFrom(cardId);
+  }, []);
+
+  const completeLinking = useCallback((targetId: string) => {
+    if (linkingFrom && linkingFrom !== targetId) {
+      linkCards(linkingFrom, targetId);
+      // Emit card:updated for DB persistence
+      const updated = useSessionStore.getState().cards.find(c => c.id === linkingFrom);
+      if (updated) bus.emit('card:updated', { card: updated });
+    }
+    setLinkingFrom(null);
+  }, [linkingFrom, linkCards]);
+
+  const cancelLinking = useCallback(() => {
+    setLinkingFrom(null);
+  }, []);
 
   // ── Retry failed agent task (delegates to worker pool) ──
   const retryTask = useCallback((task: AgentTask) => {
@@ -469,47 +644,106 @@ export default function App() {
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenExport={() => setExportOpen(true)}
         onToggleGraph={() => setGraphOpen(o => !o)}
+        onOpenSearch={() => setSearchOpen(true)}
+        onOpenCost={() => setCostOpen(true)}
+        onOpenAgentConfig={() => setAgentConfigOpen(true)}
         apiKeyStatus={apiKeyStatus}
       />
 
-      <div className="flex-1 flex overflow-x-auto">
-        {visCols.map(col => {
-          if (col.type === 'inquiry') {
+      {/* ── Linking mode banner ── */}
+      {linkingFrom && (
+        <div className="shrink-0 flex items-center justify-center gap-3 bg-purple-900/30 border-b border-purple-700/40 px-4 py-1.5">
+          <span className="text-[11px] font-semibold text-purple-300">
+            {'\uD83D\uDD17'} Click another card to create a link
+          </span>
+          <button
+            onClick={cancelLinking}
+            className="cursor-pointer rounded-md border border-purple-700 bg-purple-900/40 px-2.5 py-0.5 text-[10px] font-semibold text-purple-300 hover:bg-purple-800/40"
+          >
+            Cancel (Esc)
+          </button>
+        </div>
+      )}
+
+      <div className="flex-1 flex overflow-hidden">
+        <ColumnSidebar
+          columns={columns}
+          open={sidebarOpen}
+          onToggle={() => setSidebarOpen((o) => !o)}
+          setColumnVisible={setColumnVisible}
+          updateColumnOrder={updateColumnOrder}
+        />
+        <div className="flex-1 flex overflow-x-auto">
+          {visCols.map(col => {
+            // Ephemeral chunk columns — show chunk cards for the linked document
+            if (col.config?.ephemeral && col.config?.docCardId) {
+              const docCardId = col.config.docCardId as string;
+              const chunkCards = cards.filter(
+                (c) => !c.isDeleted && getParentDocId(c) === docCardId,
+              );
+              return (
+                <Column
+                  key={col.id}
+                  column={col}
+                  cards={chunkCards}
+                  onNavigate={navigateToCard}
+                  linkingFrom={linkingFrom}
+                  onStartLink={startLinking}
+                  onCompleteLink={completeLinking}
+                />
+              );
+            }
+            if (col.type === 'inquiry') {
+              return (
+                <InquiryColumn
+                  key={col.id}
+                  column={col}
+                  cards={cards.filter(c => c.columnId === col.id && !c.isDeleted)}
+                  allCards={cards.filter(c => !c.isDeleted)}
+                  onNavigate={navigateToCard}
+                />
+              );
+            }
+            if (col.type === 'context') {
+              // Filter out chunk cards — only show document cards and manual text cards
+              return (
+                <ContextColumn
+                  key={col.id}
+                  column={col}
+                  cards={cards.filter(c => c.columnId === col.id && !c.isDeleted && !isChunkCard(c))}
+                  onNavigate={navigateToCard}
+                />
+              );
+            }
+            if (col.type === 'agent_queue') {
+              return (
+                <AgentQueueColumn
+                  key={col.id}
+                  column={col}
+                  onRetryTask={retryTask}
+                />
+              );
+            }
+            const colCards = col.type === 'highlights'
+              ? hlCards
+              : cards.filter(c => c.columnId === col.id && (col.type === 'trash' || !c.isDeleted));
             return (
-              <InquiryColumn
+              <Column
                 key={col.id}
                 column={col}
-                cards={cards.filter(c => c.columnId === col.id && !c.isDeleted)}
-                allCards={cards.filter(c => !c.isDeleted)}
+                cards={colCards}
+                audio={col.type === 'transcript' ? audio : undefined}
+                onToggleRecord={col.type === 'transcript' ? toggleRecord : undefined}
+                onPauseRecord={col.type === 'transcript' ? pauseRecord : undefined}
+                simRunning={col.type === 'transcript' ? simRunning : false}
                 onNavigate={navigateToCard}
+                linkingFrom={linkingFrom}
+                onStartLink={startLinking}
+                onCompleteLink={completeLinking}
               />
             );
-          }
-          if (col.type === 'agent_queue') {
-            return (
-              <AgentQueueColumn
-                key={col.id}
-                column={col}
-                onRetryTask={retryTask}
-              />
-            );
-          }
-          const colCards = col.type === 'highlights'
-            ? hlCards
-            : cards.filter(c => c.columnId === col.id && (col.type === 'trash' || !c.isDeleted));
-          return (
-            <Column
-              key={col.id}
-              column={col}
-              cards={colCards}
-              audio={col.type === 'transcript' ? audio : undefined}
-              onToggleRecord={col.type === 'transcript' ? toggleRecord : undefined}
-              onPauseRecord={col.type === 'transcript' ? pauseRecord : undefined}
-              simRunning={col.type === 'transcript' ? simRunning : false}
-              onNavigate={navigateToCard}
-            />
-          );
-        })}
+          })}
+        </div>
       </div>
 
       <StatusBar simRunning={simRunning} embeddingProvider={embeddingProvider} />
@@ -517,6 +751,10 @@ export default function App() {
       <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       {exportOpen && <ExportMenu onClose={() => setExportOpen(false)} />}
       <KnowledgeGraph open={graphOpen} onClose={() => setGraphOpen(false)} />
+      <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} onNavigate={navigateToCard} />
+      <NotificationToast onNavigate={navigateToCard} />
+      <CostDashboard open={costOpen} onClose={() => setCostOpen(false)} />
+      <AgentConfig open={agentConfigOpen} onClose={() => setAgentConfigOpen(false)} />
 
       <style>{`@keyframes pulse{0%,100%{transform:scale(1);opacity:0.5;}50%{transform:scale(1.3);opacity:0;}}`}</style>
     </div>

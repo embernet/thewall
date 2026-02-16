@@ -17,14 +17,17 @@
   "dependencies": {
     "@tanstack/react-virtual": "^3.13.18",
     "better-sqlite3": "^11.7.0",
+    "csv-parse": "^6.1.0",
     "dotenv": "^17.2.4",
     "events": "^3.3.0",
     "fractional-indexing": "^3.2.0",
     "graphology": "^0.26.0",
     "graphology-types": "^0.24.8",
     "mitt": "^3.0.1",
+    "pdf-parse": "^2.4.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-markdown": "^10.1.0",
     "uuid": "^11.0.5",
     "zundo": "^2.3.0",
     "zustand": "^5.0.3"

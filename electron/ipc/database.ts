@@ -234,4 +234,13 @@ const migrations: Migration[] = [
         WHERE type = 'observations';
     `,
   },
+  {
+    name: '004_add_card_pinned',
+    up: `
+      ALTER TABLE cards ADD COLUMN pinned INTEGER DEFAULT 0;
+    `,
+    down: `
+      -- SQLite doesn't support DROP COLUMN easily; ignore
+    `,
+  },
 ];

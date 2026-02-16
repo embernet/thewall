@@ -20,6 +20,9 @@ interface TopBarProps {
   onOpenSettings: () => void;
   onOpenExport: () => void;
   onToggleGraph: () => void;
+  onOpenSearch: () => void;
+  onOpenCost: () => void;
+  onOpenAgentConfig: () => void;
   apiKeyStatus: ApiKeyStatus;
 }
 
@@ -51,6 +54,9 @@ export default function TopBar({
   onOpenSettings,
   onOpenExport,
   onToggleGraph,
+  onOpenSearch,
+  onOpenCost,
+  onOpenAgentConfig,
   apiKeyStatus,
 }: TopBarProps) {
   const session = useSessionStore((s) => s.session);
@@ -284,6 +290,34 @@ export default function TopBar({
 
       {/* ── Spacer ── */}
       <div className="flex-1" />
+
+      {/* ── Search (Cmd+K) ── */}
+      <button
+        onClick={onOpenSearch}
+        className="cursor-pointer rounded-md border border-wall-muted bg-wall-border px-2 py-[3px] text-[10px] font-semibold text-wall-text-dim hover:bg-wall-muted flex items-center gap-1"
+        title="Search all cards (Cmd+K)"
+      >
+        {'\uD83D\uDD0D'}
+        <kbd className="rounded border border-wall-muted bg-wall-border/80 px-1 text-[8px] text-wall-subtle">{'\u2318'}K</kbd>
+      </button>
+
+      {/* ── Cost Dashboard ── */}
+      <button
+        onClick={onOpenCost}
+        className="cursor-pointer rounded-md border border-wall-muted bg-wall-border px-2 py-[3px] text-[10px] font-semibold text-amber-400 hover:bg-wall-muted"
+        title="API Cost Dashboard"
+      >
+        {'\uD83D\uDCB0'}
+      </button>
+
+      {/* ── Agent Config ── */}
+      <button
+        onClick={onOpenAgentConfig}
+        className="cursor-pointer rounded-md border border-wall-muted bg-wall-border px-2 py-[3px] text-[10px] font-semibold text-cyan-400 hover:bg-wall-muted"
+        title="Agent Configuration"
+      >
+        {'\uD83E\uDD16'}
+      </button>
 
       {/* ── Knowledge Graph toggle ── */}
       <button

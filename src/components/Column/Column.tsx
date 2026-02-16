@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
 import type { Column as ColumnType, Card as CardType, AudioState } from '@/types';
 import { COL_TYPES } from '@/types';
 import { useSessionStore } from '@/store/session';
@@ -17,6 +18,9 @@ interface ColumnProps {
   onPauseRecord?: () => void;
   simRunning?: boolean;
   onNavigate?: (cardId: string) => void;
+  linkingFrom?: string | null;
+  onStartLink?: (cardId: string) => void;
+  onCompleteLink?: (cardId: string) => void;
 }
 
 const Column: React.FC<ColumnProps> = ({
@@ -27,16 +31,23 @@ const Column: React.FC<ColumnProps> = ({
   onPauseRecord,
   simRunning,
   onNavigate,
+  linkingFrom,
+  onStartLink,
+  onCompleteLink,
 }) => {
   const [input, setInput] = useState('');
   const [search, setSearch] = useState('');
   const [hlF, setHlF] = useState('all');
+  const [speakerFilter, setSpeakerFilter] = useState('');
+  const [sourceFilter, setSourceFilter] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const meta = COL_TYPES.find((c) => c.type === column.type) || COL_TYPES[0];
   const prevLen = useRef(cards.length);
 
   const deleteCard = useSessionStore((s) => s.deleteCard);
   const toggleHighlight = useSessionStore((s) => s.toggleHighlight);
+  const togglePin = useSessionStore((s) => s.togglePin);
   const updateCard = useSessionStore((s) => s.updateCard);
   const toggleColumnCollapsed = useSessionStore((s) => s.toggleColumnCollapsed);
   const emptyTrash = useSessionStore((s) => s.emptyTrash);
@@ -44,12 +55,17 @@ const Column: React.FC<ColumnProps> = ({
   const addCard = useSessionStore((s) => s.addCard);
   const agentBusy = useSessionStore((s) => s.agentBusy);
   const speakerColors = useSessionStore((s) => s.speakerColors);
+  const storeUpdateColumn = useSessionStore((s) => s.updateColumn);
 
   const isBusy = agentBusy?.[column.type];
 
-  const [summary, setSummary] = useState<string | null>(null);
+  const [summary, setSummary] = useState<string | null>(
+    (column.config?.summary as string) ?? null,
+  );
   const [summaryOpen, setSummaryOpen] = useState(true);
   const [summarizing, setSummarizing] = useState(false);
+  const [editingSummary, setEditingSummary] = useState(false);
+  const [summaryDraft, setSummaryDraft] = useState('');
 
   const handleSummarize = async () => {
     if (summarizing || cards.length === 0) return;
@@ -65,6 +81,12 @@ const Column: React.FC<ColumnProps> = ({
       );
       setSummary(result);
       setSummaryOpen(true);
+      // Persist summary to column config
+      if (result) {
+        storeUpdateColumn(column.id, {
+          config: { ...column.config, summary: result },
+        });
+      }
     } catch (e) {
       console.error('Summary failed:', e);
     } finally {
@@ -81,6 +103,9 @@ const Column: React.FC<ColumnProps> = ({
     prevLen.current = cards.length;
   }, [cards.length]);
 
+  // Unique speakers for filter dropdown
+  const speakers = Array.from(new Set(cards.map(c => c.speaker).filter(Boolean) as string[]));
+
   let filtered = cards;
   if (search) {
     const q = search.toLowerCase();
@@ -89,6 +114,12 @@ const Column: React.FC<ColumnProps> = ({
         c.content.toLowerCase().includes(q) ||
         c.speaker?.toLowerCase().includes(q),
     );
+  }
+  if (speakerFilter) {
+    filtered = filtered.filter((c) => c.speaker === speakerFilter);
+  }
+  if (sourceFilter) {
+    filtered = filtered.filter((c) => c.source === sourceFilter);
   }
   if (column.type === 'highlights') {
     if (hlF === 'user')
@@ -205,6 +236,15 @@ const Column: React.FC<ColumnProps> = ({
                 {summarizing ? '\u23F3' : '\u2728'}
               </button>
             )}
+            {cards.length > 3 && (
+              <button
+                onClick={() => setShowFilters(o => !o)}
+                className={`cursor-pointer border-none bg-transparent text-[11px] ${showFilters || speakerFilter || sourceFilter ? 'text-indigo-400' : 'text-wall-subtle'} hover:text-indigo-300`}
+                title="Filter cards"
+              >
+                {'\uD83D\uDD0D'}
+              </button>
+            )}
             <button
               onClick={() => toggleColumnCollapsed(column.id)}
               className="cursor-pointer border-none bg-transparent text-[11px] text-wall-subtle"
@@ -213,6 +253,38 @@ const Column: React.FC<ColumnProps> = ({
             </button>
           </div>
         </div>
+
+        {/* ── Column filters ── */}
+        {showFilters && (
+          <div className="flex flex-wrap gap-1 mt-1 px-0.5">
+            {speakers.length > 0 && (
+              <select
+                value={speakerFilter}
+                onChange={(e) => setSpeakerFilter(e.target.value)}
+                className="rounded-md border border-wall-muted bg-wall-border px-1.5 py-0.5 text-[9px] text-wall-text outline-none"
+              >
+                <option value="">All speakers</option>
+                {speakers.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            )}
+            <select
+              value={sourceFilter}
+              onChange={(e) => setSourceFilter(e.target.value)}
+              className="rounded-md border border-wall-muted bg-wall-border px-1.5 py-0.5 text-[9px] text-wall-text outline-none"
+            >
+              <option value="">All sources</option>
+              <option value="user">User</option>
+              <option value="agent">Agent</option>
+              <option value="transcription">Transcript</option>
+            </select>
+            {(speakerFilter || sourceFilter) && (
+              <button
+                onClick={() => { setSpeakerFilter(''); setSourceFilter(''); }}
+                className="cursor-pointer border-none bg-transparent text-[9px] text-indigo-400 hover:text-indigo-300"
+              >Clear</button>
+            )}
+          </div>
+        )}
 
         {/* ── Transcript record controls ── */}
         {column.type === 'transcript' && (
@@ -342,12 +414,29 @@ const Column: React.FC<ColumnProps> = ({
 
       {/* ── Summary panel ── */}
       {summary && (
-        <div className="mx-2 mt-1.5 rounded-md border border-amber-800/40 bg-amber-950/30 px-2.5 py-2">
-          <div className="mb-1 flex items-center justify-between">
+        <div className="mx-2 mt-1.5 rounded-md border border-amber-800/40 bg-amber-950/30 px-2.5 py-2 max-h-[33%] flex flex-col">
+          <div className="mb-1 flex items-center justify-between shrink-0">
             <span className="text-[9px] font-semibold uppercase tracking-wide text-amber-400">
               Summary
             </span>
             <div className="flex gap-1">
+              <button
+                onClick={() => navigator.clipboard?.writeText(summary)}
+                className="cursor-pointer border-none bg-transparent text-[9px] text-amber-500 hover:text-amber-300"
+                title="Copy"
+              >
+                {'\uD83D\uDCCB'}
+              </button>
+              <button
+                onClick={() => {
+                  setSummaryDraft(summary);
+                  setEditingSummary(true);
+                }}
+                className="cursor-pointer border-none bg-transparent text-[9px] text-amber-500 hover:text-amber-300"
+                title="Edit"
+              >
+                {'\u270F\uFE0F'}
+              </button>
               <button
                 onClick={handleSummarize}
                 disabled={summarizing}
@@ -364,19 +453,65 @@ const Column: React.FC<ColumnProps> = ({
                 {summaryOpen ? '\u25B2' : '\u25BC'}
               </button>
               <button
-                onClick={() => setSummary(null)}
+                onClick={() => {
+                  setSummary(null);
+                  setEditingSummary(false);
+                  storeUpdateColumn(column.id, {
+                    config: { ...column.config, summary: undefined },
+                  });
+                }}
                 className="cursor-pointer border-none bg-transparent text-[9px] text-amber-500 hover:text-amber-300"
-                title="Dismiss"
+                title="Delete"
               >
-                {'\u2715'}
+                {'\uD83D\uDDD1\uFE0F'}
               </button>
             </div>
           </div>
-          {summaryOpen && (
-            <p className="m-0 text-[11px] leading-relaxed text-amber-200/80">
-              {summary}
-            </p>
-          )}
+          {summaryOpen && editingSummary ? (
+            <div className="overflow-y-auto min-h-0">
+              <textarea
+                value={summaryDraft}
+                onChange={(e) => setSummaryDraft(e.target.value)}
+                className="w-full rounded-md border border-amber-800/40 bg-amber-950/60 p-1.5 text-[11px] text-amber-200/80 resize-y font-[inherit] outline-none"
+                style={{ minHeight: 60, boxSizing: 'border-box' }}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && e.metaKey) {
+                    setSummary(summaryDraft);
+                    setEditingSummary(false);
+                    storeUpdateColumn(column.id, {
+                      config: { ...column.config, summary: summaryDraft },
+                    });
+                  }
+                  if (e.key === 'Escape') setEditingSummary(false);
+                }}
+              />
+              <div className="flex gap-1 mt-1">
+                <button
+                  onClick={() => {
+                    setSummary(summaryDraft);
+                    setEditingSummary(false);
+                    storeUpdateColumn(column.id, {
+                      config: { ...column.config, summary: summaryDraft },
+                    });
+                  }}
+                  className="text-[10px] bg-amber-700 text-white border-none rounded px-2 py-0.5 cursor-pointer"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => setEditingSummary(false)}
+                  className="text-[10px] bg-wall-muted text-wall-text-muted border-none rounded px-2 py-0.5 cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : summaryOpen ? (
+            <div className="card-markdown text-[11px] leading-relaxed text-amber-200/80 overflow-y-auto min-h-0" style={{ scrollbarWidth: 'thin', scrollbarColor: '#92400e transparent' }}>
+              <ReactMarkdown>{summary}</ReactMarkdown>
+            </div>
+          ) : null}
         </div>
       )}
 
@@ -390,7 +525,12 @@ const Column: React.FC<ColumnProps> = ({
         }}
       >
         {filtered
-          .sort((a, b) => (a.sortOrder || '').localeCompare(b.sortOrder || ''))
+          .sort((a, b) => {
+            // Pinned cards float to top
+            if (a.pinned && !b.pinned) return -1;
+            if (!a.pinned && b.pinned) return 1;
+            return (a.sortOrder || '').localeCompare(b.sortOrder || '');
+          })
           .map((card) => (
             <div
               key={card.id}
@@ -406,7 +546,11 @@ const Column: React.FC<ColumnProps> = ({
                 onNavigate={onNavigate}
                 onDelete={(id) => deleteCard(id)}
                 onHighlight={(id) => toggleHighlight(id)}
+                onPin={(id) => togglePin(id)}
                 onEdit={(id, c) => updateCard(id, { content: c })}
+                linkingFrom={linkingFrom}
+                onStartLink={onStartLink}
+                onCompleteLink={onCompleteLink}
               />
             </div>
           ))}

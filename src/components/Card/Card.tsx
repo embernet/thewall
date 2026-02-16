@@ -1,7 +1,17 @@
 import { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 import type { Card as CardType, ColumnType } from '@/types';
 import { SOURCE_BADGES } from '@/types';
 import { fmtTime } from '@/utils/ids';
+import {
+  isDocumentCard,
+  getFileName,
+  getFileType,
+  getFileIcon,
+  getFilePath,
+  getChunkIds,
+} from '@/utils/document-cards';
+import { bus } from '@/events/bus';
 import ContextMenu, { useContextMenu } from '@/components/ContextMenu/ContextMenu';
 import type { MenuItem } from '@/components/ContextMenu/ContextMenu';
 
@@ -24,8 +34,12 @@ interface CardProps {
   speakerColors?: Record<string, string>;
   onDelete: (id: string) => void;
   onHighlight: (id: string) => void;
+  onPin?: (id: string) => void;
   onEdit: (id: string, content: string) => void;
   onNavigate?: (cardId: string) => void;
+  linkingFrom?: string | null;
+  onStartLink?: (cardId: string) => void;
+  onCompleteLink?: (cardId: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -37,8 +51,12 @@ export default function Card({
   speakerColors,
   onDelete,
   onHighlight,
+  onPin,
   onEdit,
   onNavigate,
+  linkingFrom,
+  onStartLink,
+  onCompleteLink,
 }: CardProps) {
   const [editing, setEditing] = useState(false);
   const [txt, setTxt] = useState(card.content);
@@ -49,12 +67,34 @@ export default function Card({
   const borderColor = HIGHLIGHT_COLORS[card.highlightedBy] || 'transparent';
   const highlighted = borderColor !== 'transparent';
 
+  const isLinkSource = linkingFrom === card.id;
+  const isLinkTarget = linkingFrom != null && linkingFrom !== card.id;
+
   const save = () => {
     onEdit(card.id, txt);
     setEditing(false);
   };
 
   const hasLinks = card.sourceCardIds && card.sourceCardIds.length > 0;
+
+  // Document card detection (tag-based)
+  const isDoc = isDocumentCard(card);
+  const docFileName = isDoc ? getFileName(card) || 'Unknown file' : null;
+  const docFileType = isDoc && docFileName ? getFileType(docFileName) : null;
+  const docIcon = isDoc && docFileName ? getFileIcon(docFileName) : null;
+  const docFilePath = isDoc ? getFilePath(card) : null;
+  const docChunkIds = isDoc ? getChunkIds(card) : [];
+
+  const handleOpenFile = async () => {
+    if (docFilePath && window.electronAPI?.shell?.openPath) {
+      const error = await window.electronAPI.shell.openPath(docFilePath);
+      if (error) console.error('Failed to open file:', error);
+    }
+  };
+
+  const handleViewChunks = () => {
+    bus.emit('document:viewChunks', { docCardId: card.id });
+  };
 
   // Speaker color (dynamic per-session, must use inline style)
   const spkColor = speakerColors?.[card.speaker ?? ''] || '#64748b';
@@ -64,22 +104,70 @@ export default function Card({
       id={`card-${card.id}`}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
+      onClick={isLinkTarget ? () => onCompleteLink?.(card.id) : undefined}
       onContextMenu={(e) => {
+        if (isLinkTarget) return; // No context menu during linking
         const items: MenuItem[] = [
           { label: 'Copy', icon: '\uD83D\uDCCB', onClick: () => navigator.clipboard?.writeText(card.content) },
           { label: 'Edit', icon: '\u270F\uFE0F', onClick: () => { setTxt(card.content); setEditing(true); } },
           { label: card.highlightedBy === 'user' || card.highlightedBy === 'both' ? 'Remove Highlight' : 'Highlight', icon: '\u2B50', onClick: () => onHighlight(card.id) },
+          ...(onPin ? [{ label: card.pinned ? 'Unpin' : 'Pin to Top', icon: '\uD83D\uDCCC', onClick: () => onPin(card.id) }] : []),
+          ...(onStartLink ? [{ label: 'Link to...', icon: '\uD83D\uDD17', onClick: () => onStartLink(card.id) }] : []),
           { label: '', icon: '', separator: true, onClick: () => {} },
           ...(colType !== 'trash' ? [{ label: 'Delete', icon: '\uD83D\uDDD1\uFE0F', danger: true, onClick: () => onDelete(card.id) }] : []),
         ];
         showMenu(e, items);
       }}
-      className="bg-wall-surface rounded-lg px-2.5 py-2 mb-1.5 transition-all duration-150"
+      className={`bg-wall-surface rounded-lg px-2.5 py-2 mb-1.5 transition-all duration-150 ${card.pinned ? 'ring-1 ring-amber-600/40' : ''} ${isLinkSource ? 'ring-2 ring-purple-500' : ''} ${isLinkTarget ? 'cursor-crosshair hover:ring-1 hover:ring-purple-400' : ''}`}
       style={{
-        border: `1px solid ${highlighted ? borderColor : '#1e293b'}`,
+        border: `1px solid ${highlighted ? borderColor : isLinkSource ? '#a855f7' : '#1e293b'}`,
         borderLeft: highlighted ? `3px solid ${borderColor}` : undefined,
       }}
     >
+      {/* ── Pinned indicator ──────────────────────────────────────────── */}
+      {card.pinned && (
+        <div className="text-[9px] text-amber-500 font-semibold mb-0.5">{'\uD83D\uDCCC'} Pinned</div>
+      )}
+
+      {/* ── Document header (file cards only) ─────────────────────────── */}
+      {isDoc && (
+        <div className="mb-1.5">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">{docIcon}</span>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-xs font-medium text-wall-text">
+                {docFileName}
+              </div>
+              <div className="text-[10px] text-wall-subtle">
+                {docFileType} · {docChunkIds.length} chunk{docChunkIds.length !== 1 ? 's' : ''}
+              </div>
+            </div>
+          </div>
+          <div className="mt-1.5 flex gap-1">
+            {docFilePath && (
+              <button
+                onClick={handleOpenFile}
+                className="cursor-pointer rounded-md border-none px-2 py-0.5 text-[10px] font-medium text-white"
+                style={{ background: '#334155' }}
+                title="Open in default application"
+              >
+                {'\uD83D\uDCC1'} Open
+              </button>
+            )}
+            {docChunkIds.length > 0 && (
+              <button
+                onClick={handleViewChunks}
+                className="cursor-pointer rounded-md border-none px-2 py-0.5 text-[10px] font-medium text-white"
+                style={{ background: '#10b981' }}
+                title="View parsed chunks as a column"
+              >
+                {'\uD83D\uDDC2\uFE0F'} Chunks
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ── Speaker label ────────────────────────────────────────────── */}
       {card.speaker && (
         <div className="mb-0.5">
@@ -125,8 +213,8 @@ export default function Card({
           </div>
         </div>
       ) : (
-        <div className="text-xs text-wall-text leading-normal whitespace-pre-wrap break-words">
-          {card.content}
+        <div className="card-markdown text-xs text-wall-text leading-normal break-words">
+          <ReactMarkdown>{card.content}</ReactMarkdown>
         </div>
       )}
 
@@ -202,6 +290,24 @@ export default function Card({
                   : 'Hl',
               fn: () => onHighlight(card.id),
             },
+            ...(onPin
+              ? [
+                  {
+                    icon: '\uD83D\uDCCC',
+                    label: card.pinned ? 'Unpin' : 'Pin',
+                    fn: () => onPin(card.id),
+                  },
+                ]
+              : []),
+            ...(onStartLink
+              ? [
+                  {
+                    icon: '\uD83D\uDD17',
+                    label: 'Link',
+                    fn: () => onStartLink(card.id),
+                  },
+                ]
+              : []),
             ...(colType !== 'trash'
               ? [
                   {

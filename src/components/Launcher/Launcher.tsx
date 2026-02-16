@@ -33,6 +33,49 @@ const DEFAULT_SIM_PARTS: SimParticipant[] = [
 const DEFAULT_SIM_TURNS = 20;
 
 // ---------------------------------------------------------------------------
+// Session templates
+// ---------------------------------------------------------------------------
+
+const SESSION_TEMPLATES = [
+  {
+    id: 'brainstorm',
+    icon: '\uD83D\uDCA1',
+    title: 'Brainstorming',
+    description: 'Freeform ideation with concept extraction, idea generation, and pattern finding.',
+  },
+  {
+    id: 'research',
+    icon: '\uD83D\uDD2C',
+    title: 'Research Review',
+    description: 'Analyse documents, extract claims, verify facts, and surface gaps.',
+  },
+  {
+    id: 'decision',
+    icon: '\u2696\uFE0F',
+    title: 'Decision Making',
+    description: 'Weigh tradeoffs, find alternatives, and track action items.',
+  },
+  {
+    id: 'retro',
+    icon: '\uD83D\uDD04',
+    title: 'Retrospective',
+    description: 'Review what went well, what didn\'t, and generate improvements.',
+  },
+  {
+    id: 'interview',
+    icon: '\uD83C\uDF99\uFE0F',
+    title: 'Interview Notes',
+    description: 'Capture and analyse interview transcripts with question tracking.',
+  },
+  {
+    id: 'strategy',
+    icon: '\uD83C\uDFAF',
+    title: 'Strategy Session',
+    description: 'High-level planning with gap analysis, alternatives, and actions.',
+  },
+];
+
+// ---------------------------------------------------------------------------
 // Tab definitions
 // ---------------------------------------------------------------------------
 
@@ -275,6 +318,26 @@ export default function Launcher({
               >
                 Start Session {'\u2192'}
               </button>
+
+              {/* ── Session Templates ── */}
+              <div className="mt-6 border-t border-wall-muted pt-4">
+                <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-wall-subtle">
+                  Quick Start Templates
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {SESSION_TEMPLATES.map((tpl) => (
+                    <button
+                      key={tpl.id}
+                      onClick={() => onStart(tpl.title)}
+                      className="cursor-pointer rounded-lg border border-wall-muted bg-wall-border/50 px-3 py-2.5 text-left hover:border-indigo-500/50 hover:bg-wall-border"
+                    >
+                      <div className="text-sm mb-0.5">{tpl.icon}</div>
+                      <div className="text-[11px] font-semibold text-wall-text">{tpl.title}</div>
+                      <div className="text-[9px] text-wall-subtle leading-snug mt-0.5">{tpl.description}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
 

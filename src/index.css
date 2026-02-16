@@ -34,6 +34,79 @@
   }
 }
 
+@layer components {
+  /* ── Card markdown rendering ─────────────────────────────────────── */
+  .card-markdown p {
+    @apply my-1;
+  }
+  .card-markdown p:first-child {
+    @apply mt-0;
+  }
+  .card-markdown p:last-child {
+    @apply mb-0;
+  }
+  .card-markdown strong {
+    @apply font-semibold text-wall-text;
+  }
+  .card-markdown em {
+    @apply italic;
+  }
+  .card-markdown h1,
+  .card-markdown h2,
+  .card-markdown h3,
+  .card-markdown h4,
+  .card-markdown h5,
+  .card-markdown h6 {
+    @apply font-semibold text-wall-text mt-2 mb-1;
+  }
+  .card-markdown h1 { @apply text-sm; }
+  .card-markdown h2 { @apply text-xs; }
+  .card-markdown h3, .card-markdown h4,
+  .card-markdown h5, .card-markdown h6 {
+    @apply text-xs;
+  }
+  .card-markdown ul,
+  .card-markdown ol {
+    @apply my-1 pl-4;
+  }
+  .card-markdown ul {
+    list-style-type: disc;
+  }
+  .card-markdown ol {
+    list-style-type: decimal;
+  }
+  .card-markdown li {
+    @apply my-0.5;
+  }
+  .card-markdown code {
+    @apply bg-wall-border rounded px-1 py-px text-[10px] font-mono text-cyan-400;
+  }
+  .card-markdown pre {
+    @apply bg-wall-border rounded-md p-2 my-1 overflow-x-auto;
+  }
+  .card-markdown pre code {
+    @apply bg-transparent p-0 text-[10px];
+  }
+  .card-markdown blockquote {
+    @apply border-l-2 border-wall-muted pl-2 my-1 text-wall-subtle italic;
+  }
+  .card-markdown a {
+    @apply text-indigo-400 underline;
+  }
+  .card-markdown hr {
+    @apply border-wall-border my-2;
+  }
+  .card-markdown table {
+    @apply w-full my-1 text-[10px];
+  }
+  .card-markdown th {
+    @apply text-left font-semibold border-b border-wall-border pb-0.5 pr-2;
+  }
+  .card-markdown td {
+    @apply border-b border-wall-border py-0.5 pr-2;
+  }
+}
+
 @layer utilities {
   /* Pulse animation for recording indicators */
   @keyframes wall-pulse {
@@ -48,5 +121,20 @@
   }
   .animate-wall-pulse {
     animation: wall-pulse 1.5s ease-in-out infinite;
+  }
+
+  /* Slide-in-right animation for notification toasts */
+  @keyframes slide-in-right {
+    0% {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    100% {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+  .animate-slide-in-right {
+    animation: slide-in-right 0.3s ease-out;
   }
 }

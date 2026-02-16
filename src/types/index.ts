@@ -14,6 +14,7 @@ export type ColumnType =
   | 'transcript'
   | 'observations'
   | 'notes'
+  | 'context'
   | 'concepts'
   | 'ideas'
   | 'questions'
@@ -94,6 +95,7 @@ export interface Card {
   /** Timestamp in milliseconds relative to session start. */
   timestamp?: number;
   highlightedBy: HighlightState;
+  pinned?: boolean;
   isDeleted: boolean;
   createdAt: string;
   updatedAt: string;
@@ -320,6 +322,19 @@ export interface ApiKeyConfig {
 }
 
 // ----------------------------------------------------------------------------
+// Electron IPC -- File Processing
+// ----------------------------------------------------------------------------
+
+/** Chunk returned from file processing in the main process. */
+export interface FileChunk {
+  content: string;
+  fileName: string;
+  filePath: string;
+  chunkIndex: number;
+  totalChunks: number;
+}
+
+// ----------------------------------------------------------------------------
 // Electron IPC -- Database API
 // ----------------------------------------------------------------------------
 
@@ -355,6 +370,15 @@ export interface ElectronDbApi {
 
   // API Usage
   logApiUsage: (usage: ApiUsageRecord) => Promise<void>;
+  getApiUsageSummary: () => Promise<{
+    byModel: {
+      provider: string; model: string;
+      input_tokens: number; output_tokens: number;
+      cost_usd: number; call_count: number;
+      first_call: string; last_call: string;
+    }[];
+    totals: { total_cost: number; total_input: number; total_output: number; total_calls: number };
+  }>;
 
   // API Key Management
   getApiKeyConfigs: () => Promise<ApiKeyConfig[]>;
@@ -378,12 +402,18 @@ export interface ElectronDbApi {
   importSession: (data: SessionExport) => Promise<boolean>;
   exportSession: (sessionId: string) => Promise<SessionExport | null>;
   exportAllSessions: () => Promise<BackupExport>;
+
+  // File processing (Context column)
+  processContextFile: () => Promise<FileChunk[]>;
 }
 
 export type EmbeddingProvider = 'openai' | 'local';
 
 export interface ElectronAPI {
   db: ElectronDbApi;
+  shell: {
+    openPath: (filePath: string) => Promise<string>;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -436,8 +466,9 @@ declare global {
 /** All column types with their display metadata, in default sort order. */
 export const COL_TYPES: readonly ColumnMeta[] = [
   { type: 'transcript',    title: 'Transcript',    icon: '\uD83C\uDF99\uFE0F', color: '#ef4444' },
-  { type: 'observations', title: 'Observations',  icon: '\uD83D\uDD0D',       color: '#6366f1' },
   { type: 'notes',        title: 'Notes',         icon: '\uD83D\uDCDD',       color: '#8b9cf6' },
+  { type: 'context',      title: 'Context',       icon: '\uD83D\uDCC2',       color: '#10b981' },
+  { type: 'observations', title: 'Observations',  icon: '\uD83D\uDD0D',       color: '#6366f1' },
   { type: 'concepts',     title: 'Key Concepts',  icon: '\uD83D\uDCA1',       color: '#8b5cf6' },
   { type: 'ideas',       title: 'Ideas',         icon: '\uD83E\uDDE0',       color: '#a855f7' },
   { type: 'questions',   title: 'Questions',      icon: '\u2753',             color: '#ec4899' },

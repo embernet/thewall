@@ -13,8 +13,13 @@ import type {
   SessionMode,
   HighlightState,
   QueuePauseReason,
+  SourceLink,
 } from '@/types';
+import { COL_TYPES } from '@/types';
 import { bus } from '@/events/bus';
+
+/** Quick lookup map for column type → icon/color */
+const COL_TYPES_LOOKUP = new Map(COL_TYPES.map(c => [c.type, { icon: c.icon, color: c.color }]));
 
 /* ------------------------------------------------------------------ */
 /*  Highlight toggle map: none->user, user->none, ai->both, both->ai  */
@@ -60,8 +65,16 @@ export interface SessionState {
   deleteCard: (id: string) => void;
   moveCard: (cardId: string, columnId: string, sortOrder: string) => void;
   toggleHighlight: (id: string) => void;
+  togglePin: (id: string) => void;
+  linkCards: (fromId: string, toId: string) => void;
+  unlinkCard: (cardId: string, linkId: string) => void;
   toggleColumnVisibility: (id: string) => void;
   toggleColumnCollapsed: (id: string) => void;
+  setColumnVisible: (id: string, visible: boolean) => void;
+  updateColumnOrder: (orderedIds: string[]) => void;
+  addColumn: (col: Column) => void;
+  removeColumn: (id: string) => void;
+  updateColumn: (id: string, updates: Partial<Column>) => void;
   emptyTrash: () => void;
   setAudio: (updates: Partial<AudioState>) => void;
   setAgentBusy: (key: string, busy: boolean) => void;
@@ -195,6 +208,48 @@ export const useSessionStore = create<SessionState>()(temporal((set, get) => ({
       }),
     })),
 
+  // ── PIN: toggle card pinned state ──
+  togglePin: (id) =>
+    set((state) => ({
+      cards: state.cards.map((c) =>
+        c.id === id ? { ...c, pinned: !c.pinned } : c,
+      ),
+    })),
+
+  // ── LINK: link two cards together ──
+  linkCards: (fromId, toId) =>
+    set((state) => {
+      const toCard = state.cards.find((c) => c.id === toId);
+      if (!toCard) return state;
+      const toCol = state.columns.find((c) => c.id === toCard.columnId);
+      const colMeta = toCol
+        ? (COL_TYPES_LOOKUP.get(toCol.type) || { icon: '\uD83D\uDD17', color: '#64748b' })
+        : { icon: '\uD83D\uDD17', color: '#64748b' };
+      const link: SourceLink = {
+        id: toId,
+        label: toCard.content.slice(0, 40) + (toCard.content.length > 40 ? '...' : ''),
+        icon: colMeta.icon,
+        color: colMeta.color,
+      };
+      return {
+        cards: state.cards.map((c) => {
+          if (c.id !== fromId) return c;
+          // Don't add duplicate links
+          if (c.sourceCardIds.some((s) => s.id === toId)) return c;
+          return { ...c, sourceCardIds: [...c.sourceCardIds, link] };
+        }),
+      };
+    }),
+
+  unlinkCard: (cardId, linkId) =>
+    set((state) => ({
+      cards: state.cards.map((c) =>
+        c.id === cardId
+          ? { ...c, sourceCardIds: c.sourceCardIds.filter((s) => s.id !== linkId) }
+          : c,
+      ),
+    })),
+
   // ── TOG_VIS: toggle column visibility ──
   toggleColumnVisibility: (id) =>
     set((state) => ({
@@ -208,6 +263,44 @@ export const useSessionStore = create<SessionState>()(temporal((set, get) => ({
     set((state) => ({
       columns: state.columns.map((c) =>
         c.id === id ? { ...c, collapsed: !c.collapsed } : c,
+      ),
+    })),
+
+  // ── SET_COL_VIS: explicit set column visibility ──
+  setColumnVisible: (id, visible) =>
+    set((state) => ({
+      columns: state.columns.map((c) =>
+        c.id === id ? { ...c, visible } : c,
+      ),
+    })),
+
+  // ── UPDATE_COL_ORDER: reorder columns by ID array ──
+  updateColumnOrder: (orderedIds) =>
+    set((state) => ({
+      columns: state.columns.map((c) => {
+        const idx = orderedIds.indexOf(c.id);
+        if (idx === -1) return c;
+        return { ...c, sortOrder: String.fromCharCode(98 + idx * 2) };
+      }),
+    })),
+
+  // ── ADD_COLUMN: append a new column ──
+  addColumn: (col) =>
+    set((state) => ({
+      columns: [...state.columns, col],
+    })),
+
+  // ── REMOVE_COLUMN: remove a column by id ──
+  removeColumn: (id) =>
+    set((state) => ({
+      columns: state.columns.filter((c) => c.id !== id),
+    })),
+
+  // ── UPDATE_COLUMN: partial update by id ──
+  updateColumn: (id, updates) =>
+    set((state) => ({
+      columns: state.columns.map((c) =>
+        c.id === id ? { ...c, ...updates } : c,
       ),
     })),
 

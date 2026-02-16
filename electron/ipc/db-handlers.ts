@@ -123,10 +123,10 @@ export function registerDbHandlers() {
   ipcMain.handle('db:createCard', (_e, card: any) => {
     db()
       .prepare(
-        `INSERT INTO cards (id, column_id, session_id, content, source, source_agent_id, source_agent_name,
+        `INSERT OR IGNORE INTO cards (id, column_id, session_id, content, source, source_agent_id, source_agent_name,
          source_card_ids, prompt_used, ai_tags, user_tags, speaker, timestamp_ms, highlighted_by,
-         is_deleted, created_at, updated_at, sort_order)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         is_deleted, pinned, created_at, updated_at, sort_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         card.id,
@@ -144,6 +144,7 @@ export function registerDbHandlers() {
         card.timestamp ?? null,
         card.highlightedBy || 'none',
         card.isDeleted ? 1 : 0,
+        card.pinned ? 1 : 0,
         card.createdAt || new Date().toISOString(),
         card.updatedAt || new Date().toISOString(),
         card.sortOrder
@@ -163,6 +164,7 @@ export function registerDbHandlers() {
     if (updates.aiTags !== undefined) { fields.push('ai_tags = ?'); values.push(JSON.stringify(updates.aiTags)); }
     if (updates.userTags !== undefined) { fields.push('user_tags = ?'); values.push(JSON.stringify(updates.userTags)); }
     if (updates.sourceCardIds !== undefined) { fields.push('source_card_ids = ?'); values.push(JSON.stringify(updates.sourceCardIds)); }
+    if (updates.pinned !== undefined) { fields.push('pinned = ?'); values.push(updates.pinned ? 1 : 0); }
 
     fields.push('updated_at = ?');
     values.push(new Date().toISOString());
@@ -300,6 +302,33 @@ export function registerDbHandlers() {
         usage.costUsd || 0,
         usage.createdAt || new Date().toISOString()
       );
+  });
+
+  ipcMain.handle('db:getApiUsageSummary', () => {
+    const rows = db()
+      .prepare(
+        `SELECT provider, model,
+                SUM(input_tokens) as input_tokens,
+                SUM(output_tokens) as output_tokens,
+                SUM(cost_usd) as cost_usd,
+                COUNT(*) as call_count,
+                MIN(created_at) as first_call,
+                MAX(created_at) as last_call
+         FROM api_usage
+         GROUP BY provider, model
+         ORDER BY cost_usd DESC`
+      )
+      .all();
+    const total = db()
+      .prepare(
+        `SELECT SUM(cost_usd) as total_cost,
+                SUM(input_tokens) as total_input,
+                SUM(output_tokens) as total_output,
+                COUNT(*) as total_calls
+         FROM api_usage`
+      )
+      .get() as any;
+    return { byModel: rows, totals: total || { total_cost: 0, total_input: 0, total_output: 0, total_calls: 0 } };
   });
 
   // ── Embeddings ──
@@ -507,8 +536,8 @@ export function registerDbHandlers() {
       const cardStmt = d.prepare(
         `INSERT INTO cards (id, column_id, session_id, content, source, source_agent_name,
          source_card_ids, prompt_used, ai_tags, user_tags, speaker, timestamp_ms,
-         highlighted_by, is_deleted, created_at, updated_at, sort_order)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         highlighted_by, is_deleted, pinned, created_at, updated_at, sort_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       );
       for (const card of data.cards || []) {
         cardStmt.run(
@@ -526,6 +555,7 @@ export function registerDbHandlers() {
           card.timestamp ?? card.timestamp_ms ?? null,
           card.highlightedBy || card.highlighted_by || 'none',
           card.isDeleted || card.is_deleted ? 1 : 0,
+          card.pinned ? 1 : 0,
           card.createdAt || card.created_at || new Date().toISOString(),
           card.updatedAt || card.updated_at || new Date().toISOString(),
           card.sortOrder || card.sort_order || 'n'
@@ -651,6 +681,7 @@ function mapCardFromDb(row: any) {
     timestamp: row.timestamp_ms,
     highlightedBy: row.highlighted_by,
     isDeleted: !!row.is_deleted,
+    pinned: !!row.pinned,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     sortOrder: row.sort_order,

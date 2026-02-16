@@ -34,6 +34,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // API Usage
     logApiUsage: (usage: any) => ipcRenderer.invoke('db:logApiUsage', usage),
+    getApiUsageSummary: () => ipcRenderer.invoke('db:getApiUsageSummary'),
 
     // API Key Management
     getApiKeyConfigs: () => ipcRenderer.invoke('db:getApiKeyConfigs'),
@@ -59,5 +60,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     importSession: (data: any) => ipcRenderer.invoke('db:importSession', data),
     exportSession: (sessionId: string) => ipcRenderer.invoke('db:exportSession', sessionId),
     exportAllSessions: () => ipcRenderer.invoke('db:exportAllSessions'),
+
+    // File processing (Context column)
+    processContextFile: () => ipcRenderer.invoke('file:processContextFile'),
+  },
+
+  // Shell utilities
+  shell: {
+    openPath: (filePath: string) => ipcRenderer.invoke('file:openPath', filePath),
   },
 });

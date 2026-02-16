@@ -1,12 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { COL_TYPES } from '@/types';
-import type { ColumnMeta, ApiSlot, ApiProvider, ApiKeyConfig } from '@/types';
-import { useSessionStore } from '@/store/session';
+import type { ApiSlot, ApiProvider, ApiKeyConfig } from '@/types';
 import { SLOT_PROVIDERS, providerNeedsKey, getSlotDef } from '@/utils/providers';
 import type { SlotDef } from '@/utils/providers';
 import { setChatConfig, validateApiKey } from '@/utils/llm';
 import { setEmbeddingConfig } from '@/utils/embedding-service';
 import { bus } from '@/events/bus';
+// Note: Column management is now handled by the ColumnSidebar component
 
 // ---------------------------------------------------------------------------
 // Props
@@ -73,8 +72,6 @@ type SettingsTab = 'columns' | 'agents' | 'api keys';
 
 export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
   const [tab, setTab] = useState<SettingsTab>('columns');
-  const columns = useSessionStore((s) => s.columns);
-  const toggleColumnVisibility = useSessionStore((s) => s.toggleColumnVisibility);
 
   // API Key slot states
   const [slotStates, setSlotStates] = useState<Record<ApiSlot, SlotState>>({
@@ -235,31 +232,11 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
         </div>
 
         {/* Columns tab */}
-        {tab === 'columns' &&
-          columns.map((col) => {
-            const meta: ColumnMeta | undefined = COL_TYPES.find((c) => c.type === col.type);
-            return (
-              <div
-                key={col.id}
-                className="flex items-center justify-between border-b border-wall-border py-1.5"
-              >
-                <div className="flex items-center gap-1.5">
-                  <span>{meta?.icon}</span>
-                  <span className="text-xs text-wall-text">{col.title}</span>
-                </div>
-                <button
-                  onClick={() => toggleColumnVisibility(col.id)}
-                  className="relative h-[19px] w-9 cursor-pointer rounded-[10px] border-none"
-                  style={{ background: col.visible ? '#4f46e5' : '#334155' }}
-                >
-                  <div
-                    className="absolute top-[3px] h-[13px] w-[13px] rounded-full bg-white transition-[left] duration-200"
-                    style={{ left: col.visible ? 20 : 3 }}
-                  />
-                </button>
-              </div>
-            );
-          })}
+        {tab === 'columns' && (
+          <div className="py-4 text-center text-xs text-wall-text-dim">
+            Use the sidebar on the left to manage column visibility, ordering, and layout.
+          </div>
+        )}
 
         {/* Agents tab */}
         {tab === 'agents' &&

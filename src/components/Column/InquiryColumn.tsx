@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import type { Column, Card as CardType } from '@/types';
+import type { Column, Card as CardType, SourceLink } from '@/types';
+import { COL_TYPES } from '@/types';
 import { useSessionStore } from '@/store/session';
 import { uid, now, mid } from '@/utils/ids';
 import { askClaude } from '@/utils/llm';
@@ -28,6 +29,7 @@ const InquiryColumn: React.FC<InquiryColumnProps> = ({
   const toggleHighlight = useSessionStore((s) => s.toggleHighlight);
   const updateCard = useSessionStore((s) => s.updateCard);
   const speakerColors = useSessionStore((s) => s.speakerColors);
+  const storeColumns = useSessionStore((s) => s.columns);
 
   const iCards = [...cards].sort((a, b) =>
     (a.sortOrder || '').localeCompare(b.sortOrder || ''),
@@ -92,6 +94,19 @@ const InquiryColumn: React.FC<InquiryColumnProps> = ({
     setLoading(false);
     if (!result) return;
 
+    // Build source references from the top relevant cards
+    const sourceLinks: SourceLink[] = relevant.slice(0, 5).map((r) => {
+      const col = storeColumns.find((c) => c.id === r.card.columnId);
+      const meta = col ? COL_TYPES.find((m) => m.type === col.type) : null;
+      const label = r.card.content.slice(0, 60) + (r.card.content.length > 60 ? '...' : '');
+      return {
+        id: r.card.id,
+        label,
+        icon: meta?.icon || '\uD83D\uDCCB',
+        color: meta?.color || '#6b7280',
+      };
+    });
+
     // Get the latest sorted cards to find the correct last sortOrder
     // (a new card was just added above, so we need the store's current state)
     const last2 = iCards[iCards.length - 1];
@@ -109,7 +124,7 @@ const InquiryColumn: React.FC<InquiryColumnProps> = ({
         relevant.length +
         '\n\nContext:\n' +
         context.slice(0, 500),
-      sourceCardIds: [],
+      sourceCardIds: sourceLinks,
       aiTags: [],
       userTags: [],
       highlightedBy: 'none',
@@ -168,6 +183,7 @@ const InquiryColumn: React.FC<InquiryColumnProps> = ({
             card={card}
             colType="inquiry"
             speakerColors={speakerColors}
+            onNavigate={onNavigate}
             onDelete={(id) => deleteCard(id)}
             onHighlight={(id) => toggleHighlight(id)}
             onEdit={(id, c) => updateCard(id, { content: c })}

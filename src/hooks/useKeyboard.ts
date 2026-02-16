@@ -6,7 +6,7 @@ import { useTemporalStore } from '@/store/session';
 // Global Keyboard Shortcuts
 // ---------------------------------------------------------------------------
 
-export function useKeyboard() {
+export function useKeyboard(callbacks?: { onSearch?: () => void; onEscape?: () => void }) {
   const view = useSessionStore(s => s.view);
 
   useEffect(() => {
@@ -16,6 +16,13 @@ export function useKeyboard() {
       const meta = e.metaKey || e.ctrlKey;
       const target = e.target as HTMLElement;
       const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+
+      // Cmd+K — Global search (works even in inputs)
+      if (meta && e.key === 'k') {
+        e.preventDefault();
+        callbacks?.onSearch?.();
+        return;
+      }
 
       // Cmd+Z — Undo
       if (meta && !e.shiftKey && e.key === 'z' && !isInput) {
@@ -31,8 +38,9 @@ export function useKeyboard() {
         return;
       }
 
-      // Escape — close any open panel (handled by React state, but blur focus)
+      // Escape — cancel linking / close panels / blur focus
       if (e.key === 'Escape') {
+        callbacks?.onEscape?.();
         (document.activeElement as HTMLElement)?.blur?.();
         return;
       }
@@ -40,5 +48,5 @@ export function useKeyboard() {
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [view]);
+  }, [view, callbacks]);
 }

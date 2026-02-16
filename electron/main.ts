@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { initDatabase, getDatabase } from './ipc/database';
 import { registerDbHandlers } from './ipc/db-handlers';
+import { registerFileHandlers } from './ipc/file-handlers';
 
 // ESM polyfill for __dirname (not available in ES modules)
 const __filename = fileURLToPath(import.meta.url);
@@ -47,6 +48,7 @@ app.whenReady().then(() => {
   const userDataPath = app.getPath('userData');
   initDatabase(userDataPath);
   registerDbHandlers();
+  registerFileHandlers();
 
   createWindow();
 });

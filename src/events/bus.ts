@@ -19,6 +19,7 @@ export type AppEvents = {
   'graph:edgeAdded': { edgeId: string; sourceId: string; targetId: string; relationship: string };
   'api:statusChanged': { status: ApiKeyStatus };
   'queue:pauseChanged': { reason: QueuePauseReason };
+  'document:viewChunks': { docCardId: string; highlightChunkId?: string };
 };
 
 // ---------------------------------------------------------------------------
