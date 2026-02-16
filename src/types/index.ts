@@ -193,6 +193,10 @@ export interface AudioState {
 export interface SimParticipant {
   name: string;
   role: string;
+  /** Built-in persona ID, or null for a custom description. */
+  personaId: string | null;
+  /** Custom persona system prompt (used when personaId is null or as override). */
+  personaPrompt: string;
 }
 
 /** Configuration for a simulated meeting. */
@@ -255,6 +259,10 @@ export interface AgentConfigOverride {
   triggerOnTranscript: boolean | null;
   inputColumns: string[] | null;
   toolIds: string[] | null;
+  /** Max tokens for LLM response. NULL = use agent default. */
+  maxTokens: number | null;
+  /** Cosine similarity threshold for dedup. NULL = use agent default (0.85). */
+  dedupThreshold: number | null;
   updatedAt: string;
 }
 
@@ -263,6 +271,8 @@ export interface CustomAgentConfig {
   id: string;
   name: string;
   description: string;
+  /** Built-in persona ID used as basis for system prompt, or null. */
+  personaId: string | null;
   systemPrompt: string;
   userPrompt: string;
   targetColumn: string;

@@ -506,14 +506,16 @@ export function registerDbHandlers() {
       triggerOnTranscript: r.trigger_on_transcript != null ? !!r.trigger_on_transcript : null,
       inputColumns: safeJsonParse(r.input_columns, null),
       toolIds: safeJsonParse(r.tool_ids, null),
+      maxTokens: r.max_tokens ?? null,
+      dedupThreshold: r.dedup_threshold ?? null,
       updatedAt: r.updated_at,
     }));
   });
 
   ipcMain.handle('db:saveAgentConfig', (_e, agentId: string, config: any) => {
     db().prepare(
-      `INSERT INTO agent_configs (agent_id, enabled, system_prompt, user_prompt, priority, target_column, trigger_on_transcript, input_columns, tool_ids, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO agent_configs (agent_id, enabled, system_prompt, user_prompt, priority, target_column, trigger_on_transcript, input_columns, tool_ids, max_tokens, dedup_threshold, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(agent_id) DO UPDATE SET
          enabled = excluded.enabled,
          system_prompt = excluded.system_prompt,
@@ -523,6 +525,8 @@ export function registerDbHandlers() {
          trigger_on_transcript = excluded.trigger_on_transcript,
          input_columns = excluded.input_columns,
          tool_ids = excluded.tool_ids,
+         max_tokens = excluded.max_tokens,
+         dedup_threshold = excluded.dedup_threshold,
          updated_at = excluded.updated_at`
     ).run(
       agentId,
@@ -534,6 +538,8 @@ export function registerDbHandlers() {
       config.triggerOnTranscript != null ? (config.triggerOnTranscript ? 1 : 0) : null,
       config.inputColumns ? JSON.stringify(config.inputColumns) : null,
       config.toolIds ? JSON.stringify(config.toolIds) : null,
+      config.maxTokens ?? null,
+      config.dedupThreshold ?? null,
       new Date().toISOString()
     );
   });
@@ -548,6 +554,7 @@ export function registerDbHandlers() {
       id: r.id,
       name: r.name,
       description: r.description || '',
+      personaId: r.persona_id || null,
       systemPrompt: r.system_prompt,
       userPrompt: r.user_prompt,
       targetColumn: r.target_column,
@@ -564,11 +571,12 @@ export function registerDbHandlers() {
 
   ipcMain.handle('db:saveCustomAgent', (_e, agent: any) => {
     db().prepare(
-      `INSERT INTO custom_agents (id, name, description, system_prompt, user_prompt, target_column, priority, trigger_on_transcript, depends_on, input_columns, tool_ids, enabled, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO custom_agents (id, name, description, persona_id, system_prompt, user_prompt, target_column, priority, trigger_on_transcript, depends_on, input_columns, tool_ids, enabled, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          name = excluded.name,
          description = excluded.description,
+         persona_id = excluded.persona_id,
          system_prompt = excluded.system_prompt,
          user_prompt = excluded.user_prompt,
          target_column = excluded.target_column,
@@ -583,6 +591,7 @@ export function registerDbHandlers() {
       agent.id,
       agent.name,
       agent.description || '',
+      agent.personaId || null,
       agent.systemPrompt,
       agent.userPrompt,
       agent.targetColumn,

@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { v4 as uuid } from 'uuid';
 import { COL_TYPES } from '@/types';
 import type { CustomAgentConfig } from '@/types';
+import { personaRegistry } from '@/personas/base';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -20,22 +21,35 @@ interface CreateAgentDialogProps {
 const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({ open, onClose, onSave }) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [personaId, setPersonaId] = useState<string | null>(null);
   const [sysPrompt, setSysPrompt] = useState('');
   const [usrPrompt, setUsrPrompt] = useState('{{transcript}}');
   const [targetCol, setTargetCol] = useState('observations');
   const [priority, setPriority] = useState(5);
   const [triggerOnTranscript, setTriggerOnTranscript] = useState(true);
 
+  const personas = useMemo(() => personaRegistry.list(), []);
+  const selectedPersona = personaId ? personaRegistry.get(personaId) : null;
+
   if (!open) return null;
 
   function handleCreate() {
-    if (!name.trim() || !sysPrompt.trim()) return;
+    if (!name.trim()) return;
+
+    // Build the effective system prompt: persona prefix + user's additional instructions
+    const personaPrefix = selectedPersona?.systemPromptPrefix || '';
+    const effectiveSystemPrompt = personaPrefix && sysPrompt.trim()
+      ? personaPrefix + '\n\n' + sysPrompt.trim()
+      : personaPrefix || sysPrompt.trim();
+
+    if (!effectiveSystemPrompt) return;
 
     const agent: CustomAgentConfig = {
       id: `custom-${uuid().slice(0, 8)}`,
       name: name.trim(),
       description: description.trim(),
-      systemPrompt: sysPrompt,
+      personaId,
+      systemPrompt: effectiveSystemPrompt,
       userPrompt: usrPrompt,
       targetColumn: targetCol,
       priority,
@@ -52,6 +66,7 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({ open, onClose, on
     // Reset form
     setName('');
     setDescription('');
+    setPersonaId(null);
     setSysPrompt('');
     setUsrPrompt('{{transcript}}');
     setTargetCol('observations');
@@ -59,6 +74,8 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({ open, onClose, on
     setTriggerOnTranscript(true);
     onClose();
   }
+
+  const hasValidPrompt = !!(selectedPersona?.systemPromptPrefix || sysPrompt.trim());
 
   return (
     <div
@@ -100,14 +117,47 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({ open, onClose, on
             />
           </div>
 
-          {/* System Prompt */}
+          {/* Persona */}
           <div>
-            <label className="block text-[10px] font-semibold text-wall-text mb-0.5">System Prompt *</label>
+            <label className="block text-[10px] font-semibold text-wall-text mb-0.5">Persona</label>
+            <p className="text-[8px] text-wall-subtle mb-1">
+              Select a persona to use as the basis for this agent's system prompt. Additional instructions below will be appended.
+            </p>
+            <select
+              value={personaId || ''}
+              onChange={e => setPersonaId(e.target.value || null)}
+              className="w-full rounded-md border border-wall-muted bg-wall-border px-2 py-1.5 text-[11px] text-wall-text outline-none focus:border-indigo-500"
+            >
+              <option value="">No persona (write custom system prompt)</option>
+              {personas.map(p => (
+                <option key={p.id} value={p.id}>{p.icon} {p.name} — {p.description}</option>
+              ))}
+            </select>
+            {selectedPersona && (
+              <div className="mt-1 rounded-md border border-indigo-500/20 bg-indigo-950/20 px-2 py-1.5">
+                <div className="text-[9px] font-semibold text-indigo-300 mb-0.5">
+                  {selectedPersona.icon} {selectedPersona.name} persona prompt:
+                </div>
+                <div className="text-[8px] text-wall-text-dim leading-relaxed max-h-[60px] overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-wall-muted">
+                  {selectedPersona.systemPromptPrefix}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* System Prompt (additional or full) */}
+          <div>
+            <label className="block text-[10px] font-semibold text-wall-text mb-0.5">
+              {selectedPersona ? 'Additional System Instructions' : 'System Prompt *'}
+            </label>
             <textarea
               value={sysPrompt}
               onChange={e => setSysPrompt(e.target.value)}
               rows={4}
-              placeholder="Instructions for the LLM. Describe what insights to extract and output format."
+              placeholder={selectedPersona
+                ? 'Additional instructions appended to the persona prompt (optional).'
+                : 'Instructions for the LLM. Describe what insights to extract and output format.'
+              }
               className="w-full rounded-md border border-wall-muted bg-wall-border/40 px-2 py-1.5 text-[11px] text-wall-text font-mono outline-none resize-y placeholder:text-wall-subtle focus:border-indigo-500"
             />
           </div>
@@ -179,9 +229,9 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({ open, onClose, on
           </button>
           <button
             onClick={handleCreate}
-            disabled={!name.trim() || !sysPrompt.trim()}
+            disabled={!name.trim() || !hasValidPrompt}
             className={`cursor-pointer rounded-md border px-3 py-1 text-[10px] font-semibold ${
-              name.trim() && sysPrompt.trim()
+              name.trim() && hasValidPrompt
                 ? 'border-indigo-500 bg-indigo-950 text-indigo-300 hover:bg-indigo-900'
                 : 'border-wall-muted bg-wall-border text-wall-subtle cursor-not-allowed'
             }`}

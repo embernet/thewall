@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import type { SessionIndexEntry, SimConfig, SimParticipant, SessionExport, BackupExport } from '@/types';
 import { SPEAKER_COLORS } from '@/types';
 import { exportSessionToFile, readFileAsJSON, downloadJSON } from '@/utils/export';
+import { personaRegistry } from '@/personas/base';
+import { builtInPersonas } from '@/personas/built-in';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -24,10 +26,10 @@ const DEFAULT_SIM_CTX =
   'Q3 product roadmap review. The team needs to decide between investing in developer experience or a new real-time collaboration feature.';
 
 const DEFAULT_SIM_PARTS: SimParticipant[] = [
-  { name: 'Alex', role: 'VP Engineering \u2014 facilitator' },
-  { name: 'Jordan', role: 'Lead Analyst \u2014 data-driven' },
-  { name: 'Sam', role: 'Head of Support \u2014 customer advocate' },
-  { name: 'Morgan', role: 'CFO \u2014 revenue focused' },
+  { name: 'Alex', role: 'VP Engineering \u2014 facilitator', personaId: 'cto', personaPrompt: '' },
+  { name: 'Jordan', role: 'Lead Analyst \u2014 data-driven', personaId: 'analyst', personaPrompt: '' },
+  { name: 'Sam', role: 'Head of Support \u2014 customer advocate', personaId: 'advocate', personaPrompt: '' },
+  { name: 'Morgan', role: 'CFO \u2014 revenue focused', personaId: 'cfo', personaPrompt: '' },
 ];
 
 const DEFAULT_SIM_TURNS = 20;
@@ -144,6 +146,97 @@ async function importSessionFromFile(onDone: () => void) {
       alert('Import failed: ' + (e instanceof Error ? e.message : String(e)));
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// Persona Picker (inline component)
+// ---------------------------------------------------------------------------
+
+function PersonaPicker({
+  participant,
+  index,
+  onChange,
+}: {
+  participant: SimParticipant;
+  index: number;
+  onChange: (updated: SimParticipant) => void;
+}) {
+  const [showPicker, setShowPicker] = useState(false);
+  // Use builtInPersonas directly — the registry may not be populated yet
+  // (it's filled during initOrchestrator, which runs after a session opens).
+  const personas = builtInPersonas;
+  const selectedPersona = participant.personaId
+    ? builtInPersonas.find(p => p.id === participant.personaId) ?? null
+    : null;
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setShowPicker(!showPicker)}
+        className="w-full cursor-pointer rounded-md border border-wall-muted bg-wall-border px-[7px] py-[5px] text-left text-[10px] text-wall-text outline-none hover:border-indigo-500/50"
+      >
+        {selectedPersona ? (
+          <span>{selectedPersona.icon} {selectedPersona.name}</span>
+        ) : participant.personaPrompt ? (
+          <span className="text-wall-text-muted">Custom persona</span>
+        ) : (
+          <span className="text-wall-subtle">Select persona...</span>
+        )}
+      </button>
+
+      {showPicker && (
+        <div
+          className="absolute left-0 top-full z-50 mt-1 max-h-[240px] w-[260px] overflow-y-auto rounded-lg border border-wall-border bg-wall-surface shadow-xl scrollbar-thin scrollbar-track-transparent scrollbar-thumb-wall-muted"
+        >
+          {/* No persona / custom */}
+          <button
+            onClick={() => {
+              onChange({ ...participant, personaId: null });
+              setShowPicker(false);
+            }}
+            className={`w-full cursor-pointer border-b border-wall-border px-3 py-2 text-left text-[10px] hover:bg-wall-border ${
+              !participant.personaId ? 'bg-indigo-950/30 text-indigo-300' : 'text-wall-text-muted'
+            }`}
+          >
+            No persona (custom)
+          </button>
+
+          {personas.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => {
+                onChange({ ...participant, personaId: p.id, personaPrompt: '' });
+                setShowPicker(false);
+              }}
+              className={`w-full cursor-pointer px-3 py-1.5 text-left hover:bg-wall-border ${
+                participant.personaId === p.id
+                  ? 'bg-indigo-950/30 text-indigo-300'
+                  : 'text-wall-text'
+              }`}
+            >
+              <div className="text-[10px] font-semibold">
+                {p.icon} {p.name}
+              </div>
+              <div className="text-[8px] text-wall-subtle leading-snug">{p.description}</div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Custom persona prompt (shown when no built-in persona selected) */}
+      {!participant.personaId && (
+        <textarea
+          value={participant.personaPrompt}
+          onChange={(e) =>
+            onChange({ ...participant, personaPrompt: e.target.value })
+          }
+          placeholder="Describe this participant's personality, expertise, and conversation style..."
+          rows={2}
+          className="mt-1 w-full rounded-md border border-wall-muted bg-wall-border/40 px-[7px] py-[5px] font-mono text-[9px] text-wall-text outline-none resize-y placeholder:text-wall-subtle focus:border-indigo-500"
+        />
+      )}
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -355,7 +448,7 @@ export default function Launcher({
               <div className="mb-1.5 flex items-center justify-between">
                 <label className="text-xs text-wall-text-muted">Participants</label>
                 <button
-                  onClick={() => setSimParts([...simParts, { name: '', role: '' }])}
+                  onClick={() => setSimParts([...simParts, { name: '', role: '', personaId: null, personaPrompt: '' }])}
                   className="cursor-pointer rounded border border-wall-muted bg-wall-border px-[7px] py-0.5 text-[10px] text-indigo-500 hover:bg-wall-muted"
                 >
                   + Add
@@ -363,39 +456,54 @@ export default function Launcher({
               </div>
 
               {simParts.map((p, i) => (
-                <div key={i} className="mb-1 flex items-center gap-1.5">
-                  <div
-                    className="h-2 w-2 shrink-0 rounded-full"
-                    style={{ background: SPEAKER_COLORS[i % SPEAKER_COLORS.length] }}
-                  />
-                  <input
-                    value={p.name}
-                    onChange={(e) => {
-                      const n = [...simParts];
-                      n[i] = { ...n[i], name: e.target.value };
-                      setSimParts(n);
-                    }}
-                    placeholder="Name"
-                    className="w-[90px] rounded-md border border-wall-muted bg-wall-border px-[7px] py-[5px] text-[11px] text-wall-text outline-none focus:border-indigo-500"
-                  />
-                  <input
-                    value={p.role}
-                    onChange={(e) => {
-                      const n = [...simParts];
-                      n[i] = { ...n[i], role: e.target.value };
-                      setSimParts(n);
-                    }}
-                    placeholder="Role"
-                    className="flex-1 rounded-md border border-wall-muted bg-wall-border px-[7px] py-[5px] text-[11px] text-wall-text outline-none focus:border-indigo-500"
-                  />
-                  {simParts.length > 2 && (
-                    <button
-                      onClick={() => setSimParts(simParts.filter((_, j) => j !== i))}
-                      className="cursor-pointer border-none bg-transparent text-xs text-wall-subtle hover:text-red-400"
-                    >
-                      {'\u2715'}
-                    </button>
-                  )}
+                <div key={i} className="mb-2 rounded-lg border border-wall-muted/50 bg-wall-border/30 px-2 py-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <div
+                      className="h-2 w-2 shrink-0 rounded-full"
+                      style={{ background: SPEAKER_COLORS[i % SPEAKER_COLORS.length] }}
+                    />
+                    <input
+                      value={p.name}
+                      onChange={(e) => {
+                        const n = [...simParts];
+                        n[i] = { ...n[i], name: e.target.value };
+                        setSimParts(n);
+                      }}
+                      placeholder="Name"
+                      className="w-[90px] rounded-md border border-wall-muted bg-wall-border px-[7px] py-[5px] text-[11px] text-wall-text outline-none focus:border-indigo-500"
+                    />
+                    <input
+                      value={p.role}
+                      onChange={(e) => {
+                        const n = [...simParts];
+                        n[i] = { ...n[i], role: e.target.value };
+                        setSimParts(n);
+                      }}
+                      placeholder="Role"
+                      className="flex-1 rounded-md border border-wall-muted bg-wall-border px-[7px] py-[5px] text-[11px] text-wall-text outline-none focus:border-indigo-500"
+                    />
+                    {simParts.length > 2 && (
+                      <button
+                        onClick={() => setSimParts(simParts.filter((_, j) => j !== i))}
+                        className="cursor-pointer border-none bg-transparent text-xs text-wall-subtle hover:text-red-400"
+                      >
+                        {'\u2715'}
+                      </button>
+                    )}
+                  </div>
+                  {/* Persona picker */}
+                  <div className="mt-1 ml-[18px]">
+                    <label className="block text-[8px] font-semibold text-wall-subtle mb-0.5 uppercase tracking-wider">Persona</label>
+                    <PersonaPicker
+                      participant={p}
+                      index={i}
+                      onChange={(updated) => {
+                        const n = [...simParts];
+                        n[i] = updated;
+                        setSimParts(n);
+                      }}
+                    />
+                  </div>
                 </div>
               ))}
 

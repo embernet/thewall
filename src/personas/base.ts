@@ -3,6 +3,7 @@ export interface Persona {
   name: string;
   description: string;
   icon: string;
+  tags: string[];
   systemPromptPrefix: string;
 }
 

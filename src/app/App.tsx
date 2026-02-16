@@ -23,8 +23,10 @@ import { uid, now, mid } from '@/utils/ids';
 import { COL_TYPES, SPEAKER_COLORS } from '@/types';
 import { initOrchestrator, destroyOrchestrator } from '@/agents/orchestrator';
 import { workerPool } from '@/agents/worker-pool';
+import { useAgentConfigStore } from '@/store/agent-config';
 import { useKeyboard } from '@/hooks/useKeyboard';
 import { isChunkCard, getParentDocId, getFileName } from '@/utils/document-cards';
+import { personaRegistry } from '@/personas/base';
 import type { Card, Column as ColumnType, SessionIndexEntry, SimConfig, AgentTask } from '@/types';
 
 export default function App() {
@@ -58,6 +60,17 @@ export default function App() {
   const [sessions, setSessions] = useState<SessionIndexEntry[]>([]);
   const [apiKeyStatus, setApiKeyStatus] = useState<ApiKeyStatus>('unchecked');
   const [embeddingProvider, setEmbeddingProvider] = useState<EmbeddingProvider>('local');
+  const [concurrency, setConcurrency] = useState(3);
+
+  // Agent config store (for sidebar Agents tab)
+  const agentConfigStore = useAgentConfigStore();
+  const handleToggleAgent = useCallback((agentId: string, enabled: boolean) => {
+    agentConfigStore.saveConfig(agentId, { enabled });
+  }, [agentConfigStore]);
+  const handleConcurrencyChange = useCallback((n: number) => {
+    setConcurrency(n);
+    workerPool.setConcurrency(n);
+  }, []);
 
   const cardsRef = useRef<Card[]>([]);
   const simAbort = useRef(false);
@@ -493,9 +506,17 @@ export default function App() {
       setAudio({ level: 0.3 + Math.random() * 0.7, elapsed: Date.now() - timerStart.current! });
     }, 100);
 
-    const partDesc = config.participants.map(p => p.name + ' (' + p.role + ')').join(', ');
-    const genSys = 'You are a meeting dialogue generator. Generate realistic meeting dialogue. Each line must be formatted exactly as: SPEAKER_NAME: dialogue text. One speaker per line. No stage directions. Make it natural.';
-    const genPrompt = 'Generate ' + config.turns + ' turns of a meeting.\n\nContext: ' + config.context + '\n\nParticipants:\n' + partDesc + '\n\nGenerate the full conversation now, one line per turn in format NAME: text';
+    // Build rich participant descriptions with persona details
+    const partLines = config.participants.map(p => {
+      const persona = p.personaId ? personaRegistry.get(p.personaId) : null;
+      const personaDesc = persona
+        ? persona.systemPromptPrefix
+        : p.personaPrompt || '';
+      const base = p.name + ' (' + p.role + ')';
+      return personaDesc ? base + ' — Personality: ' + personaDesc : base;
+    });
+    const genSys = 'You are a meeting dialogue generator. Generate realistic meeting dialogue. Each participant has a distinct personality and perspective described below — ensure their dialogue reflects their persona. Each line must be formatted exactly as: SPEAKER_NAME: dialogue text. One speaker per line. No stage directions. Make it natural and stay in character for each participant.';
+    const genPrompt = 'Generate ' + config.turns + ' turns of a meeting.\n\nContext: ' + config.context + '\n\nParticipants:\n' + partLines.join('\n') + '\n\nGenerate the full conversation now, one line per turn in format NAME: text';
 
     const result = await askClaude(genSys, genPrompt);
     if (!result || simAbort.current) {
@@ -672,6 +693,10 @@ export default function App() {
           onToggle={() => setSidebarOpen((o) => !o)}
           setColumnVisible={setColumnVisible}
           updateColumnOrder={updateColumnOrder}
+          agentConfigs={agentConfigStore.configs}
+          onToggleAgent={handleToggleAgent}
+          concurrency={concurrency}
+          onConcurrencyChange={handleConcurrencyChange}
         />
         <div className="flex-1 flex overflow-x-auto">
           {visCols.map(col => {

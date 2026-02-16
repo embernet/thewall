@@ -281,4 +281,45 @@ const migrations: Migration[] = [
       DROP TABLE IF EXISTS agent_configs;
     `,
   },
+  {
+    name: '006_default_disabled_agents',
+    up: `
+      -- Add maxTokens and dedupThreshold columns to agent_configs
+      ALTER TABLE agent_configs ADD COLUMN max_tokens INTEGER;
+      ALTER TABLE agent_configs ADD COLUMN dedup_threshold REAL;
+
+      -- Disable 15 agents that overlap with primary agents
+      INSERT OR IGNORE INTO agent_configs (agent_id, enabled) VALUES ('refiner', 0);
+      INSERT OR IGNORE INTO agent_configs (agent_id, enabled) VALUES ('thinker', 0);
+      INSERT OR IGNORE INTO agent_configs (agent_id, enabled) VALUES ('coach', 0);
+      INSERT OR IGNORE INTO agent_configs (agent_id, enabled) VALUES ('rhetoric-generator', 0);
+      INSERT OR IGNORE INTO agent_configs (agent_id, enabled) VALUES ('chain-of-thought', 0);
+      INSERT OR IGNORE INTO agent_configs (agent_id, enabled) VALUES ('cliche-finder', 0);
+      INSERT OR IGNORE INTO agent_configs (agent_id, enabled) VALUES ('constraint-finder', 0);
+      INSERT OR IGNORE INTO agent_configs (agent_id, enabled) VALUES ('requirement-finder', 0);
+      INSERT OR IGNORE INTO agent_configs (agent_id, enabled) VALUES ('tradeoff-enumerator', 0);
+      INSERT OR IGNORE INTO agent_configs (agent_id, enabled) VALUES ('problem-finder', 0);
+      INSERT OR IGNORE INTO agent_configs (agent_id, enabled) VALUES ('skeptic', 0);
+      INSERT OR IGNORE INTO agent_configs (agent_id, enabled) VALUES ('problem-solver', 0);
+      INSERT OR IGNORE INTO agent_configs (agent_id, enabled) VALUES ('visionary', 0);
+      INSERT OR IGNORE INTO agent_configs (agent_id, enabled) VALUES ('collaborator', 0);
+      INSERT OR IGNORE INTO agent_configs (agent_id, enabled) VALUES ('pragmatist', 0);
+    `,
+    down: `
+      DELETE FROM agent_configs WHERE agent_id IN (
+        'refiner','thinker','coach','rhetoric-generator','chain-of-thought',
+        'cliche-finder','constraint-finder','requirement-finder','tradeoff-enumerator',
+        'problem-finder','skeptic','problem-solver','visionary','collaborator','pragmatist'
+      );
+    `,
+  },
+  {
+    name: '007_custom_agent_persona',
+    up: `
+      ALTER TABLE custom_agents ADD COLUMN persona_id TEXT;
+    `,
+    down: `
+      -- SQLite doesn't support DROP COLUMN easily; ignore
+    `,
+  },
 ];
