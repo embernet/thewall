@@ -23,6 +23,8 @@ interface TopBarProps {
   onOpenSearch: () => void;
   onOpenCost: () => void;
   onOpenAgentConfig: () => void;
+  onToggleNotifications: () => void;
+  notificationCount: number;
   apiKeyStatus: ApiKeyStatus;
 }
 
@@ -57,6 +59,8 @@ export default function TopBar({
   onOpenSearch,
   onOpenCost,
   onOpenAgentConfig,
+  onToggleNotifications,
+  notificationCount,
   apiKeyStatus,
 }: TopBarProps) {
   const session = useSessionStore((s) => s.session);
@@ -290,6 +294,20 @@ export default function TopBar({
 
       {/* ── Spacer ── */}
       <div className="flex-1" />
+
+      {/* ── Notifications ── */}
+      <button
+        onClick={onToggleNotifications}
+        className="relative cursor-pointer rounded-md border border-wall-muted bg-wall-border px-2 py-[3px] text-[13px] text-wall-text-dim hover:bg-wall-muted"
+        title="Notifications"
+      >
+        {'\uD83D\uDD14'}
+        {notificationCount > 0 && (
+          <span className="absolute -top-1 -right-1 h-[12px] min-w-[12px] rounded-full bg-amber-500 text-[7px] text-white flex items-center justify-center font-bold px-0.5">
+            {notificationCount > 9 ? '9+' : notificationCount}
+          </span>
+        )}
+      </button>
 
       {/* ── Search (Cmd+K) ── */}
       <button

@@ -19,6 +19,9 @@ interface Notification {
 
 interface NotificationToastProps {
   onNavigate?: (cardId: string) => void;
+  panelOpen?: boolean;
+  onTogglePanel?: () => void;
+  onHistoryCount?: (count: number) => void;
 }
 
 // High-signal agent types that warrant notifications
@@ -32,12 +35,27 @@ const NOTIFY_AGENTS = new Set([
 // Component
 // ---------------------------------------------------------------------------
 
-const NotificationToast: React.FC<NotificationToastProps> = ({ onNavigate }) => {
+const NotificationToast: React.FC<NotificationToastProps> = ({ onNavigate, panelOpen: panelOpenProp, onTogglePanel, onHistoryCount }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [panelOpen, setPanelOpen] = useState(false);
+  const [panelOpenLocal, setPanelOpenLocal] = useState(false);
   const [history, setHistory] = useState<Notification[]>([]);
+
+  // Support controlled or uncontrolled panel state
+  const panelOpen = onTogglePanel ? (panelOpenProp ?? false) : panelOpenLocal;
+  const closePanel = useCallback(() => {
+    if (onTogglePanel) {
+      if (panelOpenProp) onTogglePanel(); // Only toggle if currently open
+    } else {
+      setPanelOpenLocal(false);
+    }
+  }, [onTogglePanel, panelOpenProp]);
   const columns = useSessionStore((s) => s.columns);
   const cards = useSessionStore((s) => s.cards);
+
+  // Report history count changes to parent
+  useEffect(() => {
+    onHistoryCount?.(history.length);
+  }, [history.length, onHistoryCount]);
 
   const dismiss = useCallback((id: string) => {
     setNotifications(ns => ns.filter(n => n.id !== id));
@@ -118,30 +136,32 @@ const NotificationToast: React.FC<NotificationToastProps> = ({ onNavigate }) => 
         ))}
       </div>
 
-      {/* ── Notification bell (in TopBar area, rendered absolutely) ── */}
-      <div className="fixed top-[10px] right-[180px] z-[9989]">
-        <button
-          onClick={() => setPanelOpen(o => !o)}
-          className="relative cursor-pointer border-none bg-transparent text-[13px] text-wall-text-dim hover:text-wall-text-muted"
-          title="Notifications"
-        >
-          {'\uD83D\uDD14'}
-          {history.length > 0 && (
-            <span className="absolute -top-0.5 -right-1.5 h-[10px] w-[10px] rounded-full bg-amber-500 text-[7px] text-white flex items-center justify-center font-bold">
-              {history.length > 9 ? '9+' : history.length}
-            </span>
-          )}
-        </button>
-      </div>
+      {/* ── Notification bell (only when uncontrolled; controlled mode renders bell in TopBar) ── */}
+      {!onTogglePanel && (
+        <div className="fixed top-[10px] right-[180px] z-[9989]">
+          <button
+            onClick={() => setPanelOpenLocal(o => !o)}
+            className="relative cursor-pointer border-none bg-transparent text-[13px] text-wall-text-dim hover:text-wall-text-muted"
+            title="Notifications"
+          >
+            {'\uD83D\uDD14'}
+            {history.length > 0 && (
+              <span className="absolute -top-0.5 -right-1.5 h-[10px] w-[10px] rounded-full bg-amber-500 text-[7px] text-white flex items-center justify-center font-bold">
+                {history.length > 9 ? '9+' : history.length}
+              </span>
+            )}
+          </button>
+        </div>
+      )}
 
       {/* ── Notification history panel ── */}
       {panelOpen && (
         <div
           className="fixed inset-0 z-[9991]"
-          onClick={() => setPanelOpen(false)}
+          onClick={closePanel}
         >
           <div
-            className="absolute top-[42px] right-[160px] w-[340px] max-h-[400px] rounded-lg border border-wall-border bg-wall-surface shadow-2xl overflow-hidden flex flex-col"
+            className="absolute top-[42px] right-4 w-[340px] max-h-[400px] rounded-lg border border-wall-border bg-wall-surface shadow-2xl overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="shrink-0 flex items-center justify-between px-3 py-2 border-b border-wall-border">
@@ -162,7 +182,7 @@ const NotificationToast: React.FC<NotificationToastProps> = ({ onNavigate }) => 
                     key={n.id + n.ts}
                     onClick={() => {
                       if (n.cardId && onNavigate) onNavigate(n.cardId);
-                      setPanelOpen(false);
+                      closePanel();
                     }}
                     className="w-full text-left px-3 py-2 border-none border-b border-wall-border/50 cursor-pointer bg-transparent hover:bg-wall-border/30 flex items-start gap-2"
                   >

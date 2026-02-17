@@ -13,6 +13,7 @@ import SearchOverlay from '@/components/SearchOverlay/SearchOverlay';
 import NotificationToast from '@/components/NotificationToast/NotificationToast';
 import CostDashboard from '@/components/CostDashboard/CostDashboard';
 import AgentConfig from '@/components/AgentConfig/AgentConfig';
+import FindRelatedView from '@/components/FindRelatedModal/FindRelatedModal';
 import TopBar from './TopBar';
 import StatusBar from './StatusBar';
 import { askClaude, loadChatConfig, validateApiKey, getApiKey } from '@/utils/llm';
@@ -42,6 +43,10 @@ export default function App() {
 
   const searchCb = useMemo(() => ({
     onSearch: () => setSearchOpen(o => !o),
+    onFind: () => {
+      setFindRelatedInitialCard(null);
+      setFindRelatedOpen(o => !o);
+    },
     onEscape: () => setLinkingFrom(null),
   }), []);
   useKeyboard(searchCb);
@@ -61,6 +66,10 @@ export default function App() {
   const [apiKeyStatus, setApiKeyStatus] = useState<ApiKeyStatus>('unchecked');
   const [embeddingProvider, setEmbeddingProvider] = useState<EmbeddingProvider>('local');
   const [concurrency, setConcurrency] = useState(3);
+  const [notifPanelOpen, setNotifPanelOpen] = useState(false);
+  const [notifCount, setNotifCount] = useState(0);
+  const [findRelatedOpen, setFindRelatedOpen] = useState(false);
+  const [findRelatedInitialCard, setFindRelatedInitialCard] = useState<Card | null>(null);
 
   // Agent config store (for sidebar Agents tab)
   const agentConfigStore = useAgentConfigStore();
@@ -274,6 +283,16 @@ export default function App() {
     bus.on('document:viewChunks', handler);
     return () => { bus.off('document:viewChunks', handler); };
   }, [session?.id, columns, cards, setColumnVisible, toggleColumnCollapsed, addColumn]);
+
+  // ── Find Related event listener ──
+  useEffect(() => {
+    const handler = ({ card }: { card: Card }) => {
+      setFindRelatedInitialCard(card);
+      setFindRelatedOpen(true);
+    };
+    bus.on('card:findRelated', handler);
+    return () => { bus.off('card:findRelated', handler); };
+  }, []);
 
   // ── Agent Orchestrator ──
   useEffect(() => {
@@ -668,6 +687,8 @@ export default function App() {
         onOpenSearch={() => setSearchOpen(true)}
         onOpenCost={() => setCostOpen(true)}
         onOpenAgentConfig={() => setAgentConfigOpen(true)}
+        onToggleNotifications={() => setNotifPanelOpen(o => !o)}
+        notificationCount={notifCount}
         apiKeyStatus={apiKeyStatus}
       />
 
@@ -777,9 +798,20 @@ export default function App() {
       {exportOpen && <ExportMenu onClose={() => setExportOpen(false)} />}
       <KnowledgeGraph open={graphOpen} onClose={() => setGraphOpen(false)} />
       <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} onNavigate={navigateToCard} />
-      <NotificationToast onNavigate={navigateToCard} />
+      <NotificationToast
+        onNavigate={navigateToCard}
+        panelOpen={notifPanelOpen}
+        onTogglePanel={() => setNotifPanelOpen(o => !o)}
+        onHistoryCount={setNotifCount}
+      />
       <CostDashboard open={costOpen} onClose={() => setCostOpen(false)} />
       <AgentConfig open={agentConfigOpen} onClose={() => setAgentConfigOpen(false)} />
+      <FindRelatedView
+        open={findRelatedOpen}
+        initialCard={findRelatedInitialCard}
+        onClose={() => { setFindRelatedOpen(false); setFindRelatedInitialCard(null); }}
+        onNavigate={navigateToCard}
+      />
 
       <style>{`@keyframes pulse{0%,100%{transform:scale(1);opacity:0.5;}50%{transform:scale(1.3);opacity:0;}}`}</style>
     </div>

@@ -6,7 +6,7 @@ import { useTemporalStore } from '@/store/session';
 // Global Keyboard Shortcuts
 // ---------------------------------------------------------------------------
 
-export function useKeyboard(callbacks?: { onSearch?: () => void; onEscape?: () => void }) {
+export function useKeyboard(callbacks?: { onSearch?: () => void; onFind?: () => void; onEscape?: () => void }) {
   const view = useSessionStore(s => s.view);
 
   useEffect(() => {
@@ -21,6 +21,13 @@ export function useKeyboard(callbacks?: { onSearch?: () => void; onEscape?: () =
       if (meta && e.key === 'k') {
         e.preventDefault();
         callbacks?.onSearch?.();
+        return;
+      }
+
+      // Cmd+F — Find Related (works even in inputs)
+      if (meta && e.key === 'f') {
+        e.preventDefault();
+        callbacks?.onFind?.();
         return;
       }
 

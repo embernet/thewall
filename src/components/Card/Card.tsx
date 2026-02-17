@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import type { Card as CardType, ColumnType } from '@/types';
 import { SOURCE_BADGES } from '@/types';
@@ -37,6 +37,7 @@ interface CardProps {
   onPin?: (id: string) => void;
   onEdit: (id: string, content: string) => void;
   onNavigate?: (cardId: string) => void;
+  onFindRelated?: (card: CardType) => void; // Optional: if not provided, uses event bus
   linkingFrom?: string | null;
   onStartLink?: (cardId: string) => void;
   onCompleteLink?: (cardId: string) => void;
@@ -54,6 +55,7 @@ export default function Card({
   onPin,
   onEdit,
   onNavigate,
+  onFindRelated,
   linkingFrom,
   onStartLink,
   onCompleteLink,
@@ -61,6 +63,8 @@ export default function Card({
   const [editing, setEditing] = useState(false);
   const [txt, setTxt] = useState(card.content);
   const [hov, setHov] = useState(false);
+  const [hamburgerOpen, setHamburgerOpen] = useState(false);
+  const hamburgerRef = useRef<HTMLDivElement>(null);
   const { menu, show: showMenu, close: closeMenu } = useContextMenu();
 
   const badge = SOURCE_BADGES[card.source] || SOURCE_BADGES.user;
@@ -96,23 +100,88 @@ export default function Card({
     bus.emit('document:viewChunks', { docCardId: card.id });
   };
 
+  // Find related handler (prop or event bus)
+  const handleFindRelated = (c: CardType) => {
+    if (onFindRelated) {
+      onFindRelated(c);
+    } else {
+      bus.emit('card:findRelated', { card: c });
+    }
+  };
+
+  // Close hamburger menu on outside click
+  useEffect(() => {
+    if (!hamburgerOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (hamburgerRef.current && !hamburgerRef.current.contains(e.target as Node)) {
+        setHamburgerOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [hamburgerOpen]);
+
   // Speaker color (dynamic per-session, must use inline style)
   const spkColor = speakerColors?.[card.speaker ?? ''] || '#64748b';
+
+  // ── Action buttons for the toolbar (icon-only, always present) ──────────
+  const toolbarActions = [
+    {
+      icon: '\uD83D\uDCCB',
+      tooltip: 'Copy',
+      fn: () => navigator.clipboard?.writeText(card.content),
+    },
+    {
+      icon: '\u270F\uFE0F',
+      tooltip: 'Edit',
+      fn: () => {
+        setTxt(card.content);
+        setEditing(true);
+      },
+    },
+    {
+      icon: '\u2B50',
+      tooltip:
+        card.highlightedBy === 'user' || card.highlightedBy === 'both'
+          ? 'Remove Highlight'
+          : 'Highlight',
+      fn: () => onHighlight(card.id),
+    },
+    ...(onPin
+      ? [
+          {
+            icon: '\uD83D\uDCCC',
+            tooltip: card.pinned ? 'Unpin' : 'Pin to Top',
+            fn: () => onPin(card.id),
+          },
+        ]
+      : []),
+    ...(onStartLink
+      ? [
+          {
+            icon: '\uD83D\uDD17',
+            tooltip: 'Link to...',
+            fn: () => onStartLink(card.id),
+          },
+        ]
+      : []),
+  ];
 
   return (
     <div
       id={`card-${card.id}`}
       onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
+      onMouseLeave={() => { setHov(false); setHamburgerOpen(false); }}
       onClick={isLinkTarget ? () => onCompleteLink?.(card.id) : undefined}
       onContextMenu={(e) => {
-        if (isLinkTarget) return; // No context menu during linking
+        if (isLinkTarget) return;
         const items: MenuItem[] = [
           { label: 'Copy', icon: '\uD83D\uDCCB', onClick: () => navigator.clipboard?.writeText(card.content) },
           { label: 'Edit', icon: '\u270F\uFE0F', onClick: () => { setTxt(card.content); setEditing(true); } },
           { label: card.highlightedBy === 'user' || card.highlightedBy === 'both' ? 'Remove Highlight' : 'Highlight', icon: '\u2B50', onClick: () => onHighlight(card.id) },
           ...(onPin ? [{ label: card.pinned ? 'Unpin' : 'Pin to Top', icon: '\uD83D\uDCCC', onClick: () => onPin(card.id) }] : []),
           ...(onStartLink ? [{ label: 'Link to...', icon: '\uD83D\uDD17', onClick: () => onStartLink(card.id) }] : []),
+          { label: 'Find Related', icon: '\uD83D\uDD0D', onClick: () => handleFindRelated(card) },
           { label: '', icon: '', separator: true, onClick: () => {} },
           ...(colType !== 'trash' ? [{ label: 'Delete', icon: '\uD83D\uDDD1\uFE0F', danger: true, onClick: () => onDelete(card.id) }] : []),
         ];
@@ -124,6 +193,70 @@ export default function Card({
         borderLeft: highlighted ? `3px solid ${borderColor}` : undefined,
       }}
     >
+      {/* ── Top toolbar (always present to avoid layout shift) ────────── */}
+      {!editing && (
+        <div className="flex items-center gap-0.5 mb-1 h-[18px]">
+          {/* Hamburger menu (left) */}
+          <div className="relative" ref={hamburgerRef}>
+            <button
+              onClick={(e) => { e.stopPropagation(); setHamburgerOpen(o => !o); }}
+              title="More actions"
+              className={`text-[9px] bg-wall-border border border-wall-muted rounded w-[22px] h-[18px] flex items-center justify-center cursor-pointer transition-opacity duration-100 ${hov ? 'opacity-70 hover:opacity-100' : 'opacity-0'}`}
+            >
+              {'\u2630'}
+            </button>
+            {/* Hamburger dropdown */}
+            {hamburgerOpen && (
+              <div className="absolute top-[20px] left-0 z-[100] min-w-[140px] rounded-lg border border-wall-border bg-wall-surface shadow-xl py-1">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setHamburgerOpen(false);
+                    handleFindRelated(card);
+                  }}
+                  className="w-full text-left px-3 py-1.5 text-[10px] text-wall-text hover:bg-wall-border cursor-pointer border-none bg-transparent flex items-center gap-2"
+                >
+                  <span>🔍</span>
+                  <span>Find Related</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Action buttons (center) */}
+          {toolbarActions.map((a, i) => (
+            <button
+              key={i}
+              onClick={(e) => {
+                e.stopPropagation();
+                a.fn();
+              }}
+              title={a.tooltip}
+              className={`text-[9px] bg-wall-border border border-wall-muted rounded w-[22px] h-[18px] flex items-center justify-center cursor-pointer transition-opacity duration-100 ${hov ? 'opacity-70 hover:opacity-100' : 'opacity-0'}`}
+            >
+              {a.icon}
+            </button>
+          ))}
+
+          {/* Spacer */}
+          <div className="flex-1" />
+
+          {/* Close / Delete button (right) */}
+          {colType !== 'trash' && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(card.id);
+              }}
+              title="Delete"
+              className={`text-[10px] bg-wall-border border border-wall-muted rounded w-[22px] h-[18px] flex items-center justify-center cursor-pointer transition-opacity duration-100 hover:bg-red-900/40 hover:border-red-700/50 hover:text-red-400 ${hov ? 'opacity-70 hover:opacity-100' : 'opacity-0'}`}
+            >
+              {'\u2715'}
+            </button>
+          )}
+        </div>
+      )}
+
       {/* ── Pinned indicator ──────────────────────────────────────────── */}
       {card.pinned && (
         <div className="text-[9px] text-amber-500 font-semibold mb-0.5">{'\uD83D\uDCCC'} Pinned</div>
@@ -264,73 +397,6 @@ export default function Card({
           })}
         </span>
       </div>
-
-      {/* ── Hover action buttons ─────────────────────────────────────── */}
-      {hov && !editing && (
-        <div className="flex gap-0.5 mt-1 flex-wrap">
-          {[
-            {
-              icon: '\uD83D\uDCCB',
-              label: 'Copy',
-              fn: () => navigator.clipboard?.writeText(card.content),
-            },
-            {
-              icon: '\u270F\uFE0F',
-              label: 'Edit',
-              fn: () => {
-                setTxt(card.content);
-                setEditing(true);
-              },
-            },
-            {
-              icon: '\u2B50',
-              label:
-                card.highlightedBy === 'user' || card.highlightedBy === 'both'
-                  ? 'Unhl'
-                  : 'Hl',
-              fn: () => onHighlight(card.id),
-            },
-            ...(onPin
-              ? [
-                  {
-                    icon: '\uD83D\uDCCC',
-                    label: card.pinned ? 'Unpin' : 'Pin',
-                    fn: () => onPin(card.id),
-                  },
-                ]
-              : []),
-            ...(onStartLink
-              ? [
-                  {
-                    icon: '\uD83D\uDD17',
-                    label: 'Link',
-                    fn: () => onStartLink(card.id),
-                  },
-                ]
-              : []),
-            ...(colType !== 'trash'
-              ? [
-                  {
-                    icon: '\uD83D\uDDD1\uFE0F',
-                    label: 'Del',
-                    fn: () => onDelete(card.id),
-                  },
-                ]
-              : []),
-          ].map((a, i) => (
-            <button
-              key={i}
-              onClick={(e) => {
-                e.stopPropagation();
-                a.fn();
-              }}
-              className="text-[9px] bg-wall-border text-wall-text-muted border border-wall-muted rounded px-1.5 py-px cursor-pointer"
-            >
-              {a.icon + ' ' + a.label}
-            </button>
-          ))}
-        </div>
-      )}
 
       {/* Context menu */}
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={closeMenu} />}
