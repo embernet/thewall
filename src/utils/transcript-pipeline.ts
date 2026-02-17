@@ -42,6 +42,16 @@ const MAX_RETRIES = 3;
 /** Delay between retries (doubles each attempt). */
 const RETRY_BASE_DELAY_MS = 5_000;
 
+/**
+ * Max raw cards per LLM chunk. Large backlogs (e.g. 186 cards from a long
+ * meeting) are split into sequential chunks so each LLM call stays within
+ * reasonable input/output token limits.
+ */
+const MAX_CARDS_PER_CHUNK = 20;
+
+/** Brief pause between sequential LLM chunk calls to avoid rate-limiting. */
+const INTER_CHUNK_DELAY_MS = 1_000;
+
 // ── Pipeline state ──────────────────────────────────────────────────────────
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -215,8 +225,9 @@ async function runPipeline(rawCards: Card[]): Promise<void> {
   const processingIds = new Set(rawCards.map((c) => c.id));
 
   const batchId = uid();
+  const totalChunks = Math.ceil(rawCards.length / MAX_CARDS_PER_CHUNK);
   console.log(
-    `[transcript-pipeline] Starting batch ${batchId}: ${rawCards.length} raw cards`,
+    `[transcript-pipeline] Starting batch ${batchId}: ${rawCards.length} raw cards in ${totalChunks} chunk(s)`,
   );
   bus.emit('transcript:pipeline:started', {
     batchId,
@@ -229,131 +240,152 @@ async function runPipeline(rawCards: Card[]): Promise<void> {
       console.warn(
         '[transcript-pipeline] No API key available — will retry via poll loop',
       );
-      // Set firstRawAt so the poll loop retries
       firstRawAt = Date.now();
       return; // finally block will set running = false
     }
 
-    // 1. Concatenate raw cards with speaker labels
-    const concatenated = rawCards
-      .map((c) => {
-        const speaker = c.speaker ? `[${c.speaker}]: ` : '';
-        return speaker + c.content;
-      })
-      .join('\n');
-
-    // 2. Ask LLM to re-segment and clean (with retries)
-    let cleanSections: string[] = [];
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      cleanSections = await resegmentAndClean(concatenated);
-      if (cleanSections.length > 0) break;
-      if (attempt < MAX_RETRIES) {
-        const delay = RETRY_BASE_DELAY_MS * attempt;
-        console.warn(
-          `[transcript-pipeline] LLM returned no sections (attempt ${attempt}/${MAX_RETRIES}), retrying in ${delay / 1000}s...`,
-        );
-        await sleep(delay);
-      }
-    }
-
-    if (cleanSections.length === 0) {
-      console.warn('[transcript-pipeline] LLM returned no sections after retries — will retry via poll loop');
-      // Set firstRawAt so the poll loop retries later
-      firstRawAt = Date.now();
-      return; // finally block will set running = false
-    }
-
-    // 3. Create clean cards
-    // Re-read store to get fresh state (cards may have changed during await)
+    // Verify transcript column exists
     const store = useSessionStore.getState();
     const tcol = store.columns.find((c) => c.type === 'transcript');
     if (!tcol || !store.session?.id) {
       console.warn('[transcript-pipeline] No transcript column or session — aborting');
       return;
     }
+    const sessionId = store.session.id;
 
-    // Build source card references for the clean cards
-    const sourceRefs = rawCards.map((c) => ({
-      id: c.id,
-      label: 'Raw',
-      color: '#f97316',
-      icon: '\uD83C\uDF10', // 🌐
-    }));
+    let totalCleanCards = 0;
 
-    // Infer speaker from raw cards (most common speaker)
-    const speakerCounts: Record<string, number> = {};
-    for (const c of rawCards) {
-      if (c.speaker) {
-        speakerCounts[c.speaker] = (speakerCounts[c.speaker] || 0) + 1;
-      }
-    }
-    const dominantSpeaker =
-      Object.entries(speakerCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ||
-      'You';
+    // ── Process in chunks ─────────────────────────────────────────────
+    for (let chunkIdx = 0; chunkIdx < totalChunks; chunkIdx++) {
+      const chunkStart = chunkIdx * MAX_CARDS_PER_CHUNK;
+      const chunkCards = rawCards.slice(chunkStart, chunkStart + MAX_CARDS_PER_CHUNK);
 
-    let cleanCardCount = 0;
-
-    for (const section of cleanSections) {
-      if (!section.trim()) continue;
-
-      // Extract speaker label if present: [Name]: text
-      let speaker = dominantSpeaker;
-      let content = section.trim();
-      const speakerMatch = content.match(/^\[([^\]]+)\]:\s*/);
-      if (speakerMatch) {
-        speaker = speakerMatch[1];
-        content = content.slice(speakerMatch[0].length).trim();
-      }
-
-      if (!content) continue;
-
-      // Get sort order: after all existing cards in transcript column
-      // Re-read from store each time since addCard mutates it
-      const freshStore = useSessionStore.getState();
-      const existing = freshStore.cards.filter(
-        (c) => c.columnId === tcol.id && !c.isDeleted,
+      console.log(
+        `[transcript-pipeline]   Chunk ${chunkIdx + 1}/${totalChunks}: ${chunkCards.length} cards`,
       );
-      const last = existing[existing.length - 1];
 
-      freshStore.addCard({
-        id: uid(),
-        columnId: tcol.id,
-        sessionId: store.session!.id,
-        content,
-        source: 'transcription',
-        speaker,
-        timestamp: rawCards[0]?.timestamp,
-        sourceCardIds: sourceRefs,
-        aiTags: [],
-        userTags: ['transcript:clean'],
-        highlightedBy: 'none',
-        isDeleted: false,
-        createdAt: now(),
-        updatedAt: now(),
-        sortOrder: last ? mid(last.sortOrder) : 'n',
-      });
+      // 1. Concatenate this chunk's raw cards with speaker labels
+      const concatenated = chunkCards
+        .map((c) => {
+          const speaker = c.speaker ? `[${c.speaker}]: ` : '';
+          return speaker + c.content;
+        })
+        .join('\n');
 
-      cleanCardCount++;
-    }
+      // 2. Ask LLM to re-segment and clean (with retries)
+      //    Scale maxTokens to input size — roughly 1.2x the input char count / 4
+      const estimatedInputTokens = Math.ceil(concatenated.length / 3.5);
+      const maxTokens = Math.max(4096, Math.min(estimatedInputTokens * 1.3, 16384));
 
-    // 4. Mark raw cards as processed (only the ones we snapshotted)
-    const latestStore = useSessionStore.getState();
-    for (const c of rawCards) {
-      // Re-read the card to get its current state (it may have changed)
-      const current = latestStore.cards.find((cc) => cc.id === c.id);
-      if (!current) continue;
-      // Only transition cards we actually processed
-      if (!processingIds.has(c.id)) continue;
-      const newTags = current.userTags
-        .filter((t) => t !== 'transcript:raw')
-        .concat('transcript:processed');
-      latestStore.updateCard(c.id, { userTags: newTags });
+      let cleanSections: string[] = [];
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        cleanSections = await resegmentAndClean(concatenated, Math.round(maxTokens));
+        if (cleanSections.length > 0) break;
+        if (attempt < MAX_RETRIES) {
+          const delay = RETRY_BASE_DELAY_MS * attempt;
+          console.warn(
+            `[transcript-pipeline]   Chunk ${chunkIdx + 1} LLM returned no sections (attempt ${attempt}/${MAX_RETRIES}), retrying in ${delay / 1000}s...`,
+          );
+          await sleep(delay);
+        }
+      }
+
+      if (cleanSections.length === 0) {
+        console.warn(
+          `[transcript-pipeline]   Chunk ${chunkIdx + 1} failed after ${MAX_RETRIES} retries — skipping chunk`,
+        );
+        // Don't abort the whole batch; skip this chunk and continue
+        continue;
+      }
+
+      // 3. Build source refs for this chunk only
+      const chunkSourceRefs = chunkCards.map((c) => ({
+        id: c.id,
+        label: 'Raw',
+        color: '#f97316',
+        icon: '\uD83C\uDF10', // 🌐
+      }));
+
+      // Infer speaker from this chunk's raw cards (most common speaker)
+      const speakerCounts: Record<string, number> = {};
+      for (const c of chunkCards) {
+        if (c.speaker) {
+          speakerCounts[c.speaker] = (speakerCounts[c.speaker] || 0) + 1;
+        }
+      }
+      const dominantSpeaker =
+        Object.entries(speakerCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ||
+        'You';
+
+      // 4. Create clean cards for this chunk
+      for (const section of cleanSections) {
+        if (!section.trim()) continue;
+
+        // Extract speaker label if present: [Name]: text
+        let speaker = dominantSpeaker;
+        let content = section.trim();
+        const speakerMatch = content.match(/^\[([^\]]+)\]:\s*/);
+        if (speakerMatch) {
+          speaker = speakerMatch[1];
+          content = content.slice(speakerMatch[0].length).trim();
+        }
+
+        if (!content) continue;
+
+        // Get sort order: after all existing cards in transcript column
+        const freshStore = useSessionStore.getState();
+        const existing = freshStore.cards.filter(
+          (c) => c.columnId === tcol.id && !c.isDeleted,
+        );
+        const last = existing[existing.length - 1];
+
+        freshStore.addCard({
+          id: uid(),
+          columnId: tcol.id,
+          sessionId,
+          content,
+          source: 'transcription',
+          speaker,
+          timestamp: chunkCards[0]?.timestamp,
+          sourceCardIds: chunkSourceRefs,
+          aiTags: [],
+          userTags: ['transcript:clean'],
+          highlightedBy: 'none',
+          isDeleted: false,
+          createdAt: now(),
+          updatedAt: now(),
+          sortOrder: last ? mid(last.sortOrder) : 'n',
+        });
+
+        totalCleanCards++;
+      }
+
+      // 5. Mark this chunk's raw cards as processed
+      const latestStore = useSessionStore.getState();
+      for (const c of chunkCards) {
+        const current = latestStore.cards.find((cc) => cc.id === c.id);
+        if (!current) continue;
+        if (!processingIds.has(c.id)) continue;
+        const newTags = current.userTags
+          .filter((t) => t !== 'transcript:raw')
+          .concat('transcript:processed');
+        latestStore.updateCard(c.id, { userTags: newTags });
+      }
+
+      console.log(
+        `[transcript-pipeline]   Chunk ${chunkIdx + 1} done: ${cleanSections.length} sections`,
+      );
+
+      // Brief pause between chunks to avoid rate-limiting
+      if (chunkIdx < totalChunks - 1) {
+        await sleep(INTER_CHUNK_DELAY_MS);
+      }
     }
 
     console.log(
-      `[transcript-pipeline] Batch ${batchId} complete: ${cleanCardCount} clean cards from ${rawCards.length} raw cards`,
+      `[transcript-pipeline] Batch ${batchId} complete: ${totalCleanCards} clean cards from ${rawCards.length} raw cards`,
     );
-    bus.emit('transcript:pipeline:completed', { batchId, cleanCardCount });
+    bus.emit('transcript:pipeline:completed', { batchId, cleanCardCount: totalCleanCards });
   } catch (e) {
     console.error('[transcript-pipeline] Pipeline error:', e);
     // On error, ensure retry by setting firstRawAt
@@ -397,11 +429,15 @@ CRITICAL RULES:
 
 async function resegmentAndClean(
   concatenatedText: string,
+  maxTokens: number = 4096,
 ): Promise<string[]> {
   const userPrompt = `Here is the raw transcript to re-segment and clean:\n\n${concatenatedText}`;
 
   try {
-    const result = await askClaude(SYSTEM_PROMPT, userPrompt, 4096);
+    console.log(
+      `[transcript-pipeline] LLM call: ~${concatenatedText.length} chars input, maxTokens=${maxTokens}`,
+    );
+    const result = await askClaude(SYSTEM_PROMPT, userPrompt, maxTokens);
     if (!result) {
       console.warn('[transcript-pipeline] askClaude returned null');
       return [];
@@ -413,6 +449,9 @@ async function resegmentAndClean(
       .map((s) => s.trim())
       .filter(Boolean);
 
+    console.log(
+      `[transcript-pipeline] LLM returned ${sections.length} sections (${result.length} chars)`,
+    );
     return sections;
   } catch (e) {
     console.error('[transcript-pipeline] LLM call failed:', e);
