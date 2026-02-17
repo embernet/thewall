@@ -107,6 +107,22 @@
   }
 }
 
+@layer components {
+  /* ── Electron window drag region ─────────────────────────────────── */
+  .drag-region {
+    -webkit-app-region: drag;
+    app-region: drag;
+  }
+  .drag-region button,
+  .drag-region input,
+  .drag-region select,
+  .drag-region a,
+  .drag-region [role="button"] {
+    -webkit-app-region: no-drag;
+    app-region: no-drag;
+  }
+}
+
 @layer utilities {
   /* Pulse animation for recording indicators */
   @keyframes wall-pulse {

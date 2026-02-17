@@ -115,7 +115,7 @@ export default function TopBar({
   );
 
   return (
-    <div className="flex h-[42px] min-h-[42px] shrink-0 items-center gap-2 border-b border-wall-border bg-wall-surface pr-3 pl-[70px]">
+    <div className="drag-region flex h-[42px] min-h-[42px] shrink-0 items-center gap-2 border-b border-wall-border bg-wall-surface pr-3 pl-[70px]">
       {/* ── Logo (click to return to launcher) ── */}
       <button
         onClick={goToLauncher}

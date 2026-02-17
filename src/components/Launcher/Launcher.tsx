@@ -268,6 +268,8 @@ export default function Launcher({
 
   return (
     <div className="flex h-screen w-full items-center justify-center bg-wall-bg font-sans">
+      {/* Drag region for window movement */}
+      <div className="drag-region fixed inset-x-0 top-0 h-10" />
       <div className="w-[580px] max-h-[90vh] overflow-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-wall-muted">
         {/* ── Header ── */}
         <div className="mb-7 text-center">
