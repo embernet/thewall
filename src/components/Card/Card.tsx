@@ -72,7 +72,6 @@ export default function Card({
 
   // Transcript phase detection
   const isRawTranscript = card.userTags.includes('transcript:raw');
-  const isProcessedTranscript = card.userTags.includes('transcript:processed');
   const isCleanTranscript = card.userTags.includes('transcript:clean');
 
   // Badge override for transcript phases
@@ -227,7 +226,7 @@ export default function Card({
         ];
         showMenu(e, items);
       }}
-      className={`bg-wall-surface rounded-lg px-2.5 py-2 mb-1.5 transition-all duration-150 ${card.pinned ? 'ring-1 ring-amber-600/40' : ''} ${isLinkSource ? 'ring-2 ring-purple-500' : ''} ${isLinkTarget ? 'cursor-crosshair hover:ring-1 hover:ring-purple-400' : ''} ${isProcessedTranscript ? 'opacity-40 max-h-8 overflow-hidden' : ''}`}
+      className={`bg-wall-surface rounded-lg px-2.5 py-2 mb-1.5 transition-all duration-150 ${card.pinned ? 'ring-1 ring-amber-600/40' : ''} ${isLinkSource ? 'ring-2 ring-purple-500' : ''} ${isLinkTarget ? 'cursor-crosshair hover:ring-1 hover:ring-purple-400' : ''} `}
       style={{
         border: `1px solid ${highlighted ? borderColor : isLinkSource ? '#a855f7' : '#1e293b'}`,
         borderLeft: isRawTranscript

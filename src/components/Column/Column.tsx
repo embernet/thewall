@@ -121,6 +121,10 @@ const Column: React.FC<ColumnProps> = ({
   if (sourceFilter) {
     filtered = filtered.filter((c) => c.source === sourceFilter);
   }
+  // Hide processed raw transcript cards — they've been merged into clean cards
+  if (column.type === 'transcript') {
+    filtered = filtered.filter((c) => !c.userTags.includes('transcript:processed'));
+  }
   if (column.type === 'highlights') {
     if (hlF === 'user')
       filtered = filtered.filter(
