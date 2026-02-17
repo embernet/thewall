@@ -133,7 +133,33 @@ const AgentsTab: React.FC<AgentsTabProps> = ({
   }, []);
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* Concurrency control — pinned at top */}
+      <div className="shrink-0 border-b border-wall-border px-2 py-1.5">
+        <div className="flex items-center gap-1.5">
+          <span className="shrink-0 text-[9px] text-wall-muted">Workers</span>
+          <input
+            type="range"
+            min={1}
+            max={99}
+            value={concurrency}
+            onChange={e => onConcurrencyChange(parseInt(e.target.value, 10))}
+            className="h-1 min-w-0 flex-1 cursor-pointer accent-indigo-500"
+          />
+          <input
+            type="number"
+            min={1}
+            max={99}
+            value={concurrency}
+            onChange={e => {
+              const v = parseInt(e.target.value, 10);
+              if (v >= 1 && v <= 99) onConcurrencyChange(v);
+            }}
+            className="w-7 shrink-0 rounded border border-wall-border bg-wall-bg py-0 text-center text-[9px] text-wall-text [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          />
+        </div>
+      </div>
+
       {/* Agent groups */}
       <div
         className="flex-1 overflow-auto px-1 py-1"
@@ -207,29 +233,6 @@ const AgentsTab: React.FC<AgentsTabProps> = ({
             </div>
           );
         })}
-      </div>
-
-      {/* Settings section */}
-      <div className="shrink-0 border-t border-wall-border px-2.5 py-2">
-        <div className="mb-1 text-[9px] font-semibold text-wall-subtle">
-          Settings
-        </div>
-
-        {/* Concurrency slider */}
-        <div className="flex items-center gap-2">
-          <span className="text-[9px] text-wall-muted">Concurrency</span>
-          <input
-            type="range"
-            min={1}
-            max={20}
-            value={concurrency}
-            onChange={e => onConcurrencyChange(parseInt(e.target.value, 10))}
-            className="h-1 flex-1 cursor-pointer accent-indigo-500"
-          />
-          <span className="w-4 text-right text-[9px] text-wall-text">
-            {concurrency}
-          </span>
-        </div>
       </div>
     </div>
   );

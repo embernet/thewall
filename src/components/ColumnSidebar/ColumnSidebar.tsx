@@ -209,12 +209,14 @@ const ColumnSidebar: React.FC<ColumnSidebarProps> = ({
           })}
         </div>
       ) : (
-        <AgentsTab
-          agentConfigs={agentConfigs}
-          onToggleAgent={onToggleAgent}
-          concurrency={concurrency}
-          onConcurrencyChange={onConcurrencyChange}
-        />
+        <div className="flex min-h-0 flex-1 flex-col">
+          <AgentsTab
+            agentConfigs={agentConfigs}
+            onToggleAgent={onToggleAgent}
+            concurrency={concurrency}
+            onConcurrencyChange={onConcurrencyChange}
+          />
+        </div>
       )}
     </div>
   );
