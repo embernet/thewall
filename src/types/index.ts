@@ -354,10 +354,10 @@ export interface SourceBadge {
 // ----------------------------------------------------------------------------
 
 /** Functional slot — each capability has its own provider/model/key. */
-export type ApiSlot = 'chat' | 'embeddings' | 'image_gen';
+export type ApiSlot = 'chat' | 'embeddings' | 'image_gen' | 'transcription';
 
 /** Supported API providers. */
-export type ApiProvider = 'anthropic' | 'openai' | 'voyage' | 'google' | 'local';
+export type ApiProvider = 'anthropic' | 'openai' | 'voyage' | 'google' | 'local' | 'wispr';
 
 /** Renderer-safe config: no raw key, just whether one exists. */
 export interface ApiKeyConfig {
@@ -465,6 +465,10 @@ export type EmbeddingProvider = 'openai' | 'local';
 
 export interface ElectronAPI {
   db: ElectronDbApi;
+
+  /** Proxy transcription API calls through the main process (bypasses CORS). */
+  transcribe: (audioBase64: string) => Promise<{ text?: string; error?: string }>;
+
   shell: {
     openPath: (filePath: string) => Promise<string>;
   };

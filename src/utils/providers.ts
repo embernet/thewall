@@ -103,6 +103,27 @@ export const SLOT_PROVIDERS: readonly SlotDef[] = [
       },
     ],
   },
+  {
+    slot: 'transcription',
+    label: 'Voice Transcription',
+    description: 'Live speech-to-text for transcript recording',
+    providers: [
+      {
+        id: 'openai',
+        label: 'OpenAI Whisper',
+        models: [
+          { id: 'whisper-1', label: 'Whisper v1', inputCost: 0.006 / 60, outputCost: 0 },
+        ],
+      },
+      {
+        id: 'wispr',
+        label: 'WISPR Flow',
+        models: [
+          { id: 'wispr-flow', label: 'WISPR Flow', inputCost: 0, outputCost: 0 },
+        ],
+      },
+    ],
+  },
 ] as const;
 
 // ---------------------------------------------------------------------------

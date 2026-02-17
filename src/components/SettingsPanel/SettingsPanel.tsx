@@ -4,6 +4,7 @@ import { SLOT_PROVIDERS, providerNeedsKey, getSlotDef } from '@/utils/providers'
 import type { SlotDef } from '@/utils/providers';
 import { setChatConfig, validateApiKey } from '@/utils/llm';
 import { setEmbeddingConfig } from '@/utils/embedding-service';
+import { setTranscriptionConfig } from '@/utils/transcription';
 import { bus } from '@/events/bus';
 // Note: Column management is now handled by the ColumnSidebar component
 
@@ -60,6 +61,7 @@ export default function SettingsPanel({ open, onClose, onOpenAgentConfig }: Sett
     chat: mkSlotState(SLOT_PROVIDERS[0]),
     embeddings: mkSlotState(SLOT_PROVIDERS[1]),
     image_gen: mkSlotState(SLOT_PROVIDERS[2]),
+    transcription: mkSlotState(SLOT_PROVIDERS[3]),
   });
 
   // Load existing configs when panel opens
@@ -72,6 +74,7 @@ export default function SettingsPanel({ open, onClose, onOpenAgentConfig }: Sett
           chat: mkSlotState(SLOT_PROVIDERS[0], configs.find(c => c.slot === 'chat')),
           embeddings: mkSlotState(SLOT_PROVIDERS[1], configs.find(c => c.slot === 'embeddings')),
           image_gen: mkSlotState(SLOT_PROVIDERS[2], configs.find(c => c.slot === 'image_gen')),
+          transcription: mkSlotState(SLOT_PROVIDERS[3], configs.find(c => c.slot === 'transcription')),
         };
         setSlotStates(next);
       } catch (e) {
@@ -155,6 +158,15 @@ export default function SettingsPanel({ open, onClose, onOpenAgentConfig }: Sett
         setSlotStates(prev => ({
           ...prev,
           embeddings: { ...prev.embeddings, saving: false, dirty: false, hasExistingKey: hasKey, status: 'saved' },
+        }));
+      } else if (slot === 'transcription') {
+        const decrypted = providerNeedsKey(state.provider)
+          ? await db.getDecryptedKey('transcription')
+          : '';
+        setTranscriptionConfig(state.provider, state.modelId, decrypted);
+        setSlotStates(prev => ({
+          ...prev,
+          transcription: { ...prev.transcription, saving: false, dirty: false, hasExistingKey: hasKey, status: 'saved' },
         }));
       } else {
         // image_gen

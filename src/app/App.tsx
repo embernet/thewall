@@ -25,6 +25,7 @@ import { COL_TYPES, SPEAKER_COLORS } from '@/types';
 import { initOrchestrator, destroyOrchestrator } from '@/agents/orchestrator';
 import { workerPool } from '@/agents/worker-pool';
 import { useAgentConfigStore } from '@/store/agent-config';
+import { startTranscription, stopTranscription, pauseTranscription, resumeTranscription, loadTranscriptionConfig } from '@/utils/transcription';
 import { useKeyboard } from '@/hooks/useKeyboard';
 import { isChunkCard, getParentDocId, getFileName } from '@/utils/document-cards';
 import { personaRegistry } from '@/personas/base';
@@ -87,7 +88,6 @@ export default function App() {
   const timerIv = useRef<ReturnType<typeof setInterval> | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recordingRef = useRef(false);
-  const recognitionRef = useRef<any>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const animFrameRef = useRef<number | null>(null);
@@ -132,6 +132,12 @@ export default function App() {
         if (!cancelled) setEmbeddingProvider(getEmbeddingProvider());
       } catch (e) {
         console.warn('Failed to load embedding config:', e);
+      }
+      // Load transcription config from DB
+      try {
+        await loadTranscriptionConfig();
+      } catch (e) {
+        console.warn('Failed to load transcription config:', e);
       }
     })();
     return () => { cancelled = true; };
@@ -318,9 +324,9 @@ export default function App() {
     });
   }, [session?.id, columns, addCard]);
 
-  const startAudioLevel = useCallback(async () => {
+  const startAudioLevel = useCallback(async (existingStream?: MediaStream) => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = existingStream ?? await navigator.mediaDevices.getUserMedia({ audio: true });
       audioCtxRef.current = new AudioContext();
       const source = audioCtxRef.current.createMediaStreamSource(stream);
       analyserRef.current = audioCtxRef.current.createAnalyser();
@@ -352,6 +358,13 @@ export default function App() {
     analyserRef.current = null;
   }, []);
 
+  // Listen for transcription results on the event bus — no stale closures
+  useEffect(() => {
+    const onSegment = ({ text }: { text: string }) => addTranscriptCard(text);
+    bus.on('transcript:segment', onSegment);
+    return () => { bus.off('transcript:segment', onSegment); };
+  }, [addTranscriptCard]);
+
   const toggleRecord = useCallback(() => {
     if (simRunning) {
       simAbort.current = true;
@@ -364,70 +377,46 @@ export default function App() {
     }
     if (audio.recording) {
       recordingRef.current = false;
-      if (recognitionRef.current) { try { recognitionRef.current.stop(); } catch {} }
-      recognitionRef.current = null;
       stopAudioLevel();
       setAudio({ recording: false, paused: false, level: 0 });
+      stopTranscription();
     } else {
       timerStart.current = Date.now();
       recordingRef.current = true;
       setAudio({ recording: true, paused: false });
-      startAudioLevel();
 
-      const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (!SR) return;
-      const recog = new SR();
-      recog.continuous = true;
-      recog.interimResults = true;
-      recog.lang = 'en-US';
-      recog.maxAlternatives = 1;
-
-      recog.onresult = (event: any) => {
-        let finalText = '';
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          if (event.results[i].isFinal) finalText += event.results[i][0].transcript;
-        }
-        if (finalText.trim()) addTranscriptCard(finalText);
-      };
-
-      recog.onerror = (event: any) => {
-        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-          recognitionRef.current = null;
-          if (timerIv.current) clearInterval(timerIv.current);
-          timerIv.current = setInterval(() => {
-            setAudio({ level: 0.05 + Math.random() * 0.1, elapsed: Date.now() - (timerStart.current || Date.now()) });
-          }, 200);
-        }
-        if (event.error === 'no-speech' || event.error === 'network') {
-          try { recog.start(); } catch {}
-        }
-      };
-
-      recog.onend = () => {
-        if (recognitionRef.current && recordingRef.current) {
-          try { recog.start(); } catch {}
-        }
-      };
-
-      try { recog.start(); } catch (e) { console.error('Failed to start recognition:', e); }
-      recognitionRef.current = recog;
+      // Start transcription — it returns the mic stream for audio visualization
+      startTranscription()
+        .then((stream) => {
+          if (stream) {
+            startAudioLevel(stream);
+          } else {
+            // No API key configured — fall back to audio-only (no transcription)
+            console.warn('Transcription unavailable (no API key configured). Audio-only mode.');
+            startAudioLevel();
+          }
+        })
+        .catch((e) => {
+          console.error('Failed to start transcription:', e);
+          startAudioLevel();
+        });
     }
-  }, [simRunning, audio.recording, addTranscriptCard, startAudioLevel, stopAudioLevel, setAudio]);
+  }, [simRunning, audio.recording, startAudioLevel, stopAudioLevel, setAudio]);
 
   const pauseRecord = useCallback(() => {
     if (audio.paused) {
-      if (recognitionRef.current) { try { recognitionRef.current.start(); } catch {} }
+      resumeTranscription();
       startAudioLevel();
       setAudio({ paused: false });
     } else {
-      if (recognitionRef.current) { try { recognitionRef.current.stop(); } catch {} }
+      pauseTranscription();
       stopAudioLevel();
       setAudio({ paused: true, level: 0 });
     }
   }, [audio.paused, startAudioLevel, stopAudioLevel, setAudio]);
 
   useEffect(() => () => {
-    if (recognitionRef.current) { try { recognitionRef.current.stop(); } catch {} }
+    stopTranscription();
     stopAudioLevel();
   }, [stopAudioLevel]);
 
@@ -651,7 +640,7 @@ export default function App() {
     simAbort.current = true;
     setSimRunning(false);
     if (timerIv.current) clearInterval(timerIv.current);
-    if (recognitionRef.current) { try { recognitionRef.current.stop(); } catch {} }
+    stopTranscription();
     stopAudioLevel();
     recordingRef.current = false;
     goToLauncher();

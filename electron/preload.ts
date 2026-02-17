@@ -74,6 +74,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     deleteCustomAgent: (id: string) => ipcRenderer.invoke('db:deleteCustomAgent', id),
   },
 
+  // Transcription proxy (bypasses CORS)
+  transcribe: (audioBase64: string) =>
+    ipcRenderer.invoke('transcribe', audioBase64) as Promise<{ text?: string; error?: string }>,
+
   // Shell utilities
   shell: {
     openPath: (filePath: string) => ipcRenderer.invoke('file:openPath', filePath),

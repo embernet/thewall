@@ -492,6 +492,82 @@ export function registerDbHandlers() {
     db().prepare('DELETE FROM api_keys WHERE slot = ?').run(slot);
   });
 
+  // ── Transcription Proxy ──
+  // Proxies transcription API calls through the main process to avoid CORS
+  // issues in the renderer. The main process fetch is not subject to CORS.
+
+  ipcMain.handle('transcribe', async (_e, audioBase64: string) => {
+    // Read transcription config from DB
+    const row = db().prepare('SELECT * FROM api_keys WHERE slot = ?').get('transcription') as any;
+    if (!row) return { error: 'No transcription API key configured' };
+
+    const provider = row.provider;
+    const modelId = row.model_id;
+
+    let apiKey = '';
+    if (row.encrypted_key) {
+      try {
+        if (safeStorage.isEncryptionAvailable()) {
+          apiKey = safeStorage.decryptString(row.encrypted_key);
+        } else {
+          apiKey = row.encrypted_key.toString('utf-8');
+        }
+      } catch {
+        return { error: 'Failed to decrypt transcription API key' };
+      }
+    }
+    if (!apiKey) return { error: 'Transcription API key is empty' };
+
+    try {
+      if (provider === 'wispr') {
+        // WISPR Flow — direct API-key auth
+        const r = await fetch('https://api.flowvoice.ai/api/v1/dash/api', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({ audio: audioBase64, properties: {} }),
+        });
+        if (!r.ok) {
+          const err = await r.text().catch(() => r.statusText);
+          return { error: `WISPR Flow API error ${r.status}: ${err}` };
+        }
+        const json = await r.json() as { text?: string };
+        return { text: (json.text ?? '').trim() };
+
+      } else {
+        // OpenAI Whisper — multipart form upload
+        // Decode base64 audio back to binary and wrap in a File so that
+        // Node's FormData sends the correct Content-Disposition filename
+        // and Content-Type in the multipart boundary.
+        const audioBuffer = Buffer.from(audioBase64, 'base64');
+        const file = new File([audioBuffer], 'audio.webm', { type: 'audio/webm' });
+
+        const form = new FormData();
+        form.append('file', file);
+        form.append('model', modelId || 'whisper-1');
+        form.append('language', 'en');
+        form.append('response_format', 'text');
+
+        const r = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${apiKey}` },
+          body: form,
+        });
+        if (!r.ok) {
+          const err = await r.text().catch(() => r.statusText);
+          return { error: `Whisper API error ${r.status}: ${err}` };
+        }
+        const text = await r.text();
+        return { text: text.trim() };
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return { error: msg };
+    }
+  });
+
   // ── Agent Configuration ──
 
   ipcMain.handle('db:getAgentConfigs', () => {

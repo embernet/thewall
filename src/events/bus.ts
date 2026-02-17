@@ -6,7 +6,8 @@ import type { Card, AgentTask, SessionMode, ApiKeyStatus, QueuePauseReason } fro
 // ---------------------------------------------------------------------------
 
 export type AppEvents = {
-  'transcript:segment': { cardId: string; text: string; speaker?: string };
+  'transcript:segment': { text: string; speaker?: string };
+  'transcript:error': { error: string };
   'card:created': { card: Card };
   'card:updated': { card: Card };
   'card:deleted': { cardId: string };
