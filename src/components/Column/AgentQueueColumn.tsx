@@ -18,6 +18,7 @@ const AgentQueueColumn: React.FC<AgentQueueColumnProps> = ({
   const running = Object.entries(agentBusy || {})
     .filter(([, v]) => v)
     .map(([k]) => k);
+  const queuedCount = agentTasks.filter((t) => t.status === 'queued').length;
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [editingPrompt, setEditingPrompt] = useState<string | null>(null);
@@ -39,9 +40,11 @@ const AgentQueueColumn: React.FC<AgentQueueColumnProps> = ({
           <span className="text-xs font-semibold text-wall-text">
             Agent Queue
           </span>
-          <span className="rounded-lg bg-wall-border px-[5px] text-[10px] text-wall-subtle">
-            {agentTasks.length}
-          </span>
+          {queuedCount > 0 && (
+            <span className="rounded-lg bg-indigo-500/20 px-[5px] text-[10px] font-semibold text-indigo-300">
+              {queuedCount} queued
+            </span>
+          )}
           {running.length > 0 && (
             <span className="animate-pulse text-[10px] text-yellow-500">
               {'\u25CF'} {running.length} active
@@ -61,6 +64,11 @@ const AgentQueueColumn: React.FC<AgentQueueColumnProps> = ({
             <span className="text-yellow-500">
               {'\u23F3'} {running.length}
             </span>
+            {queuedCount > 0 && (
+              <span className="text-indigo-300">
+                {'\u23F1\uFE0F'} {queuedCount}
+              </span>
+            )}
           </div>
         )}
       </div>

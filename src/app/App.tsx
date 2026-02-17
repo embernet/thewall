@@ -26,6 +26,7 @@ import { initOrchestrator, destroyOrchestrator } from '@/agents/orchestrator';
 import { workerPool } from '@/agents/worker-pool';
 import { useAgentConfigStore } from '@/store/agent-config';
 import { startTranscription, stopTranscription, pauseTranscription, resumeTranscription, loadTranscriptionConfig } from '@/utils/transcription';
+import { initTranscriptPipeline, destroyTranscriptPipeline, flushTranscriptPipeline } from '@/utils/transcript-pipeline';
 import { useKeyboard } from '@/hooks/useKeyboard';
 import { isChunkCard, getParentDocId, getFileName } from '@/utils/document-cards';
 import { personaRegistry } from '@/personas/base';
@@ -300,12 +301,16 @@ export default function App() {
     return () => { bus.off('card:findRelated', handler); };
   }, []);
 
-  // ── Agent Orchestrator ──
+  // ── Agent Orchestrator + Transcript Pipeline ──
   useEffect(() => {
     if (view === 'session' && session?.id) {
       initOrchestrator().catch(e => console.warn('Orchestrator init failed:', e));
+      initTranscriptPipeline();
     }
-    return () => { destroyOrchestrator(); };
+    return () => {
+      destroyOrchestrator();
+      destroyTranscriptPipeline();
+    };
   }, [view, session?.id]);
 
   // ── Speech Recognition ──
@@ -319,7 +324,7 @@ export default function App() {
       id: uid(), columnId: tcol.id, sessionId: session.id, content: text.trim(),
       source: 'transcription', speaker: speaker || 'You',
       timestamp: Date.now() - (timerStart.current || Date.now()),
-      sourceCardIds: [], aiTags: [], userTags: [], highlightedBy: 'none', isDeleted: false,
+      sourceCardIds: [], aiTags: [], userTags: ['transcript:raw'], highlightedBy: 'none', isDeleted: false,
       createdAt: now(), updatedAt: now(), sortOrder: last ? mid(last.sortOrder) : 'n',
     });
   }, [session?.id, columns, addCard]);
@@ -380,6 +385,8 @@ export default function App() {
       stopAudioLevel();
       setAudio({ recording: false, paused: false, level: 0 });
       stopTranscription();
+      // Flush any remaining raw transcript cards through the pipeline
+      flushTranscriptPipeline();
     } else {
       timerStart.current = Date.now();
       recordingRef.current = true;

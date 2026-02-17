@@ -149,6 +149,11 @@ function handleCardCreated({ card }: { card: Card }): void {
   // Only trigger agents on transcript cards
   if (card.source !== 'transcription') return;
 
+  // Only dispatch agents for clean (post-processed) transcript cards.
+  // Raw cards are processed by the transcript pipeline first, which
+  // creates clean cards with proper sentence boundaries and no filler.
+  if (!card.userTags.includes('transcript:clean')) return;
+
   transcriptBuf.push(card.content);
 
   // Debounce: wait for 4s of silence before dispatching agents

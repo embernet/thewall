@@ -23,6 +23,8 @@ export type AppEvents = {
   'document:viewChunks': { docCardId: string; highlightChunkId?: string };
   'card:findRelated': { card: Card };
   'agentConfig:changed': Record<string, never>;
+  'transcript:pipeline:started': { batchId: string; rawCardCount: number };
+  'transcript:pipeline:completed': { batchId: string; cleanCardCount: number };
 };
 
 // ---------------------------------------------------------------------------

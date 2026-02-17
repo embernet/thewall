@@ -109,10 +109,7 @@ export default function TopBar({
   // Derived agent stats
   const agentCount = cards.filter((c) => c.source === 'agent').length;
   const runningAgents = Object.values(agentBusy).filter(Boolean).length;
-  const queuedAgents = Math.max(
-    0,
-    agentTasks.filter((t) => t.status === 'running').length - runningAgents,
-  );
+  const queuedAgents = agentTasks.filter((t) => t.status === 'queued').length;
 
   return (
     <div className="drag-region flex h-[42px] min-h-[42px] shrink-0 items-center gap-2 border-b border-wall-border bg-wall-surface pr-3 pl-[70px]">

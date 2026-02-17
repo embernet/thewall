@@ -12,6 +12,7 @@ import {
   getChunkIds,
 } from '@/utils/document-cards';
 import { bus } from '@/events/bus';
+import { useSessionStore } from '@/store/session';
 import ContextMenu, { useContextMenu } from '@/components/ContextMenu/ContextMenu';
 import type { MenuItem } from '@/components/ContextMenu/ContextMenu';
 
@@ -64,10 +65,22 @@ export default function Card({
   const [txt, setTxt] = useState(card.content);
   const [hov, setHov] = useState(false);
   const [hamburgerOpen, setHamburgerOpen] = useState(false);
+  const [rawSourcesOpen, setRawSourcesOpen] = useState(false);
   const hamburgerRef = useRef<HTMLDivElement>(null);
+  const rawSourcesRef = useRef<HTMLDivElement>(null);
   const { menu, show: showMenu, close: closeMenu } = useContextMenu();
 
-  const badge = SOURCE_BADGES[card.source] || SOURCE_BADGES.user;
+  // Transcript phase detection
+  const isRawTranscript = card.userTags.includes('transcript:raw');
+  const isProcessedTranscript = card.userTags.includes('transcript:processed');
+  const isCleanTranscript = card.userTags.includes('transcript:clean');
+
+  // Badge override for transcript phases
+  const badge = isRawTranscript
+    ? { label: 'Raw', bg: '#f97316' }
+    : isCleanTranscript
+      ? { label: 'Transcript', bg: '#22c55e' }
+      : SOURCE_BADGES[card.source] || SOURCE_BADGES.user;
   const borderColor = HIGHLIGHT_COLORS[card.highlightedBy] || 'transparent';
   const highlighted = borderColor !== 'transparent';
 
@@ -80,6 +93,12 @@ export default function Card({
   };
 
   const hasLinks = card.sourceCardIds && card.sourceCardIds.length > 0;
+
+  // For clean transcript cards, source links point to raw cards —
+  // show them via a single "Raw" toolbar button dropdown instead of inline link pills.
+  const isTranscriptSourceLinks = isCleanTranscript && hasLinks &&
+    card.sourceCardIds.some((s) => s.label === 'Raw');
+  const hasNonTranscriptLinks = hasLinks && !isTranscriptSourceLinks;
 
   // Document card detection (tag-based)
   const isDoc = isDocumentCard(card);
@@ -120,6 +139,18 @@ export default function Card({
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [hamburgerOpen]);
+
+  // Close raw sources dropdown on outside click
+  useEffect(() => {
+    if (!rawSourcesOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (rawSourcesRef.current && !rawSourcesRef.current.contains(e.target as Node)) {
+        setRawSourcesOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [rawSourcesOpen]);
 
   // Speaker color (dynamic per-session, must use inline style)
   const spkColor = speakerColors?.[card.speaker ?? ''] || '#64748b';
@@ -165,13 +196,22 @@ export default function Card({
           },
         ]
       : []),
+    ...(isTranscriptSourceLinks
+      ? [
+          {
+            icon: '\uD83D\uDCC4',
+            tooltip: 'View raw transcript sources',
+            fn: () => setRawSourcesOpen((o) => !o),
+          },
+        ]
+      : []),
   ];
 
   return (
     <div
       id={`card-${card.id}`}
       onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => { setHov(false); setHamburgerOpen(false); }}
+      onMouseLeave={() => { setHov(false); setHamburgerOpen(false); setRawSourcesOpen(false); }}
       onClick={isLinkTarget ? () => onCompleteLink?.(card.id) : undefined}
       onContextMenu={(e) => {
         if (isLinkTarget) return;
@@ -187,10 +227,14 @@ export default function Card({
         ];
         showMenu(e, items);
       }}
-      className={`bg-wall-surface rounded-lg px-2.5 py-2 mb-1.5 transition-all duration-150 ${card.pinned ? 'ring-1 ring-amber-600/40' : ''} ${isLinkSource ? 'ring-2 ring-purple-500' : ''} ${isLinkTarget ? 'cursor-crosshair hover:ring-1 hover:ring-purple-400' : ''}`}
+      className={`bg-wall-surface rounded-lg px-2.5 py-2 mb-1.5 transition-all duration-150 ${card.pinned ? 'ring-1 ring-amber-600/40' : ''} ${isLinkSource ? 'ring-2 ring-purple-500' : ''} ${isLinkTarget ? 'cursor-crosshair hover:ring-1 hover:ring-purple-400' : ''} ${isProcessedTranscript ? 'opacity-40 max-h-8 overflow-hidden' : ''}`}
       style={{
         border: `1px solid ${highlighted ? borderColor : isLinkSource ? '#a855f7' : '#1e293b'}`,
-        borderLeft: highlighted ? `3px solid ${borderColor}` : undefined,
+        borderLeft: isRawTranscript
+          ? '3px solid #f97316'
+          : highlighted
+            ? `3px solid ${borderColor}`
+            : undefined,
       }}
     >
       {/* ── Top toolbar (always present to avoid layout shift) ────────── */}
@@ -351,8 +395,8 @@ export default function Card({
         </div>
       )}
 
-      {/* ── Source links ─────────────────────────────────────────────── */}
-      {hasLinks && (
+      {/* ── Source links (non-transcript) ──────────────────────────── */}
+      {hasNonTranscriptLinks && (
         <div className="mt-1 flex flex-wrap gap-0.5">
           {card.sourceCardIds.map((src, i) => (
             <button
@@ -372,6 +416,15 @@ export default function Card({
             </button>
           ))}
         </div>
+      )}
+
+      {/* ── Raw sources dropdown (clean transcript cards) ─────────── */}
+      {rawSourcesOpen && isTranscriptSourceLinks && (
+        <RawSourcesDropdown
+          ref={rawSourcesRef}
+          sourceIds={card.sourceCardIds.map((s) => s.id)}
+          onClose={() => setRawSourcesOpen(false)}
+        />
       )}
 
       {/* ── Metadata row ─────────────────────────────────────────────── */}
@@ -403,3 +456,78 @@ export default function Card({
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Raw Sources Dropdown — shown on clean transcript cards
+// ---------------------------------------------------------------------------
+
+import { forwardRef } from 'react';
+
+interface RawSourcesDropdownProps {
+  sourceIds: string[];
+  onClose: () => void;
+}
+
+const RawSourcesDropdown = forwardRef<HTMLDivElement, RawSourcesDropdownProps>(
+  function RawSourcesDropdown({ sourceIds, onClose }, ref) {
+    // Look up raw card content from the store
+    const allCards = useSessionStore((s) => s.cards);
+    const rawCards = sourceIds
+      .map((id) => allCards.find((c) => c.id === id))
+      .filter(Boolean) as CardType[];
+
+    return (
+      <div
+        ref={ref}
+        className="mt-1.5 rounded-lg border border-orange-700/40 bg-wall-bg overflow-hidden"
+      >
+        {/* Header */}
+        <div className="px-2.5 py-1.5 border-b border-orange-700/30 bg-orange-950/30">
+          <div className="text-[10px] text-orange-300 font-medium">
+            {'\uD83C\uDF10'} Raw transcript input
+          </div>
+          <div className="text-[9px] text-orange-400/70 mt-0.5">
+            These raw segments were analysed to create this and surrounding cards.
+          </div>
+        </div>
+
+        {/* Scrollable raw card list */}
+        <div className="max-h-[200px] overflow-y-auto">
+          {rawCards.length === 0 && (
+            <div className="px-2.5 py-2 text-[10px] text-wall-subtle italic">
+              Source cards no longer available.
+            </div>
+          )}
+          {rawCards.map((rc, i) => (
+            <div
+              key={rc.id}
+              className={`px-2.5 py-1.5 ${i > 0 ? 'border-t border-wall-border' : ''}`}
+            >
+              {rc.speaker && (
+                <span className="text-[9px] font-bold text-orange-400 mr-1">
+                  {rc.speaker}:
+                </span>
+              )}
+              <span className="text-[10px] text-wall-text/80 leading-snug">
+                {rc.content}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {/* Close */}
+        <div className="px-2.5 py-1 border-t border-wall-border flex justify-end">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            className="text-[9px] text-wall-subtle hover:text-wall-text cursor-pointer bg-transparent border-none"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    );
+  },
+);
