@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { MODE_COLORS } from '@/types';
 import type { SessionMode, ApiKeyStatus, QueuePauseReason } from '@/types';
-import { SLOT_PROVIDERS } from '@/utils/providers';
+import { getChatModels } from '@/utils/providers';
 import { getChatProvider } from '@/utils/llm';
 import { useSessionStore } from '@/store/session';
 import { workerPool } from '@/agents/worker-pool';
@@ -200,7 +200,7 @@ export default function TopBar({
             backgroundPosition: 'right 6px center',
           }}
         >
-          {(SLOT_PROVIDERS.find(s => s.slot === 'chat')?.providers.find(p => p.id === getChatProvider())?.models ?? []).map((m) => (
+          {getChatModels(getChatProvider()).map((m) => (
             <option key={m.id} value={m.id}>
               {m.label}
             </option>

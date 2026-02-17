@@ -16,8 +16,9 @@ import AgentConfig from '@/components/AgentConfig/AgentConfig';
 import FindRelatedView from '@/components/FindRelatedModal/FindRelatedModal';
 import TopBar from './TopBar';
 import StatusBar from './StatusBar';
-import { askClaude, loadChatConfig, validateApiKey, getApiKey } from '@/utils/llm';
+import { askClaude, loadChatConfig, validateApiKey, getApiKey, getChatProvider } from '@/utils/llm';
 import { loadEmbeddingConfig, getEmbeddingProvider } from '@/utils/embedding-service';
+import { fetchProviderModels } from '@/utils/providers';
 import type { ApiKeyStatus, EmbeddingProvider } from '@/types';
 import { bus } from '@/events/bus';
 import { uid, now, mid } from '@/utils/ids';
@@ -118,6 +119,10 @@ export default function App() {
           try {
             const result = await validateApiKey();
             if (!cancelled) setApiKeyStatus(result);
+            // Pre-fetch available models for the configured provider
+            if (!cancelled && result === 'valid') {
+              fetchProviderModels(getChatProvider(), getApiKey()).catch(() => {});
+            }
           } catch (e) {
             console.warn('API key validation failed:', e);
             if (!cancelled) setApiKeyStatus('invalid');

@@ -124,7 +124,8 @@ export const validateApiKey = async (): Promise<ApiKeyStatus> => {
   }
 };
 
-async function validateAnthropicKey(key: string, model: string): Promise<ApiKeyStatus> {
+async function validateAnthropicKey(key: string, _model: string): Promise<ApiKeyStatus> {
+  // Use a known-good model for validation so a bad model ID doesn't cause a false "invalid key"
   const r = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -134,7 +135,7 @@ async function validateAnthropicKey(key: string, model: string): Promise<ApiKeyS
       'anthropic-dangerous-direct-browser-access': 'true',
     },
     body: JSON.stringify({
-      model,
+      model: 'claude-sonnet-4-5-20250929',
       max_tokens: 1,
       messages: [{ role: 'user', content: 'Hi' }],
     }),
@@ -142,7 +143,8 @@ async function validateAnthropicKey(key: string, model: string): Promise<ApiKeyS
   return r.ok || r.status === 429 ? 'valid' : 'invalid';
 }
 
-async function validateOpenAIKey(key: string, model: string): Promise<ApiKeyStatus> {
+async function validateOpenAIKey(key: string, _model: string): Promise<ApiKeyStatus> {
+  // Use a known-good model for validation so a bad model ID doesn't cause a false "invalid key"
   const r = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -150,7 +152,7 @@ async function validateOpenAIKey(key: string, model: string): Promise<ApiKeyStat
       'Authorization': `Bearer ${key}`,
     },
     body: JSON.stringify({
-      model,
+      model: 'gpt-4o-mini',
       max_tokens: 1,
       messages: [{ role: 'user', content: 'Hi' }],
     }),

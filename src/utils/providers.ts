@@ -47,7 +47,7 @@ export const SLOT_PROVIDERS: readonly SlotDef[] = [
         label: 'Anthropic',
         models: [
           { id: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4.5', inputCost: 3.0 / 1_000_000, outputCost: 15.0 / 1_000_000 },
-          { id: 'claude-opus-4-20250918', label: 'Claude Opus 4.6', inputCost: 15.0 / 1_000_000, outputCost: 75.0 / 1_000_000 },
+          { id: 'claude-opus-4-6-20250918', label: 'Claude Opus 4.6', inputCost: 15.0 / 1_000_000, outputCost: 75.0 / 1_000_000 },
         ],
       },
       {
@@ -139,7 +139,11 @@ export function getProviderDef(slot: ApiSlot, provider: ApiProvider): ProviderDe
 }
 
 export function getModelDef(slot: ApiSlot, provider: ApiProvider, modelId: string): ModelDef | undefined {
-  return getProviderDef(slot, provider)?.models.find((m) => m.id === modelId);
+  // Check static registry first
+  const staticMatch = getProviderDef(slot, provider)?.models.find((m) => m.id === modelId);
+  if (staticMatch) return staticMatch;
+  // Check fetched model cache
+  return fetchedModelCache.get(provider)?.find((m) => m.id === modelId);
 }
 
 /** Returns the default provider for a slot (first in the list). */
@@ -157,4 +161,142 @@ export function defaultModel(slot: ApiSlot, provider?: ApiProvider): ModelDef {
 /** Whether a provider requires an API key (local does not). */
 export function providerNeedsKey(provider: ApiProvider): boolean {
   return provider !== 'local';
+}
+
+// ---------------------------------------------------------------------------
+// Live model fetching from provider APIs
+// ---------------------------------------------------------------------------
+
+/** Module-level cache: provider → fetched ModelDef[] */
+const fetchedModelCache = new Map<string, ModelDef[]>();
+
+/** Return cached fetched models for a provider, or undefined if not fetched yet. */
+export function getCachedModels(provider: ApiProvider): ModelDef[] | undefined {
+  return fetchedModelCache.get(provider);
+}
+
+/**
+ * Get the best available model list for a chat provider:
+ * fetched models if available, otherwise static fallback from SLOT_PROVIDERS.
+ */
+export function getChatModels(provider: ApiProvider): readonly ModelDef[] {
+  const cached = fetchedModelCache.get(provider);
+  if (cached && cached.length > 0) return cached;
+  const provDef = getProviderDef('chat', provider);
+  return provDef?.models ?? [];
+}
+
+/**
+ * Fetch available models from a provider's API and cache them.
+ * Returns the fetched models, or falls back to static list on failure.
+ */
+export async function fetchProviderModels(
+  provider: ApiProvider,
+  apiKey: string,
+): Promise<ModelDef[]> {
+  if (!apiKey) return [];
+  try {
+    let models: ModelDef[];
+    if (provider === 'anthropic') {
+      models = await fetchAnthropicModels(apiKey);
+    } else if (provider === 'openai') {
+      models = await fetchOpenAIModels(apiKey);
+    } else {
+      return [];
+    }
+    if (models.length > 0) {
+      fetchedModelCache.set(provider, models);
+    }
+    return models;
+  } catch (e) {
+    console.warn(`Failed to fetch models for ${provider}:`, e);
+    return [];
+  }
+}
+
+// Anthropic model ID patterns we want to show for chat
+const ANTHROPIC_CHAT_PATTERN = /^claude-/;
+// Skip internal/dated variants that are just aliases
+const ANTHROPIC_SKIP_PATTERN = /-(latest)$/;
+
+async function fetchAnthropicModels(apiKey: string): Promise<ModelDef[]> {
+  const allModels: Array<{ id: string; display_name?: string }> = [];
+  let url: string | null = 'https://api.anthropic.com/v1/models?limit=100';
+
+  while (url) {
+    const r: Response = await fetch(url, {
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+    });
+    if (!r.ok) {
+      console.warn('Anthropic /v1/models returned', r.status);
+      return [];
+    }
+    const body: { data?: Array<{ id: string; display_name?: string }>; has_more?: boolean; last_id?: string } = await r.json();
+    if (body.data) allModels.push(...body.data);
+    // Handle pagination
+    if (body.has_more && body.last_id) {
+      url = `https://api.anthropic.com/v1/models?limit=100&after_id=${body.last_id}`;
+    } else {
+      url = null;
+    }
+  }
+
+  // Filter to chat-relevant models and deduplicate
+  const seen = new Set<string>();
+  const models: ModelDef[] = [];
+  for (const m of allModels) {
+    if (!ANTHROPIC_CHAT_PATTERN.test(m.id)) continue;
+    if (ANTHROPIC_SKIP_PATTERN.test(m.id)) continue;
+    if (seen.has(m.id)) continue;
+    seen.add(m.id);
+    models.push({
+      id: m.id,
+      label: m.display_name || m.id,
+      inputCost: 0,
+      outputCost: 0,
+    });
+  }
+
+  // Sort: newer models first (longer IDs with dates tend to sort well alphabetically reversed)
+  models.sort((a, b) => a.label.localeCompare(b.label));
+  return models;
+}
+
+// OpenAI model patterns for chat
+const OPENAI_CHAT_PATTERN = /^(gpt-4|gpt-3\.5|o[1-9]|chatgpt)/;
+const OPENAI_SKIP_PATTERN = /-(realtime|audio|search)/;
+
+async function fetchOpenAIModels(apiKey: string): Promise<ModelDef[]> {
+  const r = await fetch('https://api.openai.com/v1/models', {
+    headers: { 'Authorization': `Bearer ${apiKey}` },
+  });
+  if (!r.ok) {
+    console.warn('OpenAI /v1/models returned', r.status);
+    return [];
+  }
+  const body = await r.json();
+  const data = body.data as Array<{ id: string }> | undefined;
+  if (!data) return [];
+
+  const models: ModelDef[] = [];
+  const seen = new Set<string>();
+  for (const m of data) {
+    if (!OPENAI_CHAT_PATTERN.test(m.id)) continue;
+    if (OPENAI_SKIP_PATTERN.test(m.id)) continue;
+    if (seen.has(m.id)) continue;
+    seen.add(m.id);
+    models.push({
+      id: m.id,
+      label: m.id,
+      inputCost: 0,
+      outputCost: 0,
+    });
+  }
+
+  models.sort((a, b) => a.label.localeCompare(b.label));
+  return models;
 }

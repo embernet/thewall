@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { ApiSlot, ApiProvider, ApiKeyConfig } from '@/types';
-import { SLOT_PROVIDERS, providerNeedsKey, getSlotDef } from '@/utils/providers';
-import type { SlotDef } from '@/utils/providers';
+import { SLOT_PROVIDERS, providerNeedsKey, getSlotDef, fetchProviderModels, getCachedModels } from '@/utils/providers';
+import type { SlotDef, ModelDef } from '@/utils/providers';
 import { setChatConfig, validateApiKey } from '@/utils/llm';
 import { setEmbeddingConfig } from '@/utils/embedding-service';
 import { setTranscriptionConfig } from '@/utils/transcription';
@@ -64,7 +64,34 @@ export default function SettingsPanel({ open, onClose, onOpenAgentConfig }: Sett
     transcription: mkSlotState(SLOT_PROVIDERS[3]),
   });
 
-  // Load existing configs when panel opens
+  // Fetched models per provider (live from API)
+  const [fetchedModels, setFetchedModels] = useState<Record<string, ModelDef[]>>({});
+
+  // Fetch live models for a provider using a decrypted key
+  const fetchModelsForProvider = useCallback(async (provider: ApiProvider) => {
+    // Check module-level cache first
+    const cached = getCachedModels(provider);
+    if (cached && cached.length > 0) {
+      setFetchedModels(prev => ({ ...prev, [provider]: cached }));
+      return;
+    }
+    // Fetch from API
+    try {
+      const key = await window.electronAPI?.db?.getDecryptedKey(
+        // Find which slot uses this provider to get the right key
+        provider === 'anthropic' ? 'chat' : provider === 'openai' ? 'chat' : 'chat'
+      );
+      if (!key) return;
+      const models = await fetchProviderModels(provider, key);
+      if (models.length > 0) {
+        setFetchedModels(prev => ({ ...prev, [provider]: models }));
+      }
+    } catch (e) {
+      console.warn(`Failed to fetch models for ${provider}:`, e);
+    }
+  }, []);
+
+  // Load existing configs when panel opens, then fetch live models
   useEffect(() => {
     if (!open) return;
     (async () => {
@@ -77,11 +104,17 @@ export default function SettingsPanel({ open, onClose, onOpenAgentConfig }: Sett
           transcription: mkSlotState(SLOT_PROVIDERS[3], configs.find(c => c.slot === 'transcription')),
         };
         setSlotStates(next);
+
+        // Fetch live models for providers that have keys
+        const chatConfig = configs.find(c => c.slot === 'chat');
+        if (chatConfig?.hasKey) {
+          fetchModelsForProvider(chatConfig.provider as ApiProvider);
+        }
       } catch (e) {
         console.warn('Failed to load API key configs:', e);
       }
     })();
-  }, [open]);
+  }, [open, fetchModelsForProvider]);
 
   // Update a single slot field
   const updateSlot = useCallback((slot: ApiSlot, patch: Partial<SlotState>) => {
@@ -91,19 +124,39 @@ export default function SettingsPanel({ open, onClose, onOpenAgentConfig }: Sett
     }));
   }, []);
 
-  // Handle provider change — reset model to first for that provider
+  // Handle provider change — reset model to first for that provider, auto-save if key exists
   const onProviderChange = useCallback((slot: ApiSlot, providerId: ApiProvider) => {
     const slotDef = getSlotDef(slot);
     const provDef = slotDef?.providers.find(p => p.id === providerId);
-    const firstModel = provDef?.models[0];
+    // Use fetched models if available, otherwise static
+    const liveModels = fetchedModels[providerId];
+    const firstModel = liveModels?.[0] ?? provDef?.models[0];
     updateSlot(slot, {
       provider: providerId,
       modelId: firstModel?.id ?? '',
       key: '',
-      hasExistingKey: false,
-      status: 'idle',
+      hasExistingKey: slotStates[slot].hasExistingKey,
+      status: slotStates[slot].hasExistingKey ? slotStates[slot].status : 'idle',
     });
-  }, [updateSlot]);
+    // Fetch live models for the new provider
+    fetchModelsForProvider(providerId);
+    // Auto-save provider/model change if a key is already saved
+    if (slotStates[slot].hasExistingKey) {
+      // Defer so state update applies first
+      setTimeout(() => pendingSaveRef.current = slot, 0);
+    }
+  }, [updateSlot, slotStates, fetchedModels, fetchModelsForProvider]);
+
+  // Handle model change — auto-save if key exists
+  const onModelChange = useCallback((slot: ApiSlot, modelId: string) => {
+    updateSlot(slot, { modelId });
+    if (slotStates[slot].hasExistingKey) {
+      setTimeout(() => pendingSaveRef.current = slot, 0);
+    }
+  }, [updateSlot, slotStates]);
+
+  // Ref for deferred auto-save after provider/model dropdown change
+  const pendingSaveRef = useRef<ApiSlot | null>(null);
 
   // Save a slot
   const saveSlot = useCallback(async (slot: ApiSlot) => {
@@ -149,6 +202,8 @@ export default function SettingsPanel({ open, onClose, onOpenAgentConfig }: Sett
             chat: { ...prev.chat, status: mappedStatus },
           }));
           bus.emit('api:statusChanged', { status: result });
+          // Fetch live models now that we have a valid key
+          if (result === 'valid') fetchModelsForProvider(state.provider);
         }
       } else if (slot === 'embeddings') {
         const decrypted = providerNeedsKey(state.provider)
@@ -183,7 +238,16 @@ export default function SettingsPanel({ open, onClose, onOpenAgentConfig }: Sett
         [slot]: { ...prev[slot], saving: false, status: 'error', statusMessage: msg },
       }));
     }
-  }, [slotStates]);
+  }, [slotStates, fetchModelsForProvider]);
+
+  // Auto-save when provider/model changes (deferred via ref to avoid stale state)
+  useEffect(() => {
+    if (pendingSaveRef.current) {
+      const slot = pendingSaveRef.current;
+      pendingSaveRef.current = null;
+      saveSlot(slot);
+    }
+  });
 
   if (!open) return null;
 
@@ -259,8 +323,9 @@ export default function SettingsPanel({ open, onClose, onOpenAgentConfig }: Sett
                 key={slotDef.slot}
                 slotDef={slotDef}
                 state={slotStates[slotDef.slot]}
+                fetchedModels={fetchedModels[slotStates[slotDef.slot].provider]}
                 onProviderChange={(p) => onProviderChange(slotDef.slot, p)}
-                onModelChange={(m) => updateSlot(slotDef.slot, { modelId: m })}
+                onModelChange={(m) => onModelChange(slotDef.slot, m)}
                 onKeyChange={(k) => updateSlot(slotDef.slot, { key: k })}
                 onSave={() => saveSlot(slotDef.slot)}
               />
@@ -279,6 +344,7 @@ export default function SettingsPanel({ open, onClose, onOpenAgentConfig }: Sett
 interface SlotSectionProps {
   slotDef: SlotDef;
   state: SlotState;
+  fetchedModels?: ModelDef[];
   onProviderChange: (provider: ApiProvider) => void;
   onModelChange: (modelId: string) => void;
   onKeyChange: (key: string) => void;
@@ -294,9 +360,10 @@ const STATUS_DOT: Record<SlotState['status'], { color: string; label: string }> 
   invalid:    { color: '#ef4444', label: 'Invalid key' },
 };
 
-function SlotSection({ slotDef, state, onProviderChange, onModelChange, onKeyChange, onSave }: SlotSectionProps) {
+function SlotSection({ slotDef, state, fetchedModels, onProviderChange, onModelChange, onKeyChange, onSave }: SlotSectionProps) {
   const provDef = slotDef.providers.find(p => p.id === state.provider);
-  const models = provDef?.models ?? [];
+  // Use live-fetched models if available, otherwise fall back to static list
+  const models = (fetchedModels && fetchedModels.length > 0) ? fetchedModels : (provDef?.models ?? []);
   const needsKey = providerNeedsKey(state.provider);
   const dot = STATUS_DOT[state.status];
 
