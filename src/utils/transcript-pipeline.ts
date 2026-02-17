@@ -15,7 +15,7 @@
 
 import { bus } from '@/events/bus';
 import { useSessionStore } from '@/store/session';
-import { askClaude } from '@/utils/llm';
+import { askClaude, getApiKey } from '@/utils/llm';
 import { uid, now, mid } from '@/utils/ids';
 import type { Card } from '@/types';
 
@@ -35,6 +35,12 @@ const POLL_MS = 5_000;
 
 /** Delay before processing existing raw cards on session load. */
 const SESSION_LOAD_DELAY_MS = 3_000;
+
+/** How many times to retry on LLM failure before giving up for this batch. */
+const MAX_RETRIES = 3;
+
+/** Delay between retries (doubles each attempt). */
+const RETRY_BASE_DELAY_MS = 5_000;
 
 // ── Pipeline state ──────────────────────────────────────────────────────────
 
@@ -64,7 +70,7 @@ export function initTranscriptPipeline(): void {
   // (gives the store time to settle after hydrating cards from DB)
   setTimeout(processExistingRawCards, SESSION_LOAD_DELAY_MS);
 
-  console.debug('[transcript-pipeline] Initialised');
+  console.log('[transcript-pipeline] Initialised');
 }
 
 export function destroyTranscriptPipeline(): void {
@@ -75,7 +81,7 @@ export function destroyTranscriptPipeline(): void {
   running = false;
   pendingFlush = false;
   initialised = false;
-  console.debug('[transcript-pipeline] Destroyed');
+  console.log('[transcript-pipeline] Destroyed');
 }
 
 /**
@@ -87,12 +93,12 @@ export async function flushTranscriptPipeline(): Promise<void> {
   if (running) {
     // Pipeline is mid-run — flag a pending flush so the poll loop picks it up
     pendingFlush = true;
-    console.debug('[transcript-pipeline] Flush requested while running — queued');
+    console.log('[transcript-pipeline] Flush requested while running — queued');
     return;
   }
   const rawCards = getRawCards();
   if (rawCards.length > 0) {
-    console.debug(`[transcript-pipeline] Flush: ${rawCards.length} raw cards`);
+    console.log(`[transcript-pipeline] Flush: ${rawCards.length} raw cards`);
     await runPipeline(rawCards);
   }
 }
@@ -117,13 +123,13 @@ function getRawCards(): Card[] {
 function processExistingRawCards(): void {
   if (!initialised) return;
   const rawCards = getRawCards();
+  console.log(
+    `[transcript-pipeline] Session load check: ${rawCards.length} raw cards found, API key ${getApiKey() ? 'available' : 'NOT available'}`,
+  );
   if (rawCards.length > 0) {
-    console.debug(
-      `[transcript-pipeline] Session load: found ${rawCards.length} unprocessed raw cards`,
-    );
-    // Set firstRawAt so the poll loop can pick them up even if under MIN_RAW_CARDS
-    if (firstRawAt === null) firstRawAt = Date.now() - TIME_TRIGGER_MS; // trigger immediately
-    // If we have enough, run immediately
+    // Always set firstRawAt so the poll loop can pick them up
+    if (firstRawAt === null) firstRawAt = Date.now() - TIME_TRIGGER_MS;
+    // If we have enough and not already running, run immediately
     if (rawCards.length >= MIN_RAW_CARDS_TIME && !running) {
       runPipeline(rawCards);
     }
@@ -148,10 +154,11 @@ function handleCardCreated({ card }: { card: Card }): void {
 
 /**
  * Unified poll check — runs every POLL_MS.
- * Handles three cases:
+ * Handles four cases:
  *   1. Time-based trigger (raw cards sitting for > TIME_TRIGGER_MS)
  *   2. Re-check after pipeline finishes (raw cards accumulated while running)
  *   3. Pending flush (flush was requested while pipeline was running)
+ *   4. Raw cards waiting for API key (retry on session load)
  */
 function pollCheck(): void {
   if (running) return; // let it finish
@@ -166,7 +173,7 @@ function pollCheck(): void {
   // Case 3: Pending flush — process whatever we have
   if (pendingFlush) {
     pendingFlush = false;
-    console.debug(
+    console.log(
       `[transcript-pipeline] Pending flush: ${rawCards.length} raw cards`,
     );
     runPipeline(rawCards);
@@ -175,22 +182,26 @@ function pollCheck(): void {
 
   // Case 2: Re-check — cards accumulated while we were running
   if (rawCards.length >= MIN_RAW_CARDS) {
-    console.debug(
+    console.log(
       `[transcript-pipeline] Re-check trigger: ${rawCards.length} raw cards`,
     );
     runPipeline(rawCards);
     return;
   }
 
-  // Case 1: Time-based trigger
+  // Case 1 & 4: Time-based trigger (also catches session-load retries)
   if (firstRawAt !== null) {
     const elapsed = Date.now() - firstRawAt;
     if (elapsed >= TIME_TRIGGER_MS && rawCards.length >= MIN_RAW_CARDS_TIME) {
-      console.debug(
+      console.log(
         `[transcript-pipeline] Time trigger: ${rawCards.length} raw cards after ${Math.round(elapsed / 1000)}s`,
       );
       runPipeline(rawCards);
     }
+  } else if (rawCards.length >= MIN_RAW_CARDS_TIME) {
+    // Raw cards exist but firstRawAt was cleared (e.g. after a failed pipeline run)
+    // Re-set it so the time trigger can eventually fire
+    firstRawAt = Date.now();
   }
 }
 
@@ -199,13 +210,12 @@ function pollCheck(): void {
 async function runPipeline(rawCards: Card[]): Promise<void> {
   if (running || rawCards.length === 0) return;
   running = true;
-  firstRawAt = null;
 
   // Snapshot the IDs we're processing so we don't re-process them
   const processingIds = new Set(rawCards.map((c) => c.id));
 
   const batchId = uid();
-  console.debug(
+  console.log(
     `[transcript-pipeline] Starting batch ${batchId}: ${rawCards.length} raw cards`,
   );
   bus.emit('transcript:pipeline:started', {
@@ -214,6 +224,16 @@ async function runPipeline(rawCards: Card[]): Promise<void> {
   });
 
   try {
+    // Check API key before attempting LLM call
+    if (!getApiKey()) {
+      console.warn(
+        '[transcript-pipeline] No API key available — will retry via poll loop',
+      );
+      // Set firstRawAt so the poll loop retries
+      firstRawAt = Date.now();
+      return; // finally block will set running = false
+    }
+
     // 1. Concatenate raw cards with speaker labels
     const concatenated = rawCards
       .map((c) => {
@@ -222,13 +242,25 @@ async function runPipeline(rawCards: Card[]): Promise<void> {
       })
       .join('\n');
 
-    // 2. Ask LLM to re-segment and clean
-    const cleanSections = await resegmentAndClean(concatenated);
+    // 2. Ask LLM to re-segment and clean (with retries)
+    let cleanSections: string[] = [];
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      cleanSections = await resegmentAndClean(concatenated);
+      if (cleanSections.length > 0) break;
+      if (attempt < MAX_RETRIES) {
+        const delay = RETRY_BASE_DELAY_MS * attempt;
+        console.warn(
+          `[transcript-pipeline] LLM returned no sections (attempt ${attempt}/${MAX_RETRIES}), retrying in ${delay / 1000}s...`,
+        );
+        await sleep(delay);
+      }
+    }
 
-    if (!cleanSections || cleanSections.length === 0) {
-      console.warn('[transcript-pipeline] LLM returned no sections — skipping batch');
-      running = false;
-      return;
+    if (cleanSections.length === 0) {
+      console.warn('[transcript-pipeline] LLM returned no sections after retries — will retry via poll loop');
+      // Set firstRawAt so the poll loop retries later
+      firstRawAt = Date.now();
+      return; // finally block will set running = false
     }
 
     // 3. Create clean cards
@@ -236,7 +268,7 @@ async function runPipeline(rawCards: Card[]): Promise<void> {
     const store = useSessionStore.getState();
     const tcol = store.columns.find((c) => c.type === 'transcript');
     if (!tcol || !store.session?.id) {
-      running = false;
+      console.warn('[transcript-pipeline] No transcript column or session — aborting');
       return;
     }
 
@@ -318,21 +350,22 @@ async function runPipeline(rawCards: Card[]): Promise<void> {
       latestStore.updateCard(c.id, { userTags: newTags });
     }
 
-    console.debug(
+    console.log(
       `[transcript-pipeline] Batch ${batchId} complete: ${cleanCardCount} clean cards from ${rawCards.length} raw cards`,
     );
     bus.emit('transcript:pipeline:completed', { batchId, cleanCardCount });
   } catch (e) {
     console.error('[transcript-pipeline] Pipeline error:', e);
+    // On error, ensure retry by setting firstRawAt
+    firstRawAt = Date.now();
   } finally {
     running = false;
     // After finishing, check if new raw cards accumulated during our run.
-    // The poll loop will pick them up, but let's also check immediately.
     const remaining = getRawCards();
     if (remaining.length > 0) {
       // Reset firstRawAt so time-based trigger can fire for the new batch
       if (firstRawAt === null) firstRawAt = Date.now();
-      // If enough cards, run again immediately (via setTimeout to yield)
+      // If enough cards or pending flush, run again soon (yield to event loop)
       if (remaining.length >= MIN_RAW_CARDS || pendingFlush) {
         pendingFlush = false;
         setTimeout(() => {
@@ -367,14 +400,26 @@ async function resegmentAndClean(
 ): Promise<string[]> {
   const userPrompt = `Here is the raw transcript to re-segment and clean:\n\n${concatenatedText}`;
 
-  const result = await askClaude(SYSTEM_PROMPT, userPrompt, 4096);
-  if (!result) return [];
+  try {
+    const result = await askClaude(SYSTEM_PROMPT, userPrompt, 4096);
+    if (!result) {
+      console.warn('[transcript-pipeline] askClaude returned null');
+      return [];
+    }
 
-  // Split on blank lines to get sections
-  const sections = result
-    .split(/\n\s*\n/)
-    .map((s) => s.trim())
-    .filter(Boolean);
+    // Split on blank lines to get sections
+    const sections = result
+      .split(/\n\s*\n/)
+      .map((s) => s.trim())
+      .filter(Boolean);
 
-  return sections;
+    return sections;
+  } catch (e) {
+    console.error('[transcript-pipeline] LLM call failed:', e);
+    return [];
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
 }
