@@ -98,7 +98,9 @@ export const SLOT_PROVIDERS: readonly SlotDef[] = [
         id: 'google',
         label: 'Google',
         models: [
-          { id: 'imagen-3.0-generate-002', label: 'Imagen 3', inputCost: 0, outputCost: 0.04 },
+          { id: 'imagen-3.0-generate-001', label: 'Imagen 3', inputCost: 0, outputCost: 0.04 },
+          { id: 'imagen-3.0-fast-generate-001', label: 'Imagen 3 Fast', inputCost: 0, outputCost: 0.02 },
+          { id: 'gemini-2.0-flash-preview-image-generation', label: 'Gemini 2.0 Flash Image', inputCost: 0, outputCost: 0.04 },
         ],
       },
     ],
@@ -187,6 +189,17 @@ export function getChatModels(provider: ApiProvider): readonly ModelDef[] {
 }
 
 /**
+ * Get the best available model list for the image_gen slot (Google Imagen).
+ * Returns fetched models if available, otherwise static fallback.
+ */
+export function getImageGenModels(): readonly ModelDef[] {
+  const cached = fetchedModelCache.get('google');
+  if (cached && cached.length > 0) return cached;
+  const provDef = getProviderDef('image_gen', 'google');
+  return provDef?.models ?? [];
+}
+
+/**
  * Fetch available models from a provider's API and cache them.
  * Returns the fetched models, or falls back to static list on failure.
  */
@@ -201,6 +214,8 @@ export async function fetchProviderModels(
       models = await fetchAnthropicModels(apiKey);
     } else if (provider === 'openai') {
       models = await fetchOpenAIModels(apiKey);
+    } else if (provider === 'google') {
+      models = await fetchGoogleImagenModels(apiKey);
     } else {
       return [];
     }
@@ -266,6 +281,58 @@ async function fetchAnthropicModels(apiKey: string): Promise<ModelDef[]> {
   return models;
 }
 
+// ---------------------------------------------------------------------------
+// Google Imagen model fetching
+// ---------------------------------------------------------------------------
+// Google's API requires CORS proxy through Electron IPC.
+// Falls back to static list if IPC is unavailable.
+
+/**
+ * Fetch available Imagen models from Google's Generative AI API.
+ * Proxied through Electron IPC to avoid CORS restrictions.
+ */
+async function fetchGoogleImagenModels(apiKey: string): Promise<ModelDef[]> {
+  // Use IPC proxy if available (Electron environment)
+  if (typeof window !== 'undefined' && (window as any).electronAPI?.listImagenModels) {
+    try {
+      const result = await (window as any).electronAPI.listImagenModels(apiKey);
+      if (result.error || !result.models?.length) return [];
+      return (result.models as Array<{ name: string; displayName?: string }>)
+        .filter((m) => /imagen/i.test(m.name) || /gemini.*image|image.*gemini/i.test(m.name))
+        .map((m) => {
+          // name is like "models/imagen-3.0-generate-001" — strip prefix
+          const id = m.name.replace(/^models\//, '');
+          const label = m.displayName || id;
+          return { id, label, inputCost: 0, outputCost: 0.04 };
+        })
+        .sort((a, b) => a.label.localeCompare(b.label));
+    } catch (e) {
+      console.warn('fetchGoogleImagenModels IPC error:', e);
+      return [];
+    }
+  }
+  // Fallback: try direct fetch (works in non-Electron contexts or if CORS allows)
+  try {
+    const r = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`,
+    );
+    if (!r.ok) return [];
+    const body = await r.json() as {
+      models?: Array<{ name: string; displayName?: string; supportedGenerationMethods?: string[] }>;
+    };
+    const imagenModels = (body.models ?? []).filter((m) => {
+      const isImagen = /imagen/i.test(m.name) && m.supportedGenerationMethods?.includes('predict');
+      const isGeminiImage = /gemini.*image|image.*gemini/i.test(m.name);
+      return isImagen || isGeminiImage;
+    });
+    return imagenModels.map((m) => {
+      const id = m.name.replace(/^models\//, '');
+      return { id, label: m.displayName || id, inputCost: 0, outputCost: 0.04 };
+    });
+  } catch {
+    return [];
+  }
+}
 // OpenAI model patterns for chat
 const OPENAI_CHAT_PATTERN = /^(gpt-4|gpt-3\.5|o[1-9]|chatgpt)/;
 const OPENAI_SKIP_PATTERN = /-(realtime|audio|search)/;

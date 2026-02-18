@@ -29,7 +29,7 @@ export type ColumnType =
   | 'summary'
   | 'trash';
 
-export type CardSource = 'transcription' | 'user' | 'agent' | 'inquiry';
+export type CardSource = 'transcription' | 'user' | 'agent' | 'inquiry' | 'chat';
 
 export type HighlightState = 'none' | 'user' | 'ai' | 'both';
 
@@ -101,6 +101,9 @@ export interface Card {
   createdAt: string;
   updatedAt: string;
   sortOrder: string;
+  /** Base64-encoded image data (no data: URI prefix), set on image-generation result cards. */
+  imageData?: string;
+  imageMimeType?: string;
 }
 
 // ----------------------------------------------------------------------------
@@ -460,6 +463,12 @@ export interface ElectronDbApi {
   getCustomAgents: () => Promise<CustomAgentConfig[]>;
   saveCustomAgent: (agent: CustomAgentConfig) => Promise<void>;
   deleteCustomAgent: (id: string) => Promise<void>;
+
+  // Chat Messages
+  getChatMessages: (sessionId: string) => Promise<ChatMessage[]>;
+  createChatMessage: (msg: ChatMessage & { sessionId: string }) => Promise<ChatMessage>;
+  updateChatMessage: (id: string, updates: Partial<Pick<ChatMessage, 'content' | 'hiddenFromLlm' | 'collapsed' | 'isDeleted'>>) => Promise<void>;
+  clearChatMessages: (sessionId: string) => Promise<void>;
 }
 
 export type EmbeddingProvider = 'openai' | 'local';
@@ -470,12 +479,62 @@ export interface ElectronAPI {
   /** Proxy transcription API calls through the main process (bypasses CORS). */
   transcribe: (audioBase64: string) => Promise<{ text?: string; error?: string }>;
 
+  /** List available Google Imagen models through main process (bypasses CORS). */
+  listImagenModels: (apiKey: string) => Promise<{
+    models: Array<{ name: string; displayName?: string; supportedGenerationMethods?: string[] }>;
+    error: string | null;
+  }>;
+
+  /** Proxy image generation through main process (bypasses CORS).
+   *  Supports Imagen 3 (predict API) and Gemini image-gen (generateContent API).
+   *  modelId overrides the saved setting for per-generation model selection. */
+  generateImage: (prompt: string, inputBase64?: string, modelId?: string) => Promise<{ imageData?: string; mimeType?: string; error?: string }>;
+
   shell: {
     openPath: (filePath: string) => Promise<string>;
   };
 }
 
 export type ApiKeyStatus = 'unchecked' | 'checking' | 'valid' | 'invalid';
+
+// ----------------------------------------------------------------------------
+// Chat Panel
+// ----------------------------------------------------------------------------
+
+/** An image attached to a chat message (from file picker or clipboard paste). */
+export interface ImageAttachment {
+  /** Base64-encoded image data — no data: URI prefix. */
+  data: string;
+  mimeType: string;
+  name?: string;
+}
+
+/** A message in the ChatPanel's conversation thread (persisted per session). */
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  /** Images the user attached when sending this message. */
+  imageAttachments?: ImageAttachment[];
+  /** Generated image result (base64, no data: prefix). Set on assistant image cards. */
+  imageData?: string;
+  imageMimeType?: string;
+  timestamp: number;
+  /** Agent name, set when an @agent produced this response. */
+  agentName?: string;
+  /** When true, render as ImagePromptCard with editable prompt + generate button. */
+  isImagePromptCard?: boolean;
+  /** Full structured breakdown text (SUBJECT/STYLE/MOOD/etc.) shown in the prompt card. */
+  structuredPromptText?: string;
+  /** Extracted FINAL PROMPT pre-filled in the editable textarea. */
+  finalPrompt?: string;
+  /** When true, message is excluded from LLM context on subsequent turns. */
+  hiddenFromLlm?: boolean;
+  /** When true, message body is collapsed to 3 lines in the UI. */
+  collapsed?: boolean;
+  /** When true, message is soft-deleted and hidden from the thread. */
+  isDeleted?: boolean;
+}
 
 /** Reason the agent queue is paused. `null` means the queue is running. */
 export type QueuePauseReason = 'api_not_ready' | 'api_invalid' | 'user' | null;
@@ -524,6 +583,7 @@ export const SOURCE_BADGES: Readonly<Record<CardSource, SourceBadge>> = {
   agent:         { label: 'Agent',      bg: '#0891b2' },
   transcription: { label: 'Transcript', bg: '#dc2626' },
   inquiry:       { label: 'Inquiry',    bg: '#06b6d4' },
+  chat:          { label: 'Chat',       bg: '#7c3aed' },
 } as const;
 
 /** Background accent color per session mode. */

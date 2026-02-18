@@ -1,5 +1,5 @@
 import { v4 as uuid } from 'uuid';
-import type { ApiKeyStatus, ApiKeyConfig, ApiProvider } from '@/types';
+import type { ApiKeyStatus, ApiKeyConfig, ApiProvider, ImageAttachment } from '@/types';
 import { getModelDef } from '@/utils/providers';
 import type { ModelDef } from '@/utils/providers';
 
@@ -309,15 +309,129 @@ export const getLLMProvider = (): LLMProvider => getActiveProvider();
 /**
  * Convenience wrapper matching the prototype's askClaude(sys, msg) signature.
  * Delegates to whatever LLMProvider is currently active.
+ * Pass `history` for multi-turn conversations; the new userMessage is appended.
  */
 export const askClaude = async (
   system: string,
   userMessage: string,
   maxTokens?: number,
+  history?: Array<{ role: 'user' | 'assistant'; content: string }>,
 ): Promise<string | null> => {
+  const prior: LLMMessage[] = history ?? [];
   return getActiveProvider().complete({
     system,
-    messages: [{ role: 'user', content: userMessage }],
+    messages: [...prior, { role: 'user', content: userMessage }],
     maxTokens,
   });
+};
+
+/**
+ * Multimodal variant of askClaude — sends images alongside the text message.
+ * Falls back to plain text if no images are provided.
+ * Supports Anthropic (vision content blocks) and OpenAI (image_url content blocks).
+ */
+export const askClaudeMultimodal = async (
+  system: string,
+  userText: string,
+  images: ImageAttachment[],
+  maxTokens?: number,
+): Promise<string | null> => {
+  if (images.length === 0) {
+    return askClaude(system, userText, maxTokens);
+  }
+
+  const provider = cachedProvider;
+  const model = getModelOption();
+  const mt = maxTokens ?? 1000;
+
+  if (!cachedKey) {
+    console.error('No API key set. Configure your key in Settings > API Keys.');
+    return null;
+  }
+
+  try {
+    if (provider === 'anthropic') {
+      // Anthropic vision: content is an array of blocks
+      const content: unknown[] = [
+        ...images.map(img => ({
+          type: 'image',
+          source: { type: 'base64', media_type: img.mimeType, data: img.data },
+        })),
+        { type: 'text', text: userText },
+      ];
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': cachedKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: model.id,
+          max_tokens: mt,
+          system,
+          messages: [{ role: 'user', content }],
+        }),
+      });
+      if (!r.ok) {
+        const err = await r.text();
+        console.error('LLM multimodal API error:', r.status, err);
+        return null;
+      }
+      const d = await r.json();
+      logUsage(d, model, undefined, 'anthropic');
+      return d.content?.map((b: { text?: string }) => b.text || '').join('\n') || '';
+
+    } else {
+      // OpenAI vision: content array with image_url blocks
+      const content: unknown[] = [
+        ...images.map(img => ({
+          type: 'image_url',
+          image_url: { url: `data:${img.mimeType};base64,${img.data}` },
+        })),
+        { type: 'text', text: userText },
+      ];
+      const r = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${cachedKey}`,
+        },
+        body: JSON.stringify({
+          model: model.id,
+          max_tokens: mt,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content },
+          ],
+        }),
+      });
+      if (!r.ok) {
+        const err = await r.text();
+        console.error('LLM multimodal API error:', r.status, err);
+        return null;
+      }
+      const d = await r.json();
+      const usage = d.usage as { prompt_tokens?: number; completion_tokens?: number } | undefined;
+      if (usage && window.electronAPI?.db?.logApiUsage) {
+        const inputTokens = usage.prompt_tokens ?? 0;
+        const outputTokens = usage.completion_tokens ?? 0;
+        const costUsd = inputTokens * model.inputCost + outputTokens * model.outputCost;
+        window.electronAPI.db.logApiUsage({
+          id: uuid(),
+          provider: 'openai',
+          model: model.id,
+          inputTokens,
+          outputTokens,
+          costUsd: Math.round(costUsd * 1_000_000) / 1_000_000,
+          createdAt: new Date().toISOString(),
+        }).catch((e: unknown) => console.warn('Failed to log API usage:', e));
+      }
+      return d.choices?.[0]?.message?.content || '';
+    }
+  } catch (e) {
+    console.error('LLM multimodal API error:', e);
+    return null;
+  }
 };

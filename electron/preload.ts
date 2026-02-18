@@ -72,11 +72,26 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getCustomAgents: () => ipcRenderer.invoke('db:getCustomAgents'),
     saveCustomAgent: (agent: any) => ipcRenderer.invoke('db:saveCustomAgent', agent),
     deleteCustomAgent: (id: string) => ipcRenderer.invoke('db:deleteCustomAgent', id),
+
+    // Chat Messages
+    getChatMessages: (sessionId: string) => ipcRenderer.invoke('db:getChatMessages', sessionId),
+    createChatMessage: (msg: any) => ipcRenderer.invoke('db:createChatMessage', msg),
+    updateChatMessage: (id: string, updates: any) => ipcRenderer.invoke('db:updateChatMessage', id, updates),
+    clearChatMessages: (sessionId: string) => ipcRenderer.invoke('db:clearChatMessages', sessionId),
   },
 
   // Transcription proxy (bypasses CORS)
   transcribe: (audioBase64: string) =>
     ipcRenderer.invoke('transcribe', audioBase64) as Promise<{ text?: string; error?: string }>,
+
+  // Image generation proxy (bypasses CORS for Google Imagen API)
+  listImagenModels: (apiKey: string) =>
+    ipcRenderer.invoke('listImagenModels', apiKey) as Promise<{
+      models: Array<{ name: string; displayName?: string; supportedGenerationMethods?: string[] }>;
+      error: string | null;
+    }>,
+  generateImage: (prompt: string, inputBase64?: string, modelId?: string) =>
+    ipcRenderer.invoke('generateImage', prompt, inputBase64, modelId) as Promise<{ imageData?: string; mimeType?: string; error?: string }>,
 
   // Shell utilities
   shell: {

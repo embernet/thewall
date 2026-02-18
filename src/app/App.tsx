@@ -2,7 +2,6 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useSessionStore } from '@/store/session';
 import Launcher from '@/components/Launcher/Launcher';
 import Column from '@/components/Column/Column';
-import InquiryColumn from '@/components/Column/InquiryColumn';
 import AgentQueueColumn from '@/components/Column/AgentQueueColumn';
 import ContextColumn from '@/components/Column/ContextColumn';
 import SummaryColumn from '@/components/Column/SummaryColumn';
@@ -15,10 +14,12 @@ import NotificationToast from '@/components/NotificationToast/NotificationToast'
 import CostDashboard from '@/components/CostDashboard/CostDashboard';
 import AgentConfig from '@/components/AgentConfig/AgentConfig';
 import FindRelatedView from '@/components/FindRelatedModal/FindRelatedModal';
+import ChatPanel from '@/components/ChatPanel/ChatPanel';
 import TopBar from './TopBar';
 import StatusBar from './StatusBar';
 import { askClaude, loadChatConfig, validateApiKey, getApiKey, getChatProvider } from '@/utils/llm';
 import { loadEmbeddingConfig, getEmbeddingProvider } from '@/utils/embedding-service';
+import { loadImageGenConfig } from '@/utils/image-generation';
 import { fetchProviderModels } from '@/utils/providers';
 import type { ApiKeyStatus, EmbeddingProvider } from '@/types';
 import { bus } from '@/events/bus';
@@ -57,6 +58,9 @@ export default function App() {
 
   const [sidebarOpen, setSidebarOpen] = useState(() =>
     localStorage.getItem('wall:sidebar') !== 'closed',
+  );
+  const [chatOpen, setChatOpen] = useState(() =>
+    localStorage.getItem('wall:chat-panel') !== 'closed',
   );
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
@@ -145,6 +149,12 @@ export default function App() {
         await loadTranscriptionConfig();
       } catch (e) {
         console.warn('Failed to load transcription config:', e);
+      }
+      // Load image generation config from DB
+      try {
+        await loadImageGenConfig();
+      } catch (e) {
+        console.warn('Failed to load image gen config:', e);
       }
     })();
     return () => { cancelled = true; };
@@ -746,7 +756,7 @@ export default function App() {
           concurrency={concurrency}
           onConcurrencyChange={handleConcurrencyChange}
         />
-        <div className="flex-1 flex overflow-x-auto">
+        <div className="flex-1 flex overflow-x-auto min-w-0">
           {visCols.map(col => {
             // Summary column — special component
             if (col.type === 'summary') {
@@ -778,15 +788,8 @@ export default function App() {
               );
             }
             if (col.type === 'inquiry') {
-              return (
-                <InquiryColumn
-                  key={col.id}
-                  column={col}
-                  cards={cards.filter(c => c.columnId === col.id && !c.isDeleted)}
-                  allCards={cards.filter(c => !c.isDeleted)}
-                  onNavigate={navigateToCard}
-                />
-              );
+              // Inquiry column is now the Chat panel (right sidebar) — skip rendering here
+              return null;
             }
             if (col.type === 'context') {
               // Filter out chunk cards — only show document cards and manual text cards
@@ -828,6 +831,17 @@ export default function App() {
             );
           })}
         </div>
+        <ChatPanel
+          open={chatOpen}
+          onToggle={() => setChatOpen(o => {
+            const next = !o;
+            localStorage.setItem('wall:chat-panel', next ? 'open' : 'closed');
+            return next;
+          })}
+          allCards={cards.filter(c => !c.isDeleted)}
+          onNavigate={navigateToCard}
+          sessionId={session?.id}
+        />
       </div>
 
       <StatusBar simRunning={simRunning} embeddingProvider={embeddingProvider} />

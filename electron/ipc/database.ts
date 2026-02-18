@@ -322,4 +322,31 @@ const migrations: Migration[] = [
       -- SQLite doesn't support DROP COLUMN easily; ignore
     `,
   },
+  {
+    name: '008_chat_messages',
+    up: `
+      CREATE TABLE IF NOT EXISTS chat_messages (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+        role TEXT CHECK(role IN ('user','assistant')) NOT NULL,
+        content TEXT NOT NULL,
+        image_attachments TEXT DEFAULT NULL,
+        image_data TEXT DEFAULT NULL,
+        image_mime_type TEXT DEFAULT NULL,
+        agent_name TEXT DEFAULT NULL,
+        is_image_prompt_card INTEGER DEFAULT 0,
+        structured_prompt_text TEXT DEFAULT NULL,
+        final_prompt TEXT DEFAULT NULL,
+        hidden_from_llm INTEGER DEFAULT 0,
+        collapsed INTEGER DEFAULT 0,
+        is_deleted INTEGER DEFAULT 0,
+        timestamp_ms INTEGER NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id, is_deleted, timestamp_ms);
+    `,
+    down: `
+      DROP TABLE IF EXISTS chat_messages;
+    `,
+  },
 ];

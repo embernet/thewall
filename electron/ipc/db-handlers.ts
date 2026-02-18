@@ -492,6 +492,65 @@ export function registerDbHandlers() {
     db().prepare('DELETE FROM api_keys WHERE slot = ?').run(slot);
   });
 
+  // ── Chat Messages ──
+
+  ipcMain.handle('db:getChatMessages', (_e, sessionId: string) => {
+    const rows = db()
+      .prepare(
+        'SELECT * FROM chat_messages WHERE session_id = ? AND is_deleted = 0 ORDER BY timestamp_ms ASC'
+      )
+      .all(sessionId) as any[];
+    return rows.map(mapChatMessageFromDb);
+  });
+
+  ipcMain.handle('db:createChatMessage', (_e, msg: any) => {
+    db()
+      .prepare(
+        `INSERT OR IGNORE INTO chat_messages
+         (id, session_id, role, content, image_attachments, image_data, image_mime_type,
+          agent_name, is_image_prompt_card, structured_prompt_text, final_prompt,
+          hidden_from_llm, collapsed, is_deleted, timestamp_ms, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        msg.id,
+        msg.sessionId,
+        msg.role,
+        msg.content,
+        msg.imageAttachments ? JSON.stringify(msg.imageAttachments) : null,
+        msg.imageData ?? null,
+        msg.imageMimeType ?? null,
+        msg.agentName ?? null,
+        msg.isImagePromptCard ? 1 : 0,
+        msg.structuredPromptText ?? null,
+        msg.finalPrompt ?? null,
+        msg.hiddenFromLlm ? 1 : 0,
+        msg.collapsed ? 1 : 0,
+        msg.isDeleted ? 1 : 0,
+        msg.timestamp,
+        new Date().toISOString()
+      );
+    return msg;
+  });
+
+  ipcMain.handle('db:updateChatMessage', (_e, id: string, updates: any) => {
+    const fields: string[] = [];
+    const values: any[] = [];
+
+    if (updates.content !== undefined) { fields.push('content = ?'); values.push(updates.content); }
+    if (updates.hiddenFromLlm !== undefined) { fields.push('hidden_from_llm = ?'); values.push(updates.hiddenFromLlm ? 1 : 0); }
+    if (updates.collapsed !== undefined) { fields.push('collapsed = ?'); values.push(updates.collapsed ? 1 : 0); }
+    if (updates.isDeleted !== undefined) { fields.push('is_deleted = ?'); values.push(updates.isDeleted ? 1 : 0); }
+
+    if (fields.length === 0) return;
+    values.push(id);
+    db().prepare(`UPDATE chat_messages SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+  });
+
+  ipcMain.handle('db:clearChatMessages', (_e, sessionId: string) => {
+    db().prepare('UPDATE chat_messages SET is_deleted = 1 WHERE session_id = ?').run(sessionId);
+  });
+
   // ── Transcription Proxy ──
   // Proxies transcription API calls through the main process to avoid CORS
   // issues in the renderer. The main process fetch is not subject to CORS.
@@ -562,6 +621,140 @@ export function registerDbHandlers() {
         const text = await r.text();
         return { text: text.trim() };
       }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return { error: msg };
+    }
+  });
+
+  // ── Image Generation Proxy ──
+  // Proxies Imagen 3 API calls through the main process to avoid CORS issues
+  // in the renderer. Google's Generative AI API does not set CORS headers.
+
+  // List available Google image generation models (CORS proxy).
+  // Returns Imagen models (predict method) plus Gemini models that support image output.
+  ipcMain.handle('listImagenModels', async (_e, apiKey: string) => {
+    if (!apiKey) return { error: 'No API key provided', models: [] };
+    try {
+      const r = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}&pageSize=100`,
+      );
+      if (!r.ok) {
+        const err = await r.text().catch(() => r.statusText);
+        return { error: `Google API error ${r.status}: ${err}`, models: [] };
+      }
+      const data = await r.json() as {
+        models?: Array<{ name: string; displayName?: string; supportedGenerationMethods?: string[] }>;
+      };
+      // Include Imagen models (predict) AND Gemini image-generation models (generateContent)
+      const models = (data.models ?? []).filter((m) => {
+        const isImagen = /imagen/i.test(m.name) && m.supportedGenerationMethods?.includes('predict');
+        const isGeminiImage = /gemini.*image|image.*gemini/i.test(m.name);
+        return isImagen || isGeminiImage;
+      });
+      return { models, error: null };
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return { error: msg, models: [] };
+    }
+  });
+
+  ipcMain.handle('generateImage', async (_e, prompt: string, inputBase64?: string, overrideModelId?: string) => {
+    const row = db().prepare('SELECT * FROM api_keys WHERE slot = ?').get('image_gen') as any;
+    if (!row) return { error: 'No image generation API key configured' };
+
+    let apiKey = '';
+    if (row.encrypted_key) {
+      try {
+        if (safeStorage.isEncryptionAvailable()) {
+          apiKey = safeStorage.decryptString(row.encrypted_key);
+        } else {
+          apiKey = row.encrypted_key.toString('utf-8');
+        }
+      } catch {
+        return { error: 'Failed to decrypt image generation API key' };
+      }
+    }
+    if (!apiKey) return { error: 'Image generation API key is empty' };
+
+    // overrideModelId comes from the per-generation model picker in the UI;
+    // falls back to whatever is saved in settings, then the hardcoded default.
+    const modelId = overrideModelId || row.model_id || 'imagen-3.0-generate-001';
+
+    // ── Gemini generateContent pathway ──────────────────────────────────────
+    // Gemini image-generation models (e.g. gemini-2.0-flash-preview-image-generation)
+    // use generateContent with responseModalities: ["IMAGE"].
+    const isGeminiImageModel = /gemini/i.test(modelId);
+    if (isGeminiImageModel) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+      const parts: Array<Record<string, unknown>> = [{ text: prompt }];
+      if (inputBase64) {
+        // Prepend image part for image-to-image
+        parts.unshift({ inlineData: { mimeType: 'image/png', data: inputBase64 } });
+      }
+      try {
+        const r = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts }],
+            generationConfig: { responseModalities: ['IMAGE'] },
+          }),
+        });
+        if (!r.ok) {
+          const err = await r.text().catch(() => r.statusText);
+          return { error: `Gemini image API error ${r.status}: ${err}` };
+        }
+        const data = await r.json() as {
+          candidates?: Array<{
+            content?: { parts?: Array<{ inlineData?: { mimeType?: string; data?: string } }> };
+          }>;
+        };
+        const parts2 = data.candidates?.[0]?.content?.parts ?? [];
+        const imgPart = parts2.find((p) => p.inlineData?.data);
+        if (!imgPart?.inlineData?.data) {
+          return { error: 'Gemini returned no image data' };
+        }
+        return {
+          imageData: imgPart.inlineData.data,
+          mimeType: imgPart.inlineData.mimeType || 'image/png',
+        };
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        return { error: msg };
+      }
+    }
+
+    // ── Imagen predict pathway ───────────────────────────────────────────────
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:predict?key=${apiKey}`;
+
+    const instance: Record<string, unknown> = { prompt };
+    if (inputBase64) {
+      instance.image = { bytesBase64Encoded: inputBase64 };
+    }
+
+    try {
+      const r = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          instances: [instance],
+          parameters: { sampleCount: 1 },
+        }),
+      });
+      if (!r.ok) {
+        const err = await r.text().catch(() => r.statusText);
+        return { error: `Imagen API error ${r.status}: ${err}` };
+      }
+      const data = await r.json() as { predictions?: { bytesBase64Encoded?: string; mimeType?: string }[] };
+      const prediction = data.predictions?.[0];
+      if (!prediction?.bytesBase64Encoded) {
+        return { error: 'Imagen returned no image data' };
+      }
+      return {
+        imageData: prediction.bytesBase64Encoded,
+        mimeType: prediction.mimeType || 'image/png',
+      };
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       return { error: msg };
@@ -917,6 +1110,26 @@ function mapAgentTaskFromDb(row: any) {
     createdAt: row.created_at,
     startedAt: row.started_at,
     completedAt: row.completed_at,
+  };
+}
+
+function mapChatMessageFromDb(row: any) {
+  return {
+    id: row.id,
+    sessionId: row.session_id,
+    role: row.role,
+    content: row.content,
+    imageAttachments: safeJsonParse(row.image_attachments, undefined),
+    imageData: row.image_data ?? undefined,
+    imageMimeType: row.image_mime_type ?? undefined,
+    agentName: row.agent_name ?? undefined,
+    isImagePromptCard: !!row.is_image_prompt_card,
+    structuredPromptText: row.structured_prompt_text ?? undefined,
+    finalPrompt: row.final_prompt ?? undefined,
+    hiddenFromLlm: !!row.hidden_from_llm,
+    collapsed: !!row.collapsed,
+    isDeleted: !!row.is_deleted,
+    timestamp: row.timestamp_ms,
   };
 }
 
