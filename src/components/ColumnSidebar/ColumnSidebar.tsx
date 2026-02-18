@@ -41,9 +41,10 @@ const ColumnSidebar: React.FC<ColumnSidebarProps> = ({
   const [dropIdx, setDropIdx] = useState<number | null>(null);
   const dragRef = useRef<number | null>(null);
 
-  const sorted = [...columns].sort((a, b) =>
-    (a.sortOrder || '').localeCompare(b.sortOrder || ''),
-  );
+  // Inquiry columns are now the Chat panel — exclude from the column list
+  const sorted = [...columns]
+    .filter(col => col.type !== 'inquiry')
+    .sort((a, b) => (a.sortOrder || '').localeCompare(b.sortOrder || ''));
 
   const getMeta = (col: Column) => {
     // Check for ephemeral chunk columns
@@ -108,7 +109,7 @@ const ColumnSidebar: React.FC<ColumnSidebarProps> = ({
           className="mt-2 text-[9px] text-wall-subtle"
           style={{ writingMode: 'vertical-rl', letterSpacing: 1 }}
         >
-          {activeTab === 'columns' ? 'Columns' : 'Agents'}
+          Tools
         </span>
       </div>
     );
@@ -117,8 +118,12 @@ const ColumnSidebar: React.FC<ColumnSidebarProps> = ({
   // ── Expanded sidebar ──
   return (
     <div className="flex h-full w-[200px] min-w-[200px] flex-col border-r border-wall-border bg-wall-surface">
-      {/* ── Header with tabs ── */}
-      <div className="flex shrink-0 items-center justify-between border-b border-wall-border px-1 py-1">
+      {/* ── Header with title + tabs ── */}
+      <div className="flex shrink-0 flex-col border-b border-wall-border">
+        <div className="px-2 pt-1.5 pb-0">
+          <span className="text-[9px] font-bold uppercase tracking-widest text-wall-subtle">Tools</span>
+        </div>
+        <div className="flex items-center justify-between px-1 pb-1 pt-0.5">
         <div className="flex gap-0.5">
           <button
             onClick={() => setActiveTab('columns')}
@@ -150,6 +155,7 @@ const ColumnSidebar: React.FC<ColumnSidebarProps> = ({
         >
           {'\u25C0'}
         </button>
+        </div>
       </div>
 
       {/* ── Tab content ── */}

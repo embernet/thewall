@@ -1,5 +1,6 @@
 import { agentRegistry } from '../registry';
 
+import { imageGenerator } from './image-generator';
 import { conceptExtractor } from './concept-extractor';
 import { questioner } from './questioner';
 import { claimIdentifier } from './claim-identifier';
@@ -37,6 +38,7 @@ import { knowledgeManager } from './knowledge-manager';
 import { methodology } from './methodology';
 
 export {
+  imageGenerator,
   conceptExtractor,
   questioner,
   claimIdentifier,
@@ -75,6 +77,7 @@ export {
 };
 
 export const builtInAgents = [
+  imageGenerator,
   conceptExtractor,
   questioner,
   claimIdentifier,

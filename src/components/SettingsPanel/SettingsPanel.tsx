@@ -5,6 +5,7 @@ import type { SlotDef, ModelDef } from '@/utils/providers';
 import { setChatConfig, validateApiKey } from '@/utils/llm';
 import { setEmbeddingConfig } from '@/utils/embedding-service';
 import { setTranscriptionConfig } from '@/utils/transcription';
+import { setImageGenConfig } from '@/utils/image-generation';
 import { bus } from '@/events/bus';
 import {
   loadSummaryPrompts,
@@ -90,12 +91,15 @@ export default function SettingsPanel({ open, onClose, onOpenAgentConfig }: Sett
       setFetchedModels(prev => ({ ...prev, [provider]: cached }));
       return;
     }
+    // Determine which DB slot holds the key for this provider
+    const keySlot: ApiSlot =
+      provider === 'google' ? 'image_gen'
+      : provider === 'openai' ? 'chat'
+      : provider === 'anthropic' ? 'chat'
+      : 'chat';
     // Fetch from API
     try {
-      const key = await window.electronAPI?.db?.getDecryptedKey(
-        // Find which slot uses this provider to get the right key
-        provider === 'anthropic' ? 'chat' : provider === 'openai' ? 'chat' : 'chat'
-      );
+      const key = await window.electronAPI?.db?.getDecryptedKey(keySlot);
       if (!key) return;
       const models = await fetchProviderModels(provider, key);
       if (models.length > 0) {
@@ -124,6 +128,10 @@ export default function SettingsPanel({ open, onClose, onOpenAgentConfig }: Sett
         const chatConfig = configs.find(c => c.slot === 'chat');
         if (chatConfig?.hasKey) {
           fetchModelsForProvider(chatConfig.provider as ApiProvider);
+        }
+        const imageGenConfig = configs.find(c => c.slot === 'image_gen');
+        if (imageGenConfig?.hasKey) {
+          fetchModelsForProvider(imageGenConfig.provider as ApiProvider);
         }
       } catch (e) {
         console.warn('Failed to load API key configs:', e);
@@ -245,10 +253,14 @@ export default function SettingsPanel({ open, onClose, onOpenAgentConfig }: Sett
         }));
       } else {
         // image_gen
+        const decrypted = await db.getDecryptedKey('image_gen');
+        setImageGenConfig(decrypted, state.modelId);
         setSlotStates(prev => ({
           ...prev,
           image_gen: { ...prev.image_gen, saving: false, dirty: false, hasExistingKey: hasKey, status: 'saved' },
         }));
+        // Fetch live Imagen models now that we have a valid key
+        if (decrypted) fetchModelsForProvider(state.provider as ApiProvider);
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
