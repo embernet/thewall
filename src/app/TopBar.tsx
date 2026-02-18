@@ -24,6 +24,8 @@ interface TopBarProps {
   onOpenCost: () => void;
   onOpenAgentConfig: () => void;
   onToggleNotifications: () => void;
+  onToggleSummary: () => void;
+  summaryVisible: boolean;
   notificationCount: number;
   apiKeyStatus: ApiKeyStatus;
 }
@@ -60,6 +62,8 @@ export default function TopBar({
   onOpenCost,
   onOpenAgentConfig,
   onToggleNotifications,
+  onToggleSummary,
+  summaryVisible,
   notificationCount,
   apiKeyStatus,
 }: TopBarProps) {
@@ -332,6 +336,19 @@ export default function TopBar({
         title="Agent Configuration"
       >
         {'\uD83E\uDD16'}
+      </button>
+
+      {/* ── Summary toggle ── */}
+      <button
+        onClick={onToggleSummary}
+        className={`cursor-pointer rounded-md border px-2 py-[3px] text-[10px] font-semibold hover:bg-wall-muted ${
+          summaryVisible
+            ? 'border-amber-600 bg-amber-900/30 text-amber-400'
+            : 'border-wall-muted bg-wall-border text-amber-400'
+        }`}
+        title={summaryVisible ? 'Hide Summary' : 'Show Summary'}
+      >
+        {'\uD83D\uDCCB'} Summary
       </button>
 
       {/* ── Knowledge Graph toggle ── */}

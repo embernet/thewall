@@ -5,6 +5,7 @@ import Column from '@/components/Column/Column';
 import InquiryColumn from '@/components/Column/InquiryColumn';
 import AgentQueueColumn from '@/components/Column/AgentQueueColumn';
 import ContextColumn from '@/components/Column/ContextColumn';
+import SummaryColumn from '@/components/Column/SummaryColumn';
 import ColumnSidebar from '@/components/ColumnSidebar/ColumnSidebar';
 import SettingsPanel from '@/components/SettingsPanel/SettingsPanel';
 import ExportMenu from '@/components/ExportMenu/ExportMenu';
@@ -443,8 +444,9 @@ export default function App() {
     const sid = uid();
     const cols = COL_TYPES.map((c, i) => ({
       id: uid(), sessionId: sid, type: c.type, title: c.title,
-      sortOrder: String.fromCharCode(98 + i * 2),
-      visible: c.type !== 'trash', collapsed: false,
+      // Summary column gets sort order 'a' so it appears on the left when visible
+      sortOrder: c.type === 'summary' ? 'a' : String.fromCharCode(98 + i * 2),
+      visible: c.type !== 'trash' && c.type !== 'summary', collapsed: false,
     }));
     return {
       session: { id: sid, title, mode, goal: '', status: 'active' as const, createdAt: now(), updatedAt: now() },
@@ -481,6 +483,15 @@ export default function App() {
       };
       await window.electronAPI.db.createColumn(contextCol);
       cols.push(contextCol);
+    }
+    // Backfill summary column for existing sessions
+    if (!cols.some(c => c.type === 'summary')) {
+      const summaryCol: ColumnType = {
+        id: uid(), sessionId: id, type: 'summary', title: 'Summary',
+        sortOrder: 'a', visible: false, collapsed: false,
+      };
+      await window.electronAPI.db.createColumn(summaryCol);
+      cols.push(summaryCol);
     }
     const cardRows = await window.electronAPI.db.getCards(id);
     init({
@@ -648,6 +659,19 @@ export default function App() {
     if (timerIv.current) clearInterval(timerIv.current);
   }, []);
 
+  const toggleSummaryColumn = useCallback(() => {
+    const summaryCol = columns.find(c => c.type === 'summary');
+    if (summaryCol) {
+      toggleColumnVisibility(summaryCol.id);
+      // If making visible and collapsed, also uncollapse
+      if (!summaryCol.visible && summaryCol.collapsed) {
+        toggleColumnCollapsed(summaryCol.id);
+      }
+    }
+  }, [columns, toggleColumnVisibility, toggleColumnCollapsed]);
+
+  const summaryColumnVisible = columns.some(c => c.type === 'summary' && c.visible);
+
   const handleGoToLauncher = useCallback(async () => {
     simAbort.current = true;
     setSimRunning(false);
@@ -689,6 +713,8 @@ export default function App() {
         onOpenCost={() => setCostOpen(true)}
         onOpenAgentConfig={() => setAgentConfigOpen(true)}
         onToggleNotifications={() => setNotifPanelOpen(o => !o)}
+        onToggleSummary={toggleSummaryColumn}
+        summaryVisible={summaryColumnVisible}
         notificationCount={notifCount}
         apiKeyStatus={apiKeyStatus}
       />
@@ -722,6 +748,17 @@ export default function App() {
         />
         <div className="flex-1 flex overflow-x-auto">
           {visCols.map(col => {
+            // Summary column — special component
+            if (col.type === 'summary') {
+              return (
+                <SummaryColumn
+                  key={col.id}
+                  column={col}
+                  allColumns={columns}
+                  allCards={cards}
+                />
+              );
+            }
             // Ephemeral chunk columns — show chunk cards for the linked document
             if (col.config?.ephemeral && col.config?.docCardId) {
               const docCardId = col.config.docCardId as string;

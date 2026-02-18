@@ -67,12 +67,30 @@ const Column: React.FC<ColumnProps> = ({
   const [editingSummary, setEditingSummary] = useState(false);
   const [summaryDraft, setSummaryDraft] = useState('');
 
+  // Change tracking: compute a content hash from visible cards
+  const computeContentHash = (cardList: CardType[]): string => {
+    const visible = cardList.filter((c) => !c.isDeleted);
+    if (column.type === 'transcript') {
+      // For transcript, exclude processed raw cards
+      const filtered = visible.filter((c) => !c.userTags.includes('transcript:processed'));
+      return filtered.length + ':' + filtered.map(c => c.id).join(',');
+    }
+    return visible.length + ':' + visible.map(c => c.id).join(',');
+  };
+
+  const currentHash = computeContentHash(cards);
+  const lastSummaryHash = (column.config?.summaryHash as string) ?? '';
+  const summaryUpToDate = !!summary && lastSummaryHash === currentHash;
+
   const handleSummarize = async () => {
     if (summarizing || cards.length === 0) return;
     setSummarizing(true);
     try {
-      const cardTexts = cards
-        .filter((c) => !c.isDeleted)
+      let visibleCards = cards.filter((c) => !c.isDeleted);
+      if (column.type === 'transcript') {
+        visibleCards = visibleCards.filter((c) => !c.userTags.includes('transcript:processed'));
+      }
+      const cardTexts = visibleCards
         .map((c) => c.content)
         .join('\n---\n');
       const result = await askClaude(
@@ -81,10 +99,11 @@ const Column: React.FC<ColumnProps> = ({
       );
       setSummary(result);
       setSummaryOpen(true);
-      // Persist summary to column config
+      // Persist summary + content hash to column config
       if (result) {
+        const hash = computeContentHash(cards);
         storeUpdateColumn(column.id, {
-          config: { ...column.config, summary: result },
+          config: { ...column.config, summary: result, summaryHash: hash },
         });
       }
     } catch (e) {
@@ -230,12 +249,16 @@ const Column: React.FC<ColumnProps> = ({
                 Empty
               </button>
             )}
-            {column.type !== 'trash' && column.type !== 'transcript' && cards.length > 0 && (
+            {column.type !== 'trash' && column.type !== 'summary' && cards.length > 0 && (
               <button
                 onClick={handleSummarize}
                 disabled={summarizing}
-                className="cursor-pointer border-none bg-transparent text-[11px] text-wall-subtle hover:text-amber-400"
-                title="Summarize cards"
+                className={`cursor-pointer border-none bg-transparent text-[11px] ${
+                  summaryUpToDate
+                    ? 'text-green-400 hover:text-green-300'
+                    : 'text-wall-subtle hover:text-amber-400'
+                }`}
+                title={summaryUpToDate ? 'Summary up to date (click to regenerate)' : 'Summarize cards'}
               >
                 {summarizing ? '\u23F3' : '\u2728'}
               </button>
@@ -461,7 +484,7 @@ const Column: React.FC<ColumnProps> = ({
                   setSummary(null);
                   setEditingSummary(false);
                   storeUpdateColumn(column.id, {
-                    config: { ...column.config, summary: undefined },
+                    config: { ...column.config, summary: undefined, summaryHash: undefined },
                   });
                 }}
                 className="cursor-pointer border-none bg-transparent text-[9px] text-amber-500 hover:text-amber-300"

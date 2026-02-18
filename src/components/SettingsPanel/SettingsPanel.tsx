@@ -6,6 +6,13 @@ import { setChatConfig, validateApiKey } from '@/utils/llm';
 import { setEmbeddingConfig } from '@/utils/embedding-service';
 import { setTranscriptionConfig } from '@/utils/transcription';
 import { bus } from '@/events/bus';
+import {
+  loadSummaryPrompts,
+  saveSummaryPrompts,
+  resetAllBuiltInPrompts,
+  DEFAULT_SUMMARY_PROMPTS,
+} from '@/utils/summary-prompts';
+import type { SummaryPrompt } from '@/utils/summary-prompts';
 // Note: Column management is now handled by the ColumnSidebar component
 
 // ---------------------------------------------------------------------------
@@ -51,7 +58,7 @@ function mkSlotState(slotDef: SlotDef, config?: ApiKeyConfig): SlotState {
 // Component
 // ---------------------------------------------------------------------------
 
-type SettingsTab = 'columns' | 'agents' | 'api keys';
+type SettingsTab = 'columns' | 'agents' | 'api keys' | 'summaries';
 
 export default function SettingsPanel({ open, onClose, onOpenAgentConfig }: SettingsPanelProps) {
   const [tab, setTab] = useState<SettingsTab>('columns');
@@ -66,6 +73,14 @@ export default function SettingsPanel({ open, onClose, onOpenAgentConfig }: Sett
 
   // Fetched models per provider (live from API)
   const [fetchedModels, setFetchedModels] = useState<Record<string, ModelDef[]>>({});
+
+  // Summary prompts state
+  const [summaryPrompts, setSummaryPrompts] = useState<SummaryPrompt[]>([]);
+  const [editingPromptId, setEditingPromptId] = useState<string | null>(null);
+  const [editingPromptDraft, setEditingPromptDraft] = useState('');
+  const [editingLabelDraft, setEditingLabelDraft] = useState('');
+  const [newPromptLabel, setNewPromptLabel] = useState('');
+  const [newPromptText, setNewPromptText] = useState('');
 
   // Fetch live models for a provider using a decrypted key
   const fetchModelsForProvider = useCallback(async (provider: ApiProvider) => {
@@ -115,6 +130,11 @@ export default function SettingsPanel({ open, onClose, onOpenAgentConfig }: Sett
       }
     })();
   }, [open, fetchModelsForProvider]);
+
+  // Load summary prompts when panel opens
+  useEffect(() => {
+    if (open) setSummaryPrompts(loadSummaryPrompts());
+  }, [open]);
 
   // Update a single slot field
   const updateSlot = useCallback((slot: ApiSlot, patch: Partial<SlotState>) => {
@@ -272,8 +292,8 @@ export default function SettingsPanel({ open, onClose, onOpenAgentConfig }: Sett
         </div>
 
         {/* Tab bar */}
-        <div className="mb-3.5 flex gap-[3px]">
-          {(['columns', 'agents', 'api keys'] as const).map((t) => (
+        <div className="mb-3.5 flex gap-[3px] flex-wrap">
+          {(['columns', 'agents', 'api keys', 'summaries'] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -330,6 +350,184 @@ export default function SettingsPanel({ open, onClose, onOpenAgentConfig }: Sett
                 onSave={() => saveSlot(slotDef.slot)}
               />
             ))}
+          </div>
+        )}
+
+        {/* Summaries tab */}
+        {tab === 'summaries' && (
+          <div className="space-y-4">
+            <div className="text-xs text-wall-text-muted">
+              Manage summary prompt templates. Edit built-in prompts or add your own.
+            </div>
+
+            {/* Reset all built-ins button */}
+            <button
+              onClick={() => {
+                const updated = resetAllBuiltInPrompts();
+                setSummaryPrompts(updated);
+                setEditingPromptId(null);
+              }}
+              className="cursor-pointer rounded-md border border-wall-muted bg-wall-border px-3 py-1 text-[10px] font-medium text-wall-text-dim hover:bg-wall-muted"
+            >
+              Reset All System Prompts to Defaults
+            </button>
+
+            {/* Prompt list */}
+            {summaryPrompts.map((prompt) => {
+              const isEditing = editingPromptId === prompt.id;
+              const isDefault = DEFAULT_SUMMARY_PROMPTS.some(d => d.id === prompt.id);
+              const defaultPrompt = DEFAULT_SUMMARY_PROMPTS.find(d => d.id === prompt.id);
+              const isModified = isDefault && defaultPrompt && defaultPrompt.prompt !== prompt.prompt;
+
+              return (
+                <div key={prompt.id} className="rounded-lg border border-wall-border bg-wall-bg p-3">
+                  <div className="mb-1.5 flex items-center gap-2">
+                    <span className="flex-1 text-xs font-semibold text-wall-text">
+                      {prompt.label}
+                    </span>
+                    {prompt.builtIn && (
+                      <span className="rounded-md bg-indigo-900/40 px-1.5 py-0.5 text-[8px] font-medium text-indigo-300">
+                        System
+                      </span>
+                    )}
+                    {isModified && (
+                      <span className="rounded-md bg-amber-900/40 px-1.5 py-0.5 text-[8px] font-medium text-amber-300">
+                        Modified
+                      </span>
+                    )}
+                    {!prompt.builtIn && (
+                      <button
+                        onClick={() => {
+                          const updated = summaryPrompts.filter(p => p.id !== prompt.id);
+                          saveSummaryPrompts(updated);
+                          setSummaryPrompts(updated);
+                          if (editingPromptId === prompt.id) setEditingPromptId(null);
+                        }}
+                        className="cursor-pointer border-none bg-transparent text-[9px] text-red-400 hover:text-red-300"
+                        title="Delete"
+                      >
+                        {'\uD83D\uDDD1\uFE0F'}
+                      </button>
+                    )}
+                  </div>
+
+                  {isEditing ? (
+                    <div className="space-y-1.5">
+                      {!prompt.builtIn && (
+                        <input
+                          value={editingLabelDraft}
+                          onChange={(e) => setEditingLabelDraft(e.target.value)}
+                          className="w-full rounded-md border border-wall-muted bg-wall-border px-2 py-1 text-xs text-wall-text outline-none"
+                          style={{ boxSizing: 'border-box' }}
+                          placeholder="Prompt name..."
+                        />
+                      )}
+                      <textarea
+                        value={editingPromptDraft}
+                        onChange={(e) => setEditingPromptDraft(e.target.value)}
+                        className="w-full resize-y rounded-md border border-wall-muted bg-wall-border px-2 py-1.5 text-[11px] text-wall-text outline-none font-inherit"
+                        style={{ minHeight: 80, maxHeight: 300, boxSizing: 'border-box' }}
+                      />
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => {
+                            const updated = summaryPrompts.map(p =>
+                              p.id === prompt.id
+                                ? { ...p, prompt: editingPromptDraft, label: prompt.builtIn ? p.label : editingLabelDraft }
+                                : p,
+                            );
+                            saveSummaryPrompts(updated);
+                            setSummaryPrompts(updated);
+                            setEditingPromptId(null);
+                          }}
+                          className="cursor-pointer rounded-md border-none bg-indigo-600 px-3 py-1 text-[10px] font-semibold text-white hover:bg-indigo-500"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={() => setEditingPromptId(null)}
+                          className="cursor-pointer rounded-md border-none bg-wall-muted px-3 py-1 text-[10px] font-semibold text-wall-text-dim hover:bg-wall-border"
+                        >
+                          Cancel
+                        </button>
+                        {isDefault && (
+                          <button
+                            onClick={() => {
+                              const def = DEFAULT_SUMMARY_PROMPTS.find(d => d.id === prompt.id);
+                              if (def) {
+                                setEditingPromptDraft(def.prompt);
+                              }
+                            }}
+                            className="cursor-pointer rounded-md border-none bg-wall-muted px-3 py-1 text-[10px] font-semibold text-amber-400 hover:bg-wall-border"
+                          >
+                            Reset to Default
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div
+                        className="text-[10px] text-wall-text-dim whitespace-pre-wrap line-clamp-3"
+                        style={{ maxHeight: 60, overflow: 'hidden' }}
+                      >
+                        {prompt.prompt}
+                      </div>
+                      <button
+                        onClick={() => {
+                          setEditingPromptId(prompt.id);
+                          setEditingPromptDraft(prompt.prompt);
+                          setEditingLabelDraft(prompt.label);
+                        }}
+                        className="mt-1 cursor-pointer border-none bg-transparent text-[10px] text-indigo-400 hover:text-indigo-300"
+                      >
+                        Edit
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Add new prompt */}
+            <div className="rounded-lg border border-dashed border-wall-muted bg-wall-bg p-3">
+              <div className="mb-1.5 text-xs font-semibold text-wall-text">Add Custom Prompt</div>
+              <input
+                value={newPromptLabel}
+                onChange={(e) => setNewPromptLabel(e.target.value)}
+                placeholder="Prompt name..."
+                className="mb-1.5 w-full rounded-md border border-wall-muted bg-wall-border px-2 py-1 text-xs text-wall-text outline-none"
+                style={{ boxSizing: 'border-box' }}
+              />
+              <textarea
+                value={newPromptText}
+                onChange={(e) => setNewPromptText(e.target.value)}
+                placeholder="Describe what kind of summary you want..."
+                rows={3}
+                className="w-full resize-y rounded-md border border-wall-muted bg-wall-border px-2 py-1.5 text-[11px] text-wall-text outline-none font-inherit"
+                style={{ minHeight: 60, boxSizing: 'border-box' }}
+              />
+              <button
+                onClick={() => {
+                  if (!newPromptLabel.trim() || !newPromptText.trim()) return;
+                  const newPrompt: SummaryPrompt = {
+                    id: 'custom-' + Date.now(),
+                    label: newPromptLabel.trim(),
+                    prompt: newPromptText.trim(),
+                    builtIn: false,
+                  };
+                  const updated = [...summaryPrompts, newPrompt];
+                  saveSummaryPrompts(updated);
+                  setSummaryPrompts(updated);
+                  setNewPromptLabel('');
+                  setNewPromptText('');
+                }}
+                disabled={!newPromptLabel.trim() || !newPromptText.trim()}
+                className="mt-1.5 cursor-pointer rounded-md border-none bg-indigo-600 px-3 py-1 text-[10px] font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Add Prompt
+              </button>
+            </div>
           </div>
         )}
       </div>

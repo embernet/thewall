@@ -26,6 +26,7 @@ export type ColumnType =
   | 'inquiry'
   | 'agent_queue'
   | 'highlights'
+  | 'summary'
   | 'trash';
 
 export type CardSource = 'transcription' | 'user' | 'agent' | 'inquiry';
@@ -510,6 +511,7 @@ export const COL_TYPES: readonly ColumnMeta[] = [
   { type: 'inquiry',     title: 'Inquiry',        icon: '\uD83D\uDD2E',       color: '#06b6d4' },
   { type: 'agent_queue', title: 'Agent Queue',    icon: '\u26A1',             color: '#eab308' },
   { type: 'highlights',  title: 'Highlights',     icon: '\u2B50',             color: '#fbbf24' },
+  { type: 'summary',     title: 'Summary',        icon: '\uD83D\uDCCB',       color: '#f59e0b' },
   { type: 'trash',       title: 'Trash',          icon: '\uD83D\uDDD1\uFE0F', color: '#6b7280' },
 ] as const;
 
