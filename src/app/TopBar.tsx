@@ -25,6 +25,8 @@ interface TopBarProps {
   onOpenAgentConfig: () => void;
   onToggleNotifications: () => void;
   onToggleSummary: () => void;
+  onOpenHelp: () => void;
+  onOpenAbout: () => void;
   summaryVisible: boolean;
   notificationCount: number;
   apiKeyStatus: ApiKeyStatus;
@@ -63,6 +65,8 @@ export default function TopBar({
   onOpenAgentConfig,
   onToggleNotifications,
   onToggleSummary,
+  onOpenHelp,
+  onOpenAbout,
   summaryVisible,
   notificationCount,
   apiKeyStatus,
@@ -408,6 +412,24 @@ export default function TopBar({
               ? '\u25CF sync error'
               : '\u25CB unsaved'}
       </span>
+
+      {/* ── Help ── */}
+      <button
+        onClick={onOpenHelp}
+        className="cursor-pointer rounded-md border border-wall-muted bg-wall-border px-2 py-[3px] text-[10px] font-semibold text-wall-text-dim hover:bg-wall-muted"
+        title="Help"
+      >
+        ? Help
+      </button>
+
+      {/* ── About ── */}
+      <button
+        onClick={onOpenAbout}
+        className="cursor-pointer rounded-md border border-wall-muted bg-wall-border px-2 py-[3px] text-[10px] font-semibold text-wall-text-dim hover:bg-wall-muted"
+        title="About The Wall"
+      >
+        About
+      </button>
 
       {/* ── Settings ── */}
       <button

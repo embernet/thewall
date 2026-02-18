@@ -16,6 +16,8 @@ interface LauncherProps {
   onOpen: (id: string) => void;
   onDelete: (id: string) => void;
   onRefresh: () => void;
+  onOpenHelp: () => void;
+  onOpenAbout: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -250,6 +252,8 @@ export default function Launcher({
   onOpen,
   onDelete,
   onRefresh,
+  onOpenHelp,
+  onOpenAbout,
 }: LauncherProps) {
   const [tab, setTab] = useState<LauncherTab>(sessions.length > 0 ? 'recent' : 'new');
   const [title, setTitle] = useState('');
@@ -307,7 +311,7 @@ export default function Launcher({
         </div>
 
         {/* ── Panel ── */}
-        <div className="rounded-xl border border-wall-border bg-wall-surface p-5">
+        <div className="rounded-xl border border-wall-border bg-wall-surface p-5 relative">
           {/* ─── Recent Sessions Tab ─── */}
           {tab === 'recent' && (
             <div>
@@ -542,6 +546,25 @@ export default function Launcher({
             </div>
           )}
         </div>
+      </div>
+
+      {/* ── Footer ── */}
+      <div className="mt-4 flex items-center justify-center gap-4 text-[10px] text-wall-subtle">
+        <button
+          onClick={onOpenHelp}
+          className="cursor-pointer border-none bg-transparent text-wall-subtle hover:text-wall-text-muted"
+        >
+          ? Help
+        </button>
+        <span>·</span>
+        <button
+          onClick={onOpenAbout}
+          className="cursor-pointer border-none bg-transparent text-wall-subtle hover:text-wall-text-muted"
+        >
+          About
+        </button>
+        <span>·</span>
+        <span>v0.1.0</span>
       </div>
     </div>
   );

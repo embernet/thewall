@@ -14,6 +14,8 @@ import NotificationToast from '@/components/NotificationToast/NotificationToast'
 import CostDashboard from '@/components/CostDashboard/CostDashboard';
 import AgentConfig from '@/components/AgentConfig/AgentConfig';
 import FindRelatedView from '@/components/FindRelatedModal/FindRelatedModal';
+import HelpModal from '@/components/HelpModal/HelpModal';
+import AboutModal from '@/components/AboutModal/AboutModal';
 import ChatPanel from '@/components/ChatPanel/ChatPanel';
 import TopBar from './TopBar';
 import StatusBar from './StatusBar';
@@ -78,6 +80,8 @@ export default function App() {
   const [notifCount, setNotifCount] = useState(0);
   const [findRelatedOpen, setFindRelatedOpen] = useState(false);
   const [findRelatedInitialCard, setFindRelatedInitialCard] = useState<Card | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
 
   // Agent config store (for sidebar Agents tab)
   const agentConfigStore = useAgentConfigStore();
@@ -695,14 +699,20 @@ export default function App() {
   // ── Render ──
   if (view === 'launcher' || !session) {
     return (
-      <Launcher
-        sessions={sessions}
-        onStart={startSession}
-        onSimulate={startSim}
-        onOpen={openSession}
-        onDelete={deleteSessionEntry}
-        onRefresh={loadSessions}
-      />
+      <>
+        <Launcher
+          sessions={sessions}
+          onStart={startSession}
+          onSimulate={startSim}
+          onOpen={openSession}
+          onDelete={deleteSessionEntry}
+          onRefresh={loadSessions}
+          onOpenHelp={() => setHelpOpen(true)}
+          onOpenAbout={() => setAboutOpen(true)}
+        />
+        <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
+        <AboutModal open={aboutOpen} onClose={() => setAboutOpen(false)} />
+      </>
     );
   }
 
@@ -724,6 +734,8 @@ export default function App() {
         onOpenAgentConfig={() => setAgentConfigOpen(true)}
         onToggleNotifications={() => setNotifPanelOpen(o => !o)}
         onToggleSummary={toggleSummaryColumn}
+        onOpenHelp={() => setHelpOpen(true)}
+        onOpenAbout={() => setAboutOpen(true)}
         summaryVisible={summaryColumnVisible}
         notificationCount={notifCount}
         apiKeyStatus={apiKeyStatus}
@@ -864,6 +876,8 @@ export default function App() {
         onClose={() => { setFindRelatedOpen(false); setFindRelatedInitialCard(null); }}
         onNavigate={navigateToCard}
       />
+      <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
+      <AboutModal open={aboutOpen} onClose={() => setAboutOpen(false)} />
 
       <style>{`@keyframes pulse{0%,100%{transform:scale(1);opacity:0.5;}50%{transform:scale(1.3);opacity:0;}}`}</style>
     </div>
