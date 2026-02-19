@@ -93,8 +93,8 @@ export function exportSessionMarkdown(state: ExportState): void {
       const num = fmtCardNum(card);
       const numStr = num ? num + ' ' : '';
       const prefix = card.speaker ? '**' + card.speaker + ':** ' : '';
-      const agent = card.sourceAgentName ? ' _(' + card.sourceAgentName + ')_' : '';
-      md += '- ' + numStr + prefix + card.content + agent + '\n';
+      const agent = card.sourceAgentName ? '**' + card.sourceAgentName + ':** ' : '';
+      md += '- ' + numStr + agent + prefix + card.content + '\n';
     }
     md += '\n';
   }
@@ -220,7 +220,7 @@ export function exportSessionHTML(state: ExportState): void {
       const num = cn ? `<span class="card-num">${cn}</span>` : '';
       const spk = card.speaker ? `<span class="speaker">${esc(card.speaker)}</span>` : '';
       const agent = card.sourceAgentName ? `<span class="agent">${esc(card.sourceAgentName)}</span>` : '';
-      body += `<div class="card">${num}${spk}<p>${esc(card.content)}</p>${agent}</div>`;
+      body += `<div class="card">${num}${agent}${spk}<p>${esc(card.content)}</p></div>`;
     }
     body += '</section>';
   }

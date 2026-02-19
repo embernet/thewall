@@ -453,6 +453,13 @@ export default function Card({
         </div>
       )}
 
+      {/* ── Agent name (shown above content like speaker labels) ───── */}
+      {card.sourceAgentName && (
+        <div className="mb-0.5">
+          <span className="text-[10px] font-bold text-cyan-500">{card.sourceAgentName}</span>
+        </div>
+      )}
+
       {/* ── Content / edit / split mode ────────────────────────────── */}
       {splitting ? (
         <div>
@@ -642,9 +649,6 @@ export default function Card({
         >
           {badge.label}
         </span>
-        {card.sourceAgentName && (
-          <span className="text-[9px] text-cyan-500">{card.sourceAgentName}</span>
-        )}
         {card.timestamp !== undefined && card.timestamp !== null && (
           <span className="text-[9px] text-wall-subtle">
             {'\u23F1' + fmtTime(card.timestamp)}
