@@ -9,6 +9,7 @@ interface TranscriptInputProps {
   sessionId: string;
   cards: Card[];
   speakers: string[];
+  onAddSpeaker?: (name: string) => void;
 }
 
 const TranscriptInput: React.FC<TranscriptInputProps> = ({
@@ -16,6 +17,7 @@ const TranscriptInput: React.FC<TranscriptInputProps> = ({
   sessionId,
   cards,
   speakers,
+  onAddSpeaker,
 }) => {
   const [text, setText] = useState('');
   const [speaker, setSpeaker] = useState('');
@@ -59,83 +61,19 @@ const TranscriptInput: React.FC<TranscriptInputProps> = ({
 
   const handleAddSpeaker = () => {
     if (!customSpeaker.trim()) return;
-    setSpeaker(customSpeaker.trim());
+    const name = customSpeaker.trim();
+    setSpeaker(name);
+    onAddSpeaker?.(name);
     setCustomSpeaker('');
     setShowAddSpeaker(false);
   };
 
+  const toggleSpeaker = (s: string) => {
+    setSpeaker((prev) => (prev === s ? '' : s));
+  };
+
   return (
     <div className="shrink-0 border-t border-wall-border px-2 py-1.5">
-      {/* Speaker selector row */}
-      <div className="mb-1 flex flex-wrap items-center gap-[3px]">
-        <span className="text-[9px] text-wall-text-dim">Speaker:</span>
-        <button
-          onClick={() => setSpeaker('')}
-          className="cursor-pointer rounded-md px-1.5 py-0.5 text-[9px]"
-          style={{
-            border: !speaker ? '1px solid #6366f1' : '1px solid #334155',
-            background: !speaker ? '#6366f120' : 'transparent',
-            color: !speaker ? '#a5b4fc' : '#64748b',
-          }}
-        >
-          None
-        </button>
-        {knownSpeakers.map((s, i) => {
-          const color = SPEAKER_COLORS[i % SPEAKER_COLORS.length];
-          return (
-            <button
-              key={s}
-              onClick={() => setSpeaker(s)}
-              className="cursor-pointer rounded-md px-1.5 py-0.5 text-[9px]"
-              style={{
-                border:
-                  speaker === s
-                    ? `1px solid ${color}`
-                    : '1px solid #334155',
-                background: speaker === s ? `${color}20` : 'transparent',
-                color: speaker === s ? color : '#64748b',
-              }}
-            >
-              {s}
-            </button>
-          );
-        })}
-        {showAddSpeaker ? (
-          <div className="flex items-center gap-0.5">
-            <input
-              value={customSpeaker}
-              onChange={(e) => setCustomSpeaker(e.target.value)}
-              placeholder="Name"
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleAddSpeaker();
-                if (e.key === 'Escape') setShowAddSpeaker(false);
-              }}
-              className="w-[70px] rounded border border-wall-muted bg-wall-border px-[5px] py-0.5 text-[9px] text-wall-text outline-none"
-            />
-            <button
-              onClick={handleAddSpeaker}
-              className="cursor-pointer rounded border-none bg-green-500 px-[5px] py-0.5 text-[9px] text-white"
-            >
-              {'\u2713'}
-            </button>
-            <button
-              onClick={() => setShowAddSpeaker(false)}
-              className="cursor-pointer border-none bg-transparent text-[9px] text-wall-text-dim"
-            >
-              {'\u2715'}
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => setShowAddSpeaker(true)}
-            className="cursor-pointer rounded border border-dashed border-wall-muted bg-transparent px-[5px] py-0.5 text-[9px] text-wall-subtle"
-          >
-            +
-          </button>
-        )}
-      </div>
-
       {/* Text input row */}
       <div className="flex gap-[3px]">
         <textarea
@@ -169,6 +107,114 @@ const TranscriptInput: React.FC<TranscriptInputProps> = ({
           Add
         </button>
       </div>
+
+      {/* Speaker toggles row (below input) */}
+      {knownSpeakers.length > 0 && (
+        <div className="mt-1 flex flex-wrap items-center gap-[3px]">
+          {knownSpeakers.map((s, i) => {
+            const color = SPEAKER_COLORS[i % SPEAKER_COLORS.length];
+            const active = speaker === s;
+            return (
+              <button
+                key={s}
+                onClick={() => toggleSpeaker(s)}
+                className="cursor-pointer rounded-md px-1.5 py-0.5 text-[9px] flex items-center gap-1"
+                style={{
+                  border: active ? `1px solid ${color}` : '1px solid #334155',
+                  background: active ? `${color}20` : 'transparent',
+                  color: active ? color : '#64748b',
+                }}
+              >
+                <span
+                  className="inline-block w-[10px] h-[10px] rounded-sm border text-[8px] leading-[10px] text-center"
+                  style={{
+                    borderColor: active ? color : '#475569',
+                    background: active ? `${color}40` : 'transparent',
+                    color: active ? color : 'transparent',
+                  }}
+                >
+                  {active ? '\u2713' : ''}
+                </span>
+                {s}
+              </button>
+            );
+          })}
+          {showAddSpeaker ? (
+            <div className="flex items-center gap-0.5">
+              <input
+                value={customSpeaker}
+                onChange={(e) => setCustomSpeaker(e.target.value)}
+                placeholder="Name"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleAddSpeaker();
+                  if (e.key === 'Escape') setShowAddSpeaker(false);
+                }}
+                className="w-[70px] rounded border border-wall-muted bg-wall-border px-[5px] py-0.5 text-[9px] text-wall-text outline-none"
+              />
+              <button
+                onClick={handleAddSpeaker}
+                className="cursor-pointer rounded border-none bg-green-500 px-[5px] py-0.5 text-[9px] text-white"
+              >
+                {'\u2713'}
+              </button>
+              <button
+                onClick={() => setShowAddSpeaker(false)}
+                className="cursor-pointer border-none bg-transparent text-[9px] text-wall-text-dim"
+              >
+                {'\u2715'}
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowAddSpeaker(true)}
+              className="cursor-pointer rounded border border-dashed border-wall-muted bg-transparent px-[5px] py-0.5 text-[9px] text-wall-subtle"
+            >
+              +
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Show just the + button when no speakers exist yet */}
+      {knownSpeakers.length === 0 && (
+        <div className="mt-1 flex items-center gap-[3px]">
+          {showAddSpeaker ? (
+            <div className="flex items-center gap-0.5">
+              <input
+                value={customSpeaker}
+                onChange={(e) => setCustomSpeaker(e.target.value)}
+                placeholder="Add speaker"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleAddSpeaker();
+                  if (e.key === 'Escape') setShowAddSpeaker(false);
+                }}
+                className="w-[80px] rounded border border-wall-muted bg-wall-border px-[5px] py-0.5 text-[9px] text-wall-text outline-none"
+              />
+              <button
+                onClick={handleAddSpeaker}
+                className="cursor-pointer rounded border-none bg-green-500 px-[5px] py-0.5 text-[9px] text-white"
+              >
+                {'\u2713'}
+              </button>
+              <button
+                onClick={() => setShowAddSpeaker(false)}
+                className="cursor-pointer border-none bg-transparent text-[9px] text-wall-text-dim"
+              >
+                {'\u2715'}
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowAddSpeaker(true)}
+              className="cursor-pointer rounded border border-dashed border-wall-muted bg-transparent px-[5px] py-0.5 text-[9px] text-wall-subtle"
+            >
+              + Add speaker
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="mt-[3px] text-[9px] text-wall-subtle">
         Enter to add segment &bull; Shift+Enter for new line &bull; Agents

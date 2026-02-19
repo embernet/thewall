@@ -33,10 +33,14 @@ interface CardProps {
   card: CardType;
   colType: ColumnType;
   speakerColors?: Record<string, string>;
+  knownSpeakers?: string[];
   onDelete: (id: string) => void;
   onHighlight: (id: string) => void;
   onPin?: (id: string) => void;
   onEdit: (id: string, content: string) => void;
+  onSpeakerChange?: (id: string, speaker: string | undefined) => void;
+  onAddSpeaker?: (id: string, name: string) => void;
+  onSplit?: (id: string, splitIndex: number) => void;
   onNavigate?: (cardId: string) => void;
   onFindRelated?: (card: CardType) => void; // Optional: if not provided, uses event bus
   linkingFrom?: string | null;
@@ -51,10 +55,14 @@ export default function Card({
   card,
   colType,
   speakerColors,
+  knownSpeakers,
   onDelete,
   onHighlight,
   onPin,
   onEdit,
+  onSpeakerChange,
+  onAddSpeaker,
+  onSplit,
   onNavigate,
   onFindRelated,
   linkingFrom,
@@ -66,8 +74,12 @@ export default function Card({
   const [hov, setHov] = useState(false);
   const [hamburgerOpen, setHamburgerOpen] = useState(false);
   const [rawSourcesOpen, setRawSourcesOpen] = useState(false);
+  const [splitting, setSplitting] = useState(false);
+  const [splitHover, setSplitHover] = useState<number | null>(null);
+  const [speakerDropOpen, setSpeakerDropOpen] = useState(false);
   const hamburgerRef = useRef<HTMLDivElement>(null);
   const rawSourcesRef = useRef<HTMLDivElement>(null);
+  const speakerDropRef = useRef<HTMLDivElement>(null);
   const { menu, show: showMenu, close: closeMenu } = useContextMenu();
 
   // Transcript phase detection
@@ -151,6 +163,18 @@ export default function Card({
     return () => document.removeEventListener('mousedown', handler);
   }, [rawSourcesOpen]);
 
+  // Close speaker dropdown on outside click
+  useEffect(() => {
+    if (!speakerDropOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (speakerDropRef.current && !speakerDropRef.current.contains(e.target as Node)) {
+        setSpeakerDropOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [speakerDropOpen]);
+
   // Speaker color (dynamic per-session, must use inline style)
   const spkColor = speakerColors?.[card.speaker ?? ''] || '#64748b';
 
@@ -210,16 +234,42 @@ export default function Card({
     <div
       id={`card-${card.id}`}
       onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => { setHov(false); setHamburgerOpen(false); setRawSourcesOpen(false); }}
+      onMouseLeave={() => { setHov(false); setHamburgerOpen(false); setRawSourcesOpen(false); setSpeakerDropOpen(false); }}
       onClick={isLinkTarget ? () => onCompleteLink?.(card.id) : undefined}
       onContextMenu={(e) => {
         if (isLinkTarget) return;
+        const addNewItem: MenuItem = {
+          label: 'Add new...',
+          inputPlaceholder: 'Speaker name',
+          onInput: (name: string) => onAddSpeaker?.(card.id, name),
+          onClick: () => {},
+        };
+        const speakerChildren: MenuItem[] = knownSpeakers && knownSpeakers.length > 0
+          ? [
+              // "None" option
+              { label: 'None', checked: !card.speaker, onClick: () => onSpeakerChange?.(card.id, undefined) },
+              { label: '', separator: true, onClick: () => {} },
+              ...knownSpeakers.map((s) => ({
+                label: s,
+                checked: card.speaker === s,
+                onClick: () => onSpeakerChange?.(card.id, s),
+              })),
+              { label: '', separator: true, onClick: () => {} },
+              addNewItem,
+            ]
+          : [
+              { label: 'None', checked: !card.speaker, onClick: () => onSpeakerChange?.(card.id, undefined) },
+              { label: '', separator: true, onClick: () => {} },
+              addNewItem,
+            ];
         const items: MenuItem[] = [
           { label: 'Copy', icon: '\uD83D\uDCCB', onClick: () => navigator.clipboard?.writeText(card.content) },
           { label: 'Edit', icon: '\u270F\uFE0F', onClick: () => { setTxt(card.content); setEditing(true); } },
           { label: card.highlightedBy === 'user' || card.highlightedBy === 'both' ? 'Remove Highlight' : 'Highlight', icon: '\u2B50', onClick: () => onHighlight(card.id) },
           ...(onPin ? [{ label: card.pinned ? 'Unpin' : 'Pin to Top', icon: '\uD83D\uDCCC', onClick: () => onPin(card.id) }] : []),
           ...(onStartLink ? [{ label: 'Link to...', icon: '\uD83D\uDD17', onClick: () => onStartLink(card.id) }] : []),
+          ...(onSpeakerChange ? [{ label: 'Speaker', icon: '\uD83D\uDDE3\uFE0F', children: speakerChildren, onClick: () => {} }] : []),
+          ...(onSplit ? [{ label: 'Split', icon: '\u2702\uFE0F', onClick: () => setSplitting(true) }] : []),
           { label: 'Find Related', icon: '\uD83D\uDD0D', onClick: () => handleFindRelated(card) },
           { label: '', icon: '', separator: true, onClick: () => {} },
           ...(colType !== 'trash' ? [{ label: 'Delete', icon: '\uD83D\uDDD1\uFE0F', danger: true, onClick: () => onDelete(card.id) }] : []),
@@ -344,11 +394,15 @@ export default function Card({
         </div>
       )}
 
-      {/* ── Speaker label ────────────────────────────────────────────── */}
+      {/* ── Speaker label (clickable to change) ───────────────────── */}
       {card.speaker && (
-        <div className="mb-0.5">
+        <div className="mb-0.5 relative" ref={speakerDropRef}>
           <span
-            className="text-[10px] font-bold rounded-lg px-1.5 py-px"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onSpeakerChange) setSpeakerDropOpen((o) => !o);
+            }}
+            className="text-[10px] font-bold rounded-lg px-1.5 py-px cursor-pointer hover:brightness-125 transition-all duration-75"
             style={{
               color: spkColor,
               background: `${spkColor}18`,
@@ -356,11 +410,160 @@ export default function Card({
           >
             {card.speaker}
           </span>
+          {speakerDropOpen && onSpeakerChange && (
+            <div className="absolute left-0 top-[20px] z-[100] flex flex-wrap gap-[3px] rounded-lg border border-wall-border bg-wall-surface p-1.5 shadow-xl min-w-[120px] max-w-[240px]">
+              {/* "None" pill to remove speaker */}
+              <span
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSpeakerChange(card.id, undefined);
+                  setSpeakerDropOpen(false);
+                }}
+                className="text-[10px] font-bold rounded-lg px-1.5 py-px cursor-pointer hover:brightness-125 transition-all duration-75"
+                style={{
+                  color: '#94a3b8',
+                  background: '#94a3b818',
+                  border: '1px solid #334155',
+                }}
+              >
+                {'\u2715'} None
+              </span>
+              {knownSpeakers?.filter((s) => s !== card.speaker).map((s) => {
+                const c = speakerColors?.[s] || '#64748b';
+                return (
+                  <span
+                    key={s}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSpeakerChange(card.id, s);
+                      setSpeakerDropOpen(false);
+                    }}
+                    className="text-[10px] font-bold rounded-lg px-1.5 py-px cursor-pointer hover:brightness-125 transition-all duration-75"
+                    style={{
+                      color: c,
+                      background: `${c}18`,
+                    }}
+                  >
+                    {s}
+                  </span>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
-      {/* ── Content / edit mode ──────────────────────────────────────── */}
-      {editing ? (
+      {/* ── Content / edit / split mode ────────────────────────────── */}
+      {splitting ? (
+        <div>
+          <div className="text-[9px] text-amber-400 mb-1">{'\u2702\uFE0F'} Click between words to split this card:</div>
+          <div
+            className="text-xs leading-relaxed break-words select-none cursor-pointer"
+            onMouseLeave={() => setSplitHover(null)}
+          >
+            {(() => {
+              // Build word boundaries for split points
+              const text = card.content;
+              const words: { text: string; start: number }[] = [];
+              const regex = /\S+/g;
+              let match;
+              while ((match = regex.exec(text)) !== null) {
+                words.push({ text: match[0], start: match.index });
+              }
+              // For each word, compute the split-point index (the char index where the
+              // second card would start). The split point is at the start of each word
+              // (except the first). We render the space before each word as part of
+              // the clickable zone.
+              const elements: React.ReactNode[] = [];
+              for (let w = 0; w < words.length; w++) {
+                const word = words[w];
+                const isFirst = w === 0;
+                // Gap text (space) between previous word end and this word start
+                const prevEnd = isFirst ? 0 : words[w - 1].start + words[w - 1].text.length;
+                const gap = text.slice(prevEnd, word.start);
+                const splitIdx = word.start; // split at start of this word
+
+                // Determine highlight colours based on hover
+                const inFirstHalf = splitHover !== null && word.start < splitHover;
+                const inSecondHalf = splitHover !== null && word.start >= splitHover;
+                const wordBg = inFirstHalf
+                  ? 'rgba(59, 130, 246, 0.15)'
+                  : inSecondHalf
+                    ? 'rgba(245, 158, 11, 0.15)'
+                    : undefined;
+                const wordColor = inFirstHalf
+                  ? '#93c5fd'
+                  : inSecondHalf
+                    ? '#fbbf24'
+                    : '#e2e8f0';
+
+                if (!isFirst) {
+                  // Render gap + split indicator
+                  elements.push(
+                    <span
+                      key={`gap-${w}`}
+                      onMouseEnter={() => setSplitHover(splitIdx)}
+                      onClick={() => {
+                        setSplitting(false);
+                        setSplitHover(null);
+                        onSplit?.(card.id, splitIdx);
+                      }}
+                      style={{
+                        position: 'relative',
+                        borderLeft: splitHover === splitIdx ? '2px solid #f59e0b' : undefined,
+                        paddingLeft: splitHover === splitIdx ? 1 : undefined,
+                        color: wordColor,
+                      }}
+                    >
+                      {gap}
+                    </span>,
+                  );
+                } else if (gap) {
+                  elements.push(<span key="gap-0">{gap}</span>);
+                }
+
+                elements.push(
+                  <span
+                    key={`word-${w}`}
+                    onMouseEnter={() => {
+                      if (!isFirst) setSplitHover(splitIdx);
+                    }}
+                    onClick={!isFirst ? () => {
+                      setSplitting(false);
+                      setSplitHover(null);
+                      onSplit?.(card.id, splitIdx);
+                    } : undefined}
+                    className="rounded-sm"
+                    style={{
+                      background: wordBg,
+                      color: wordColor,
+                      transition: 'background 75ms, color 75ms',
+                    }}
+                  >
+                    {word.text}
+                  </span>,
+                );
+              }
+              // Trailing text
+              if (words.length > 0) {
+                const lastEnd = words[words.length - 1].start + words[words.length - 1].text.length;
+                if (lastEnd < text.length) {
+                  elements.push(<span key="trail">{text.slice(lastEnd)}</span>);
+                }
+              }
+              return elements;
+            })()}
+          </div>
+          <div className="flex gap-1 mt-1.5">
+            <button
+              onClick={() => { setSplitting(false); setSplitHover(null); }}
+              className="text-[10px] bg-wall-muted text-wall-text-muted border-none rounded px-2 py-0.5 cursor-pointer"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : editing ? (
         <div>
           <textarea
             value={txt}

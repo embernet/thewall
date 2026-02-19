@@ -1,7 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import type { Column as ColumnType, Card as CardType, AudioState } from '@/types';
-import { COL_TYPES } from '@/types';
+import { COL_TYPES, SPEAKER_COLORS } from '@/types';
 import { useSessionStore } from '@/store/session';
 import { uid, now, mid } from '@/utils/ids';
 import { fmtTime } from '@/utils/ids';
@@ -41,9 +41,12 @@ const Column: React.FC<ColumnProps> = ({
   const [speakerFilter, setSpeakerFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [transcriptMenuOpen, setTranscriptMenuOpen] = useState(false);
+  const transcriptMenuRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const meta = COL_TYPES.find((c) => c.type === column.type) || COL_TYPES[0];
   const prevLen = useRef(cards.length);
+  const suppressScrollRef = useRef(false);
 
   const deleteCard = useSessionStore((s) => s.deleteCard);
   const toggleHighlight = useSessionStore((s) => s.toggleHighlight);
@@ -55,6 +58,7 @@ const Column: React.FC<ColumnProps> = ({
   const addCard = useSessionStore((s) => s.addCard);
   const agentBusy = useSessionStore((s) => s.agentBusy);
   const speakerColors = useSessionStore((s) => s.speakerColors);
+  const setSpeakerColors = useSessionStore((s) => s.setSpeakerColors);
   const storeUpdateColumn = useSessionStore((s) => s.updateColumn);
 
   const isBusy = agentBusy?.[column.type];
@@ -114,16 +118,126 @@ const Column: React.FC<ColumnProps> = ({
   };
 
   useEffect(() => {
-    if (cards.length > prevLen.current)
+    if (suppressScrollRef.current) {
+      suppressScrollRef.current = false;
+    } else if (cards.length > prevLen.current) {
       scrollRef.current?.scrollTo({
         top: scrollRef.current.scrollHeight,
         behavior: 'smooth',
       });
+    }
     prevLen.current = cards.length;
   }, [cards.length]);
 
-  // Unique speakers for filter dropdown
+  // Unique speakers for filter dropdown + context menu
   const speakers = Array.from(new Set(cards.map(c => c.speaker).filter(Boolean) as string[]));
+  // All known speakers (from speakerColors + cards)
+  const allKnownSpeakers = useMemo(() => {
+    const s = new Set(Object.keys(speakerColors));
+    cards.forEach((c) => { if (c.speaker) s.add(c.speaker); });
+    return [...s];
+  }, [speakerColors, cards]);
+
+  const handleAddSpeaker = (cardId: string, name: string) => {
+    // Assign a color and persist the speaker in speakerColors
+    const idx = Object.keys(speakerColors).length;
+    const color = SPEAKER_COLORS[idx % SPEAKER_COLORS.length];
+    setSpeakerColors({ ...speakerColors, [name]: color });
+    // Set the speaker on the card
+    updateCard(cardId, { speaker: name });
+  };
+
+  const handleSplit = (cardId: string, splitIndex: number) => {
+    const card = cards.find((c) => c.id === cardId);
+    if (!card) return;
+    // Suppress the auto-scroll-to-bottom that normally fires when a card is added
+    suppressScrollRef.current = true;
+
+    const before = card.content.slice(0, splitIndex).trimEnd();
+    const after = card.content.slice(splitIndex).trimStart();
+    if (!before || !after) return;
+
+    // Find the next card in sort order for timestamp interpolation
+    const sorted = [...cards]
+      .filter((c) => !c.isDeleted)
+      .sort((a, b) => (a.sortOrder || '').localeCompare(b.sortOrder || ''));
+    const idx = sorted.findIndex((c) => c.id === cardId);
+    const nextCard = idx >= 0 && idx < sorted.length - 1 ? sorted[idx + 1] : null;
+
+    // Compute sortOrder between this card and the next
+    const newSortOrder = mid(card.sortOrder, nextCard?.sortOrder);
+
+    // Compute proportional timestamp for the second card
+    let newTimestamp: number | undefined;
+    if (card.timestamp != null && nextCard?.timestamp != null) {
+      const fraction = splitIndex / card.content.length;
+      newTimestamp = Math.round(
+        card.timestamp + fraction * (nextCard.timestamp - card.timestamp),
+      );
+    } else if (card.timestamp != null) {
+      // No next card — just keep the same timestamp
+      newTimestamp = card.timestamp;
+    }
+
+    // Update original card content
+    updateCard(cardId, { content: before });
+
+    // Create the new card from the second half
+    addCard({
+      id: uid(),
+      columnId: card.columnId,
+      sessionId: card.sessionId,
+      content: after,
+      source: card.source,
+      speaker: card.speaker,
+      timestamp: newTimestamp,
+      sourceCardIds: [],
+      aiTags: [],
+      userTags: [...card.userTags],
+      highlightedBy: 'none',
+      isDeleted: false,
+      createdAt: now(),
+      updatedAt: now(),
+      sortOrder: newSortOrder,
+    });
+  };
+
+  // Close transcript hamburger on outside click
+  useEffect(() => {
+    if (!transcriptMenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (transcriptMenuRef.current && !transcriptMenuRef.current.contains(e.target as Node)) {
+        setTranscriptMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [transcriptMenuOpen]);
+
+  const handleRenumberCards = () => {
+    // Renumber all non-deleted cards in sort order, respecting the numbering groups
+    const sorted = [...cards]
+      .filter((c) => !c.isDeleted)
+      .sort((a, b) => (a.sortOrder || '').localeCompare(b.sortOrder || ''));
+
+    // Track next number per group (raw, clean, other)
+    const nextByGroup: Record<string, number> = {};
+    const groupKey = (c: CardType): string => {
+      if (c.userTags.includes('transcript:raw')) return 'raw';
+      if (c.userTags.includes('transcript:clean')) return 'clean';
+      return 'other';
+    };
+
+    for (const c of sorted) {
+      const key = groupKey(c);
+      const num = (nextByGroup[key] ?? 0) + 1;
+      nextByGroup[key] = num;
+      if (c.cardNumber !== num) {
+        updateCard(c.id, { cardNumber: num });
+      }
+    }
+    setTranscriptMenuOpen(false);
+  };
 
   let filtered = cards;
   if (search) {
@@ -411,6 +525,27 @@ const Column: React.FC<ColumnProps> = ({
                   }}
                 />
               </button>
+              {/* Transcript hamburger menu */}
+              <div className="relative" ref={transcriptMenuRef}>
+                <button
+                  onClick={() => setTranscriptMenuOpen((o) => !o)}
+                  title="Transcript options"
+                  className="flex h-[26px] w-[26px] cursor-pointer items-center justify-center rounded-md border border-wall-muted bg-wall-border text-[10px] text-wall-text-muted hover:text-wall-text"
+                >
+                  {'\u2630'}
+                </button>
+                {transcriptMenuOpen && (
+                  <div className="absolute top-[28px] left-0 z-[100] min-w-[160px] rounded-lg border border-wall-border bg-wall-surface shadow-xl py-1">
+                    <button
+                      onClick={handleRenumberCards}
+                      className="w-full text-left px-3 py-1.5 text-[11px] text-wall-text hover:bg-wall-border cursor-pointer border-none bg-transparent flex items-center gap-2"
+                    >
+                      <span>#</span>
+                      <span>Renumber cards</span>
+                    </button>
+                  </div>
+                )}
+              </div>
               {audio?.recording && (
                 <button
                   onClick={onPauseRecord}
@@ -630,11 +765,15 @@ const Column: React.FC<ColumnProps> = ({
                 card={card}
                 colType={column.type}
                 speakerColors={speakerColors}
+                knownSpeakers={allKnownSpeakers}
                 onNavigate={onNavigate}
                 onDelete={(id) => deleteCard(id)}
                 onHighlight={(id) => toggleHighlight(id)}
                 onPin={(id) => togglePin(id)}
                 onEdit={(id, c) => updateCard(id, { content: c })}
+                onSpeakerChange={(id, s) => updateCard(id, { speaker: s })}
+                onAddSpeaker={handleAddSpeaker}
+                onSplit={column.type === 'transcript' ? handleSplit : undefined}
                 linkingFrom={linkingFrom}
                 onStartLink={onStartLink}
                 onCompleteLink={onCompleteLink}
@@ -685,6 +824,11 @@ const Column: React.FC<ColumnProps> = ({
           sessionId={column.sessionId}
           cards={cards}
           speakers={Object.keys(speakerColors)}
+          onAddSpeaker={(name) => {
+            const idx = Object.keys(speakerColors).length;
+            const color = SPEAKER_COLORS[idx % SPEAKER_COLORS.length];
+            setSpeakerColors({ ...speakerColors, [name]: color });
+          }}
         />
       )}
     </div>
