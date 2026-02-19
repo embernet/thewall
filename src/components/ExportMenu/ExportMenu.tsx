@@ -1,10 +1,12 @@
 import { useSessionStore } from '@/store/session';
 import {
   exportSessionToFile,
+  exportSessionToFileCompact,
   exportSessionMarkdown,
   exportSessionCSV,
   exportSessionHTML,
   exportSessionObsidian,
+  filterVisibleCards,
 } from '@/utils/export';
 
 // ---------------------------------------------------------------------------
@@ -39,6 +41,15 @@ export default function ExportMenu({ onClose }: ExportMenuProps) {
       desc: 'Complete session data including all cards, columns, agent tasks, and metadata. Can be imported back.',
       fn: () => {
         exportSessionToFile(state);
+        onClose();
+      },
+    },
+    {
+      icon: '\uD83D\uDCE6',
+      label: 'Save as JSON (compact, re-importable)',
+      desc: 'Smaller version keeping just the processed transcript and all other cards. Discards the original raw transcript segments used during processing.',
+      fn: () => {
+        exportSessionToFileCompact(state);
         onClose();
       },
     },
@@ -85,16 +96,20 @@ export default function ExportMenu({ onClose }: ExportMenuProps) {
       fn: () => {
         let txt = '';
         const visCols = columns
-          .filter((c) => c.visible && c.type !== 'trash')
+          .filter((c) => c.visible && c.type !== 'trash' && c.type !== 'agent_queue')
           .sort((a, b) => (a.sortOrder || '').localeCompare(b.sortOrder || ''));
         for (const col of visCols) {
-          const colCards = cards
-            .filter((c) => c.columnId === col.id && !c.isDeleted)
+          const colCards = filterVisibleCards(cards, col)
             .sort((a, b) => (a.sortOrder || '').localeCompare(b.sortOrder || ''));
           if (!colCards.length) continue;
           txt += '=== ' + col.title + ' ===\n';
           for (const card of colCards) {
-            txt += (card.speaker ? card.speaker + ': ' : '') + card.content + '\n';
+            let num = '';
+            if (card.cardNumber != null) {
+              const prefix = card.userTags.includes('transcript:raw') ? 'R' : '#';
+              num = prefix + card.cardNumber + ' ';
+            }
+            txt += num + (card.speaker ? card.speaker + ': ' : '') + card.content + '\n';
           }
           txt += '\n';
         }

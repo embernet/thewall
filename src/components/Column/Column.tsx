@@ -263,6 +263,66 @@ const Column: React.FC<ColumnProps> = ({
                 {summarizing ? '\u23F3' : '\u2728'}
               </button>
             )}
+            {cards.length > 0 && (
+              <button
+                onClick={() => {
+                  let visibleCards = cards.filter((c) => !c.isDeleted);
+                  if (column.type === 'transcript') {
+                    visibleCards = visibleCards.filter((c) => !c.userTags.includes('transcript:processed'));
+                  }
+                  visibleCards.sort((a, b) => (a.sortOrder || '').localeCompare(b.sortOrder || ''));
+                  const parts: string[] = [];
+                  if (summary) parts.push(summary);
+                  const cardTexts = visibleCards.map((c) => c.content);
+                  if (parts.length > 0 && cardTexts.length > 0) parts.push('');
+                  parts.push(cardTexts.join('\n\n--\n\n'));
+                  navigator.clipboard?.writeText(parts.join('\n'));
+                }}
+                className="cursor-pointer border-none bg-transparent text-[11px] text-wall-subtle hover:text-indigo-300"
+                title="Copy column content to clipboard"
+              >
+                {'\uD83D\uDCCB'}
+              </button>
+            )}
+            {cards.length > 0 && (
+              <button
+                onClick={() => {
+                  let visibleCards = cards.filter((c) => !c.isDeleted);
+                  if (column.type === 'transcript') {
+                    visibleCards = visibleCards.filter((c) => !c.userTags.includes('transcript:processed'));
+                  }
+                  visibleCards.sort((a, b) => (a.sortOrder || '').localeCompare(b.sortOrder || ''));
+                  const exportCards = visibleCards.map((c) => {
+                    const obj: Record<string, unknown> = {};
+                    if (c.cardNumber != null) obj.cardNumber = c.cardNumber;
+                    obj.content = c.content;
+                    obj.source = c.source;
+                    if (c.sourceAgentName) obj.agentName = c.sourceAgentName;
+                    if (c.speaker) obj.speaker = c.speaker;
+                    if (c.highlightedBy !== 'none') obj.highlighted = c.highlightedBy;
+                    if (c.pinned) obj.pinned = true;
+                    if (c.aiTags.length > 0) obj.aiTags = c.aiTags;
+                    if (c.userTags.length > 0) obj.userTags = c.userTags;
+                    if (c.timestamp != null) obj.timestamp = c.timestamp;
+                    obj.createdAt = c.createdAt;
+                    obj.id = c.id;
+                    return obj;
+                  });
+                  const payload: Record<string, unknown> = {
+                    column: column.title,
+                    type: column.type,
+                  };
+                  if (summary) payload.summary = summary;
+                  payload.cardCount = exportCards.length;
+                  payload.cards = exportCards;
+                  navigator.clipboard?.writeText(JSON.stringify(payload, null, 2));
+                }}
+                className="cursor-pointer border-none bg-transparent text-[11px] text-wall-subtle hover:text-indigo-300"
+                title="Copy column as JSON to clipboard"
+              >
+                {'\u007B\u007D'}
+              </button>
+            )}
             {cards.length > 3 && (
               <button
                 onClick={() => setShowFilters(o => !o)}

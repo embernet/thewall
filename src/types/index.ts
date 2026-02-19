@@ -101,6 +101,8 @@ export interface Card {
   createdAt: string;
   updatedAt: string;
   sortOrder: string;
+  /** Stable sequential number within the column, assigned on creation and never renumbered. */
+  cardNumber?: number;
   /** Base64-encoded image data (no data: URI prefix), set on image-generation result cards. */
   imageData?: string;
   imageMimeType?: string;

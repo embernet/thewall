@@ -125,8 +125,8 @@ export function registerDbHandlers() {
       .prepare(
         `INSERT OR IGNORE INTO cards (id, column_id, session_id, content, source, source_agent_id, source_agent_name,
          source_card_ids, prompt_used, ai_tags, user_tags, speaker, timestamp_ms, highlighted_by,
-         is_deleted, pinned, created_at, updated_at, sort_order)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         is_deleted, pinned, created_at, updated_at, sort_order, card_number)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         card.id,
@@ -147,7 +147,8 @@ export function registerDbHandlers() {
         card.pinned ? 1 : 0,
         card.createdAt || new Date().toISOString(),
         card.updatedAt || new Date().toISOString(),
-        card.sortOrder
+        card.sortOrder,
+        card.cardNumber ?? null
       );
     return card;
   });
@@ -165,6 +166,7 @@ export function registerDbHandlers() {
     if (updates.userTags !== undefined) { fields.push('user_tags = ?'); values.push(JSON.stringify(updates.userTags)); }
     if (updates.sourceCardIds !== undefined) { fields.push('source_card_ids = ?'); values.push(JSON.stringify(updates.sourceCardIds)); }
     if (updates.pinned !== undefined) { fields.push('pinned = ?'); values.push(updates.pinned ? 1 : 0); }
+    if (updates.cardNumber !== undefined) { fields.push('card_number = ?'); values.push(updates.cardNumber); }
 
     fields.push('updated_at = ?');
     values.push(new Date().toISOString());
@@ -923,8 +925,8 @@ export function registerDbHandlers() {
       const cardStmt = d.prepare(
         `INSERT INTO cards (id, column_id, session_id, content, source, source_agent_name,
          source_card_ids, prompt_used, ai_tags, user_tags, speaker, timestamp_ms,
-         highlighted_by, is_deleted, pinned, created_at, updated_at, sort_order)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         highlighted_by, is_deleted, pinned, created_at, updated_at, sort_order, card_number)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       );
       for (const card of data.cards || []) {
         cardStmt.run(
@@ -945,7 +947,8 @@ export function registerDbHandlers() {
           card.pinned ? 1 : 0,
           card.createdAt || card.created_at || new Date().toISOString(),
           card.updatedAt || card.updated_at || new Date().toISOString(),
-          card.sortOrder || card.sort_order || 'n'
+          card.sortOrder || card.sort_order || 'n',
+          card.cardNumber || card.card_number || null
         );
       }
 
@@ -1069,6 +1072,7 @@ function mapCardFromDb(row: any) {
     highlightedBy: row.highlighted_by,
     isDeleted: !!row.is_deleted,
     pinned: !!row.pinned,
+    cardNumber: row.card_number ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     sortOrder: row.sort_order,

@@ -428,6 +428,11 @@ export default function Card({
 
       {/* ── Metadata row ─────────────────────────────────────────────── */}
       <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+        {card.cardNumber != null && (
+          <span className="text-[9px] font-mono text-wall-subtle">
+            {isRawTranscript ? 'R' : '#'}{card.cardNumber}
+          </span>
+        )}
         <span
           className="text-[8px] text-white px-1.5 py-px rounded-[7px] font-semibold uppercase tracking-wide"
           style={{ background: badge.bg }}

@@ -130,12 +130,47 @@ export const useSessionStore = create<SessionState>()(temporal((set, get) => ({
   ...initialState,
 
   // ── INIT: replace entire state, switch view to session ──
-  init: (incoming) =>
+  init: (incoming) => {
+    // Backfill cardNumber for any cards loaded without one
+    const cards = incoming.cards;
+    const needsNumber = cards.some((c) => c.cardNumber == null);
+    const numberedCards = needsNumber
+      ? (() => {
+          // Group key splits numbering: raw transcript, clean transcript, and
+          // everything else each get their own sequence per column.
+          const groupKey = (c: Card): string => {
+            const suffix = c.userTags.includes('transcript:raw')
+              ? ':raw'
+              : c.userTags.includes('transcript:clean')
+                ? ':clean'
+                : '';
+            return c.columnId + suffix;
+          };
+          // Track next number per group
+          const maxByGroup: Record<string, number> = {};
+          for (const c of cards) {
+            if (c.cardNumber != null) {
+              const key = groupKey(c);
+              maxByGroup[key] = Math.max(maxByGroup[key] ?? 0, c.cardNumber);
+            }
+          }
+          // Assign numbers to unnumbered cards
+          return cards.map((c) => {
+            if (c.cardNumber != null) return c;
+            const key = groupKey(c);
+            const next = (maxByGroup[key] ?? 0) + 1;
+            maxByGroup[key] = next;
+            return { ...c, cardNumber: next };
+          });
+        })()
+      : cards;
     set(() => ({
       ...incoming,
+      cards: numberedCards,
       view: 'session' as AppView,
       saveStatus: 'idle' as SaveStatus,
-    })),
+    }));
+  },
 
   // ── SET_TITLE ──
   setTitle: (title) =>
@@ -153,10 +188,28 @@ export const useSessionStore = create<SessionState>()(temporal((set, get) => ({
 
   // ── ADD_CARD ──
   addCard: (card) => {
-    set((state) => ({
-      cards: [...state.cards, card],
-    }));
-    bus.emit('card:created', { card });
+    set((state) => {
+      // Auto-assign cardNumber if not already set
+      let numbered = card;
+      if (numbered.cardNumber == null) {
+        // Split numbering sequences: raw transcript cards count independently
+        // from clean transcript cards and all other cards.
+        const isRaw = card.userTags.includes('transcript:raw');
+        const isClean = card.userTags.includes('transcript:clean');
+        const peerCards = state.cards.filter((c) => {
+          if (c.columnId !== card.columnId) return false;
+          if (isRaw) return c.userTags.includes('transcript:raw');
+          if (isClean) return c.userTags.includes('transcript:clean');
+          return !c.userTags.includes('transcript:raw') && !c.userTags.includes('transcript:clean');
+        });
+        const maxNum = peerCards.reduce((m, c) => Math.max(m, c.cardNumber ?? 0), 0);
+        numbered = { ...card, cardNumber: maxNum + 1 };
+      }
+      return { cards: [...state.cards, numbered] };
+    });
+    // Re-read to get the numbered version for the event
+    const added = get().cards.find((c) => c.id === card.id);
+    if (added) bus.emit('card:created', { card: added });
   },
 
   // ── UPDATE_CARD: partial update by id, refresh updatedAt ──

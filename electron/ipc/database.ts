@@ -349,4 +349,13 @@ const migrations: Migration[] = [
       DROP TABLE IF EXISTS chat_messages;
     `,
   },
+  {
+    name: '009_card_number',
+    up: `
+      ALTER TABLE cards ADD COLUMN card_number INTEGER;
+    `,
+    down: `
+      -- SQLite doesn't support DROP COLUMN easily; ignore
+    `,
+  },
 ];
