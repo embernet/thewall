@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { APP_VERSION } from '@/version';
 import type { SessionIndexEntry, SimConfig, SimParticipant, SessionExport, BackupExport, SessionTemplate, ColumnType, SessionMode } from '@/types';
 import { SPEAKER_COLORS, COL_TYPES } from '@/types';
 import { v4 as uid } from 'uuid';
@@ -671,7 +672,7 @@ export default function Launcher({
             About
           </button>
           <span>·</span>
-          <span>v0.2.0</span>
+          <span>v{APP_VERSION}</span>
         </div>
       </div>
     </div>

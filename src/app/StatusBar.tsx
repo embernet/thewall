@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { APP_VERSION } from '@/version';
 import { MODE_COLORS } from '@/types';
 import type { ApiKeyStatus, EmbeddingProvider } from '@/types';
 import { useSessionStore } from '@/store/session';
@@ -123,7 +124,7 @@ export default function StatusBar({ simRunning, embeddingProvider, apiKeyStatus 
         </select>
       </div>
 
-      <span>The Wall &mdash; v0.2.0</span>
+      <span>The Wall &mdash; v{APP_VERSION}</span>
     </div>
   );
 }
