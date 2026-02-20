@@ -11,6 +11,8 @@ export interface MenuItem {
   disabled?: boolean;
   separator?: boolean;
   checked?: boolean;
+  /** Optional color for pill-style rendering (e.g. speaker colors). */
+  color?: string;
   children?: MenuItem[];
   /** If set, this item renders as an inline text input with submit. */
   inputPlaceholder?: string;
@@ -147,7 +149,16 @@ function SubMenu({ item, onClose }: { item: MenuItem; onClose: () => void }) {
                   {child.checked ? '\u2713' : ''}
                 </span>
                 {child.icon && <span className="text-xs">{child.icon}</span>}
-                {child.label}
+                {child.color ? (
+                  <span
+                    className="text-[10px] font-bold rounded-lg px-1.5 py-px"
+                    style={{ color: child.color, background: `${child.color}18` }}
+                  >
+                    {child.label}
+                  </span>
+                ) : (
+                  child.label
+                )}
               </button>
             );
           })}

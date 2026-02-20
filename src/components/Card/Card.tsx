@@ -247,18 +247,19 @@ export default function Card({
         const speakerChildren: MenuItem[] = knownSpeakers && knownSpeakers.length > 0
           ? [
               // "None" option
-              { label: 'None', checked: !card.speaker, onClick: () => onSpeakerChange?.(card.id, undefined) },
+              { label: 'None', checked: !card.speaker, color: '#94a3b8', onClick: () => onSpeakerChange?.(card.id, undefined) },
               { label: '', separator: true, onClick: () => {} },
               ...knownSpeakers.map((s) => ({
                 label: s,
                 checked: card.speaker === s,
+                color: speakerColors?.[s] || '#64748b',
                 onClick: () => onSpeakerChange?.(card.id, s),
               })),
               { label: '', separator: true, onClick: () => {} },
               addNewItem,
             ]
           : [
-              { label: 'None', checked: !card.speaker, onClick: () => onSpeakerChange?.(card.id, undefined) },
+              { label: 'None', checked: !card.speaker, color: '#94a3b8', onClick: () => onSpeakerChange?.(card.id, undefined) },
               { label: '', separator: true, onClick: () => {} },
               addNewItem,
             ];

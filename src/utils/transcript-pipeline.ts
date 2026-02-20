@@ -315,7 +315,7 @@ async function runPipeline(rawCards: Card[]): Promise<void> {
       }
       const dominantSpeaker =
         Object.entries(speakerCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ||
-        'You';
+        undefined;
 
       // 4. Create clean cards for this chunk
       for (const section of cleanSections) {

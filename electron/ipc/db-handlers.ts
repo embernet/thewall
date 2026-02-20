@@ -166,6 +166,7 @@ export function registerDbHandlers() {
     if (updates.userTags !== undefined) { fields.push('user_tags = ?'); values.push(JSON.stringify(updates.userTags)); }
     if (updates.sourceCardIds !== undefined) { fields.push('source_card_ids = ?'); values.push(JSON.stringify(updates.sourceCardIds)); }
     if (updates.pinned !== undefined) { fields.push('pinned = ?'); values.push(updates.pinned ? 1 : 0); }
+    if (updates.speaker !== undefined) { fields.push('speaker = ?'); values.push(updates.speaker || null); }
     if (updates.cardNumber !== undefined) { fields.push('card_number = ?'); values.push(updates.cardNumber); }
 
     fields.push('updated_at = ?');
@@ -185,6 +186,23 @@ export function registerDbHandlers() {
     db()
       .prepare('UPDATE cards SET column_id = ?, sort_order = ?, is_deleted = 0, updated_at = ? WHERE id = ?')
       .run(columnId, sortOrder, new Date().toISOString(), id);
+  });
+
+  // Speaker Colors
+  ipcMain.handle('db:getSpeakerColors', (_e, sessionId: string) => {
+    const rows = db().prepare('SELECT speaker, color FROM speaker_colors WHERE session_id = ?').all(sessionId) as any[];
+    const colors: Record<string, string> = {};
+    for (const row of rows) colors[row.speaker] = row.color;
+    return colors;
+  });
+
+  ipcMain.handle('db:saveSpeakerColors', (_e, sessionId: string, colors: Record<string, string>) => {
+    const d = db();
+    d.prepare('DELETE FROM speaker_colors WHERE session_id = ?').run(sessionId);
+    const stmt = d.prepare('INSERT INTO speaker_colors (session_id, speaker, color) VALUES (?, ?, ?)');
+    for (const [speaker, color] of Object.entries(colors)) {
+      stmt.run(sessionId, speaker, color);
+    }
   });
 
   // ── Agents ──

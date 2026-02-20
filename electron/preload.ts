@@ -22,6 +22,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     moveCard: (id: string, columnId: string, sortOrder: string) =>
       ipcRenderer.invoke('db:moveCard', id, columnId, sortOrder),
 
+    // Speaker Colors
+    getSpeakerColors: (sessionId: string) => ipcRenderer.invoke('db:getSpeakerColors', sessionId),
+    saveSpeakerColors: (sessionId: string, colors: Record<string, string>) =>
+      ipcRenderer.invoke('db:saveSpeakerColors', sessionId, colors),
+
     // Agents
     getAgents: () => ipcRenderer.invoke('db:getAgents'),
     createAgent: (agent: any) => ipcRenderer.invoke('db:createAgent', agent),

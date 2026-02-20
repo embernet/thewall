@@ -25,6 +25,7 @@ export type AppEvents = {
   'agentConfig:changed': Record<string, never>;
   'transcript:pipeline:started': { batchId: string; rawCardCount: number };
   'transcript:pipeline:completed': { batchId: string; cleanCardCount: number };
+  'speakerColors:updated': { colors: Record<string, string> };
 };
 
 // ---------------------------------------------------------------------------

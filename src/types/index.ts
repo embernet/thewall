@@ -410,6 +410,10 @@ export interface ElectronDbApi {
   deleteCard: (id: string) => Promise<void>;
   moveCard: (id: string, columnId: string, sortOrder: string) => Promise<void>;
 
+  // Speaker Colors
+  getSpeakerColors: (sessionId: string) => Promise<Record<string, string>>;
+  saveSpeakerColors: (sessionId: string, colors: Record<string, string>) => Promise<void>;
+
   // Agents
   getAgents: () => Promise<Agent[]>;
   createAgent: (agent: Agent) => Promise<Agent>;

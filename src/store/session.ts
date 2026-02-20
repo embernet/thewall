@@ -406,7 +406,10 @@ export const useSessionStore = create<SessionState>()(temporal((set, get) => ({
   setView: (view) => set(() => ({ view })),
 
   // ── SET_COLORS ──
-  setSpeakerColors: (colors) => set(() => ({ speakerColors: colors })),
+  setSpeakerColors: (colors) => {
+    set(() => ({ speakerColors: colors }));
+    bus.emit('speakerColors:updated', { colors });
+  },
 
   // ── SET_SAVE_STATUS ──
   setSaveStatus: (status) => set(() => ({ saveStatus: status })),

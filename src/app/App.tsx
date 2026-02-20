@@ -262,6 +262,7 @@ export default function App() {
           userTags: card.userTags,
           sourceCardIds: card.sourceCardIds,
           pinned: card.pinned,
+          speaker: card.speaker,
         })
         .catch(console.error);
     };
@@ -281,6 +282,19 @@ export default function App() {
       bus.off('card:updated', handleUpdate);
       bus.off('card:deleted', handleDelete);
     };
+  }, [session?.id]);
+
+  // ── Persist speaker color changes ──
+  useEffect(() => {
+    if (!session?.id || !window.electronAPI) return;
+    const sid = session.id;
+
+    const handleColorsUpdated = ({ colors }: { colors: Record<string, string> }) => {
+      window.electronAPI.db.saveSpeakerColors(sid, colors).catch(console.error);
+    };
+
+    bus.on('speakerColors:updated', handleColorsUpdated);
+    return () => { bus.off('speakerColors:updated', handleColorsUpdated); };
   }, [session?.id]);
 
   // ── Document chunk column creation (listen for viewChunks events) ──
@@ -355,7 +369,7 @@ export default function App() {
     const last = existing[existing.length - 1];
     addCard({
       id: uid(), columnId: tcol.id, sessionId: session.id, content: text.trim(),
-      source: 'transcription', speaker: speaker || 'You',
+      source: 'transcription', speaker: speaker || undefined,
       timestamp: Date.now() - (timerStart.current || Date.now()),
       sourceCardIds: [], aiTags: [], userTags: ['transcript:raw'], highlightedBy: 'none', isDeleted: false,
       createdAt: now(), updatedAt: now(), sortOrder: last ? mid(last.sortOrder) : 'n',
@@ -521,6 +535,7 @@ export default function App() {
       cols.push(summaryCol);
     }
     const cardRows = await window.electronAPI.db.getCards(id);
+    const colors = await window.electronAPI.db.getSpeakerColors(id);
     init({
       session: {
         id: sessionRow.id, title: sessionRow.title, mode: sessionRow.mode,
@@ -533,7 +548,7 @@ export default function App() {
       audio: { recording: false, paused: false, level: 0, elapsed: 0, autoScroll: true },
       agentBusy: {},
       agentTasks: [],
-      speakerColors: {},
+      speakerColors: colors || {},
     });
   }, [init]);
 
