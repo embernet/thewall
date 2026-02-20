@@ -320,7 +320,7 @@ const Column: React.FC<ColumnProps> = ({
           {column.title}
         </span>
         <span className="mt-[3px] rounded-[7px] bg-wall-border px-1 py-[1px] text-[9px] text-wall-text-muted font-medium">
-          {cards.length}
+          {filtered.length !== cards.length ? `${filtered.length}/${cards.length}` : cards.length}
         </span>
       </div>
     );
@@ -353,7 +353,7 @@ const Column: React.FC<ColumnProps> = ({
               {column.title}
             </span>
             <span className="rounded-lg bg-wall-border px-[5px] text-[10px] text-wall-text-muted font-medium">
-              {cards.length}
+              {filtered.length !== cards.length ? `${filtered.length}/${cards.length}` : cards.length}
             </span>
             {isBusy && (
               <span className="animate-pulse text-[10px] text-cyan-600">
