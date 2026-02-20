@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { builtInAgents } from '@/agents/built-in';
 import type { BaseAgent, AgentContext } from '@/agents/base';
 import type { AgentConfigOverride, CustomAgentConfig } from '@/types';
-import { COL_TYPES } from '@/types';
+import { AGENT_TARGET_COL_TYPES } from '@/types';
 import type { ToolManifest } from '@/tools/adapter';
 
 // ---------------------------------------------------------------------------
@@ -232,7 +232,7 @@ const AgentDetail: React.FC<AgentDetailProps> = ({
             onChange={e => { setTargetCol(e.target.value); markDirty(); }}
             className="w-full rounded-md border border-wall-muted bg-wall-border px-2 py-1 text-[11px] text-wall-text outline-none focus:border-indigo-500"
           >
-            {COL_TYPES.map(c => (
+            {AGENT_TARGET_COL_TYPES.map(c => (
               <option key={c.type} value={c.type}>{c.icon} {c.title}</option>
             ))}
           </select>

@@ -576,6 +576,9 @@ export const COL_TYPES: readonly ColumnMeta[] = [
   { type: 'trash',       title: 'Trash',          icon: '\uD83D\uDDD1\uFE0F', color: '#6b7280' },
 ] as const;
 
+/** Column types excluding Trash — used for agent target-column pickers. */
+export const AGENT_TARGET_COL_TYPES = COL_TYPES.filter(c => c.type !== 'trash');
+
 /**
  * Badge display info keyed by CardSource.
  * `label` is the user-visible short name; `bg` is the badge background color.

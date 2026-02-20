@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { v4 as uuid } from 'uuid';
-import { COL_TYPES } from '@/types';
+import { AGENT_TARGET_COL_TYPES } from '@/types';
 import type { CustomAgentConfig } from '@/types';
 import { personaRegistry } from '@/personas/base';
 
@@ -186,7 +186,7 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({ open, onClose, on
                 onChange={e => setTargetCol(e.target.value)}
                 className="w-full rounded-md border border-wall-muted bg-wall-border px-2 py-1 text-[11px] text-wall-text outline-none focus:border-indigo-500"
               >
-                {COL_TYPES.map(c => (
+                {AGENT_TARGET_COL_TYPES.map(c => (
                   <option key={c.type} value={c.type}>{c.icon} {c.title}</option>
                 ))}
               </select>
