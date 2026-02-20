@@ -358,4 +358,33 @@ const migrations: Migration[] = [
       -- SQLite doesn't support DROP COLUMN easily; ignore
     `,
   },
+  {
+    name: '010_session_templates',
+    up: `
+      -- Session templates (user-created; built-in templates are hardcoded)
+      CREATE TABLE IF NOT EXISTS session_templates (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        icon TEXT NOT NULL DEFAULT '',
+        description TEXT NOT NULL DEFAULT '',
+        enabled_agent_ids TEXT DEFAULT '[]',
+        visible_column_types TEXT DEFAULT '[]',
+        default_mode TEXT CHECK(default_mode IN ('silent','active','sidekick')) NOT NULL DEFAULT 'sidekick',
+        system_prompt TEXT NOT NULL DEFAULT '',
+        goal_placeholder TEXT NOT NULL DEFAULT '',
+        is_built_in INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+      );
+
+      -- Extend sessions with template-related fields
+      ALTER TABLE sessions ADD COLUMN template_id TEXT;
+      ALTER TABLE sessions ADD COLUMN system_prompt TEXT DEFAULT '';
+      ALTER TABLE sessions ADD COLUMN enabled_agent_ids TEXT;
+    `,
+    down: `
+      DROP TABLE IF EXISTS session_templates;
+      -- SQLite doesn't support DROP COLUMN easily; ignore added columns
+    `,
+  },
 ];

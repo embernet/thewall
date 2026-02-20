@@ -15,6 +15,7 @@ import { bus } from '@/events/bus';
 import { useSessionStore } from '@/store/session';
 import ContextMenu, { useContextMenu } from '@/components/ContextMenu/ContextMenu';
 import type { MenuItem } from '@/components/ContextMenu/ContextMenu';
+import { SvgIcon } from '@/components/Icons';
 
 // ---------------------------------------------------------------------------
 // Highlight border color lookup (dynamic -- must remain inline styles)
@@ -181,12 +182,12 @@ export default function Card({
   // ── Action buttons for the toolbar (icon-only, always present) ──────────
   const toolbarActions = [
     {
-      icon: '\uD83D\uDCCB',
+      icon: 'copy',
       tooltip: 'Copy',
       fn: () => navigator.clipboard?.writeText(card.content),
     },
     {
-      icon: '\u270F\uFE0F',
+      icon: 'edit',
       tooltip: 'Edit',
       fn: () => {
         setTxt(card.content);
@@ -194,7 +195,7 @@ export default function Card({
       },
     },
     {
-      icon: '\u2B50',
+      icon: 'star',
       tooltip:
         card.highlightedBy === 'user' || card.highlightedBy === 'both'
           ? 'Remove Highlight'
@@ -204,7 +205,7 @@ export default function Card({
     ...(onPin
       ? [
           {
-            icon: '\uD83D\uDCCC',
+            icon: 'pin',
             tooltip: card.pinned ? 'Unpin' : 'Pin to Top',
             fn: () => onPin(card.id),
           },
@@ -213,7 +214,7 @@ export default function Card({
     ...(onStartLink
       ? [
           {
-            icon: '\uD83D\uDD17',
+            icon: 'link',
             tooltip: 'Link to...',
             fn: () => onStartLink(card.id),
           },
@@ -222,7 +223,7 @@ export default function Card({
     ...(isTranscriptSourceLinks
       ? [
           {
-            icon: '\uD83D\uDCC4',
+            icon: 'document',
             tooltip: 'View raw transcript sources',
             fn: () => setRawSourcesOpen((o) => !o),
           },
@@ -264,16 +265,16 @@ export default function Card({
               addNewItem,
             ];
         const items: MenuItem[] = [
-          { label: 'Copy', icon: '\uD83D\uDCCB', onClick: () => navigator.clipboard?.writeText(card.content) },
-          { label: 'Edit', icon: '\u270F\uFE0F', onClick: () => { setTxt(card.content); setEditing(true); } },
-          { label: card.highlightedBy === 'user' || card.highlightedBy === 'both' ? 'Remove Highlight' : 'Highlight', icon: '\u2B50', onClick: () => onHighlight(card.id) },
-          ...(onPin ? [{ label: card.pinned ? 'Unpin' : 'Pin to Top', icon: '\uD83D\uDCCC', onClick: () => onPin(card.id) }] : []),
-          ...(onStartLink ? [{ label: 'Link to...', icon: '\uD83D\uDD17', onClick: () => onStartLink(card.id) }] : []),
-          ...(onSpeakerChange ? [{ label: 'Speaker', icon: '\uD83D\uDDE3\uFE0F', children: speakerChildren, onClick: () => {} }] : []),
-          ...(onSplit ? [{ label: 'Split', icon: '\u2702\uFE0F', onClick: () => setSplitting(true) }] : []),
-          { label: 'Find Related', icon: '\uD83D\uDD0D', onClick: () => handleFindRelated(card) },
+          { label: 'Copy', icon: 'copy', onClick: () => navigator.clipboard?.writeText(card.content) },
+          { label: 'Edit', icon: 'edit', onClick: () => { setTxt(card.content); setEditing(true); } },
+          { label: card.highlightedBy === 'user' || card.highlightedBy === 'both' ? 'Remove Highlight' : 'Highlight', icon: 'star', onClick: () => onHighlight(card.id) },
+          ...(onPin ? [{ label: card.pinned ? 'Unpin' : 'Pin to Top', icon: 'pin', onClick: () => onPin(card.id) }] : []),
+          ...(onStartLink ? [{ label: 'Link to...', icon: 'link', onClick: () => onStartLink(card.id) }] : []),
+          ...(onSpeakerChange ? [{ label: 'Speaker', icon: 'speaker', children: speakerChildren, onClick: () => {} }] : []),
+          ...(onSplit ? [{ label: 'Split', icon: 'scissors', onClick: () => setSplitting(true) }] : []),
+          { label: 'Find Related', icon: 'find-related', onClick: () => handleFindRelated(card) },
           { label: '', icon: '', separator: true, onClick: () => {} },
-          ...(colType !== 'trash' ? [{ label: 'Delete', icon: '\uD83D\uDDD1\uFE0F', danger: true, onClick: () => onDelete(card.id) }] : []),
+          ...(colType !== 'trash' ? [{ label: 'Delete', icon: 'delete', danger: true, onClick: () => onDelete(card.id) }] : []),
         ];
         showMenu(e, items);
       }}
@@ -297,7 +298,7 @@ export default function Card({
               title="More actions"
               className={`text-[9px] bg-wall-border border border-wall-muted rounded w-[22px] h-[18px] flex items-center justify-center cursor-pointer transition-opacity duration-100 ${hov ? 'opacity-70 hover:opacity-100' : 'opacity-0'}`}
             >
-              {'\u2630'}
+              <SvgIcon name="more" size={10} />
             </button>
             {/* Hamburger dropdown */}
             {hamburgerOpen && (
@@ -310,7 +311,7 @@ export default function Card({
                   }}
                   className="w-full text-left px-3 py-1.5 text-[10px] text-wall-text hover:bg-wall-border cursor-pointer border-none bg-transparent flex items-center gap-2"
                 >
-                  <span>🔍</span>
+                  <SvgIcon name="find-related" size={11} />
                   <span>Find Related</span>
                 </button>
               </div>
@@ -328,7 +329,7 @@ export default function Card({
               title={a.tooltip}
               className={`text-[9px] bg-wall-border border border-wall-muted rounded w-[22px] h-[18px] flex items-center justify-center cursor-pointer transition-opacity duration-100 ${hov ? 'opacity-70 hover:opacity-100' : 'opacity-0'}`}
             >
-              {a.icon}
+              <SvgIcon name={a.icon} size={10} />
             </button>
           ))}
 
@@ -360,7 +361,7 @@ export default function Card({
       {isDoc && (
         <div className="mb-1.5">
           <div className="flex items-center gap-2">
-            <span className="text-xl">{docIcon}</span>
+            <SvgIcon name={docIcon!} size={20} />
             <div className="min-w-0 flex-1">
               <div className="truncate text-xs font-medium text-wall-text">
                 {docFileName}
@@ -618,7 +619,7 @@ export default function Card({
               className="text-[9px] text-white border-none rounded-[5px] px-[7px] py-0.5 cursor-pointer flex items-center gap-0.5 opacity-85"
               style={{ background: src.color || 'var(--wall-border-hex)' }}
             >
-              <span>{src.icon || '\uD83D\uDCCC'}</span>
+              <SvgIcon name={src.icon || 'pin'} size={11} />
               <span className="max-w-[120px] overflow-hidden text-ellipsis whitespace-nowrap">
                 {src.label || 'Source'}
               </span>

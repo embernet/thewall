@@ -3,6 +3,7 @@ import { builtInAgents } from '@/agents/built-in';
 import type { BaseAgent } from '@/agents/base';
 import type { AgentConfigOverride, CustomAgentConfig } from '@/types';
 import { COL_TYPES as COL_META_LIST } from '@/types';
+import { SvgIcon } from '@/components/Icons';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -120,7 +121,7 @@ const AgentList: React.FC<AgentListProps> = ({ selectedId, onSelect, configs, cu
                   : 'bg-transparent text-wall-text-dim hover:bg-wall-border/40 hover:text-wall-text'
               } ${isDisabled ? 'opacity-40' : ''}`}
             >
-              <span className="text-xs shrink-0">{meta?.icon || '\uD83E\uDD16'}</span>
+              <SvgIcon name={meta?.icon || 'bot'} size={12} className="shrink-0" style={{ color: meta?.color }} />
               <div className="flex-1 min-w-0">
                 <div className="text-[10px] font-semibold truncate">{agent.name}</div>
               </div>

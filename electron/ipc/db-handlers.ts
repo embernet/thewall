@@ -30,8 +30,8 @@ export function registerDbHandlers() {
   ipcMain.handle('db:createSession', (_e, session: any) => {
     db()
       .prepare(
-        `INSERT INTO sessions (id, title, mode, status, goal, approach, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO sessions (id, title, mode, status, goal, approach, template_id, system_prompt, enabled_agent_ids, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         session.id,
@@ -40,6 +40,9 @@ export function registerDbHandlers() {
         session.status || 'active',
         session.goal || '',
         session.approach || '',
+        session.templateId || null,
+        session.systemPrompt || '',
+        session.enabledAgentIds ? JSON.stringify(session.enabledAgentIds) : null,
         session.createdAt || new Date().toISOString(),
         session.updatedAt || new Date().toISOString()
       );
@@ -55,6 +58,11 @@ export function registerDbHandlers() {
     if (updates.status !== undefined) { fields.push('status = ?'); values.push(updates.status); }
     if (updates.goal !== undefined) { fields.push('goal = ?'); values.push(updates.goal); }
     if (updates.approach !== undefined) { fields.push('approach = ?'); values.push(updates.approach); }
+    if (updates.systemPrompt !== undefined) { fields.push('system_prompt = ?'); values.push(updates.systemPrompt); }
+    if (updates.enabledAgentIds !== undefined) {
+      fields.push('enabled_agent_ids = ?');
+      values.push(updates.enabledAgentIds ? JSON.stringify(updates.enabledAgentIds) : null);
+    }
 
     fields.push('updated_at = ?');
     values.push(new Date().toISOString());
@@ -899,6 +907,60 @@ export function registerDbHandlers() {
     db().prepare('DELETE FROM custom_agents WHERE id = ?').run(id);
   });
 
+  // ── Session Templates ──
+
+  ipcMain.handle('db:getSessionTemplates', () => {
+    const rows = db().prepare('SELECT * FROM session_templates ORDER BY is_built_in DESC, name ASC').all() as any[];
+    return rows.map((r: any) => ({
+      id: r.id,
+      name: r.name,
+      icon: r.icon,
+      description: r.description,
+      enabledAgentIds: safeJsonParse(r.enabled_agent_ids, []),
+      visibleColumnTypes: safeJsonParse(r.visible_column_types, []),
+      defaultMode: r.default_mode,
+      systemPrompt: r.system_prompt,
+      goalPlaceholder: r.goal_placeholder,
+      isBuiltIn: !!r.is_built_in,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+    }));
+  });
+
+  ipcMain.handle('db:saveSessionTemplate', (_e, tpl: any) => {
+    db().prepare(
+      `INSERT INTO session_templates (id, name, icon, description, enabled_agent_ids, visible_column_types, default_mode, system_prompt, goal_placeholder, is_built_in, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         name = excluded.name,
+         icon = excluded.icon,
+         description = excluded.description,
+         enabled_agent_ids = excluded.enabled_agent_ids,
+         visible_column_types = excluded.visible_column_types,
+         default_mode = excluded.default_mode,
+         system_prompt = excluded.system_prompt,
+         goal_placeholder = excluded.goal_placeholder,
+         updated_at = excluded.updated_at`
+    ).run(
+      tpl.id,
+      tpl.name,
+      tpl.icon || '',
+      tpl.description || '',
+      JSON.stringify(tpl.enabledAgentIds || []),
+      JSON.stringify(tpl.visibleColumnTypes || []),
+      tpl.defaultMode || 'sidekick',
+      tpl.systemPrompt || '',
+      tpl.goalPlaceholder || '',
+      tpl.isBuiltIn ? 1 : 0,
+      tpl.createdAt || new Date().toISOString(),
+      new Date().toISOString()
+    );
+  });
+
+  ipcMain.handle('db:deleteSessionTemplate', (_e, id: string) => {
+    db().prepare('DELETE FROM session_templates WHERE id = ?').run(id);
+  });
+
   // ── Bulk Import/Export ──
 
   ipcMain.handle('db:importSession', (_e, data: any) => {
@@ -1052,6 +1114,9 @@ function mapSessionFromDb(row: any) {
     status: row.status,
     goal: row.goal,
     approach: row.approach,
+    templateId: row.template_id ?? null,
+    systemPrompt: row.system_prompt ?? '',
+    enabledAgentIds: safeJsonParse(row.enabled_agent_ids, null),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     cardCount: row.card_count,

@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAgentConfigStore } from '@/store/agent-config';
+import { useSessionStore } from '@/store/session';
 import { builtInAgents } from '@/agents/built-in';
 import type { BaseAgent } from '@/agents/base';
+import type { ColumnType } from '@/types';
 import AgentList from './AgentList';
 import AgentDetail from './AgentDetail';
 import AgentColumnMatrix from './AgentColumnMatrix';
@@ -53,6 +55,16 @@ const AgentConfig: React.FC<AgentConfigProps> = ({ open, onClose }) => {
       saveConfig(agentId, { targetColumn });
     }
   }, [customAgents, saveConfig, saveCustomAgent]);
+
+  // Pull session-level constraints for the matrix filter
+  const session = useSessionStore(s => s.session);
+  const sessionColumns = useSessionStore(s => s.columns);
+  const sessionEnabledAgentIds = session?.enabledAgentIds ?? null;
+  const sessionVisibleColumnTypes = useMemo<ColumnType[] | null>(() => {
+    if (!session) return null;
+    const visible = sessionColumns.filter(c => c.visible).map(c => c.type);
+    return visible.length > 0 ? visible : null;
+  }, [session, sessionColumns]);
 
   if (!open) return null;
 
@@ -154,6 +166,8 @@ const AgentConfig: React.FC<AgentConfigProps> = ({ open, onClose }) => {
               configs={configs}
               customAgents={customAgents}
               onChangeTarget={handleMatrixChangeTarget}
+              sessionEnabledAgentIds={sessionEnabledAgentIds}
+              sessionVisibleColumnTypes={sessionVisibleColumnTypes}
             />
           )}
 

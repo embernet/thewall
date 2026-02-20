@@ -139,8 +139,15 @@ export class WorkerPool {
     // Congestion control: when queue is backed up, skip low-priority agents
     const congested = this.queue.length > 10;
 
+    // Session-level agent filter: if a template specified enabled agents, only run those
+    const sessionAgentSet = context.enabledAgentIds?.length
+      ? new Set(context.enabledAgentIds)
+      : null;
+
     for (const agent of agents) {
       if (this.isAgentDisabled(agent.id)) continue;
+      // Skip agents not enabled for this session's template
+      if (sessionAgentSet && !sessionAgentSet.has(agent.id)) continue;
       if (!agent.shouldActivate(context)) continue;
 
       // Congestion control: skip low-priority agents when queue is backed up

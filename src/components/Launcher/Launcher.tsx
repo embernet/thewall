@@ -1,17 +1,28 @@
-import { useState, useMemo } from 'react';
-import type { SessionIndexEntry, SimConfig, SimParticipant, SessionExport, BackupExport } from '@/types';
-import { SPEAKER_COLORS } from '@/types';
+import { useState, useEffect, useMemo } from 'react';
+import type { SessionIndexEntry, SimConfig, SimParticipant, SessionExport, BackupExport, SessionTemplate, ColumnType, SessionMode } from '@/types';
+import { SPEAKER_COLORS, COL_TYPES } from '@/types';
+import { v4 as uid } from 'uuid';
 import { exportSessionToFile, readFileAsJSON, downloadJSON } from '@/utils/export';
 import { personaRegistry } from '@/personas/base';
 import { builtInPersonas } from '@/personas/built-in';
+import { BUILT_IN_TEMPLATES } from '@/templates/built-in';
+import { builtInAgents } from '@/agents/built-in';
+import TemplateEditor from './TemplateEditor';
+import { SvgIcon } from '@/components/Icons';
 
 // ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
 
+interface StartSessionOpts {
+  title: string;
+  templateId?: string | null;
+  goal?: string;
+}
+
 interface LauncherProps {
   sessions: SessionIndexEntry[];
-  onStart: (title: string) => void;
+  onStart: (opts: StartSessionOpts) => void;
   onSimulate: (config: SimConfig) => void;
   onOpen: (id: string) => void;
   onDelete: (id: string) => void;
@@ -37,47 +48,8 @@ const DEFAULT_SIM_PARTS: SimParticipant[] = [
 const DEFAULT_SIM_TURNS = 20;
 
 // ---------------------------------------------------------------------------
-// Session templates
+// Session templates — sourced from built-in definitions + user custom
 // ---------------------------------------------------------------------------
-
-const SESSION_TEMPLATES = [
-  {
-    id: 'brainstorm',
-    icon: '\uD83D\uDCA1',
-    title: 'Brainstorming',
-    description: 'Freeform ideation with concept extraction, idea generation, and pattern finding.',
-  },
-  {
-    id: 'research',
-    icon: '\uD83D\uDD2C',
-    title: 'Research Review',
-    description: 'Analyse documents, extract claims, verify facts, and surface gaps.',
-  },
-  {
-    id: 'decision',
-    icon: '\u2696\uFE0F',
-    title: 'Decision Making',
-    description: 'Weigh tradeoffs, find alternatives, and track action items.',
-  },
-  {
-    id: 'retro',
-    icon: '\uD83D\uDD04',
-    title: 'Retrospective',
-    description: 'Review what went well, what didn\'t, and generate improvements.',
-  },
-  {
-    id: 'interview',
-    icon: '\uD83C\uDF99\uFE0F',
-    title: 'Interview Notes',
-    description: 'Capture and analyse interview transcripts with question tracking.',
-  },
-  {
-    id: 'strategy',
-    icon: '\uD83C\uDFAF',
-    title: 'Strategy Session',
-    description: 'High-level planning with gap analysis, alternatives, and actions.',
-  },
-];
 
 // ---------------------------------------------------------------------------
 // Tab definitions
@@ -178,7 +150,7 @@ function PersonaPicker({
         className="w-full cursor-pointer rounded-md border border-wall-muted bg-wall-border px-[7px] py-[5px] text-left text-[10px] text-wall-text outline-none hover:border-indigo-500/50"
       >
         {selectedPersona ? (
-          <span>{selectedPersona.icon} {selectedPersona.name}</span>
+          <span className="flex items-center gap-1"><SvgIcon name={selectedPersona.icon} size={12} />{selectedPersona.name}</span>
         ) : participant.personaPrompt ? (
           <span className="text-wall-text-muted">Custom persona</span>
         ) : (
@@ -216,8 +188,8 @@ function PersonaPicker({
                   : 'text-wall-text'
               }`}
             >
-              <div className="text-[10px] font-semibold">
-                {p.icon} {p.name}
+              <div className="text-[10px] font-semibold flex items-center gap-1">
+                <SvgIcon name={p.icon} size={12} /> {p.name}
               </div>
               <div className="text-[8px] text-wall-subtle leading-snug">{p.description}</div>
             </button>
@@ -257,9 +229,23 @@ export default function Launcher({
 }: LauncherProps) {
   const [tab, setTab] = useState<LauncherTab>(sessions.length > 0 ? 'recent' : 'new');
   const [title, setTitle] = useState('');
+  const [selectedTemplate, setSelectedTemplate] = useState<SessionTemplate | null>(null);
+  const [templateGoal, setTemplateGoal] = useState('');
+  const [customTemplates, setCustomTemplates] = useState<SessionTemplate[]>([]);
+  const [showCreateTemplate, setShowCreateTemplate] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<SessionTemplate | null>(null);
   const [simCtx, setSimCtx] = useState(DEFAULT_SIM_CTX);
   const [simParts, setSimParts] = useState<SimParticipant[]>(DEFAULT_SIM_PARTS);
   const [simTurns, setSimTurns] = useState(DEFAULT_SIM_TURNS);
+
+  // Load custom templates from DB
+  useEffect(() => {
+    if (window.electronAPI?.db?.getSessionTemplates) {
+      window.electronAPI.db.getSessionTemplates().then(templates => {
+        setCustomTemplates(templates.filter(t => !t.isBuiltIn));
+      }).catch(console.error);
+    }
+  }, []);
 
   // Build tab list -- only show "Recent" when there are sessions
   const tabs: TabDef[] = [
@@ -409,7 +395,7 @@ export default function Launcher({
                 real-time across columns.
               </p>
               <button
-                onClick={() => onStart(title || 'New Session')}
+                onClick={() => onStart({ title: title || 'New Session' })}
                 className="w-full cursor-pointer rounded-lg border-none py-[11px] text-sm font-bold text-white"
                 style={{
                   background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
@@ -418,24 +404,146 @@ export default function Launcher({
                 Start Session {'\u2192'}
               </button>
 
-              {/* ── Session Templates ── */}
+              {/* ── Quick Start Templates ── */}
               <div className="mt-6 border-t border-wall-muted pt-4">
                 <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-wall-subtle">
                   Quick Start Templates
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  {SESSION_TEMPLATES.map((tpl) => (
+
+                {/* Template selection or goal input */}
+                {selectedTemplate ? (
+                  <div className="rounded-lg border border-indigo-500/50 bg-wall-border/50 p-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <SvgIcon name={selectedTemplate.icon} size={16} />
+                        <span className="text-[12px] font-semibold text-wall-text">{selectedTemplate.name}</span>
+                      </div>
+                      <button
+                        onClick={() => { setSelectedTemplate(null); setTemplateGoal(''); }}
+                        className="cursor-pointer rounded-md bg-wall-muted px-2 py-0.5 text-[10px] text-wall-text-muted hover:text-wall-text"
+                      >
+                        {'\u2715'} Change
+                      </button>
+                    </div>
+                    <p className="mb-2 text-[10px] text-wall-subtle">{selectedTemplate.description}</p>
+                    <label className="mb-1 block text-[10px] text-wall-text-muted">
+                      Session Goal / Context
+                    </label>
+                    <textarea
+                      value={templateGoal}
+                      onChange={(e) => setTemplateGoal(e.target.value)}
+                      placeholder={selectedTemplate.goalPlaceholder}
+                      rows={2}
+                      className="mb-2.5 box-border w-full resize-y rounded-lg border border-wall-muted bg-wall-border px-3 py-[7px] font-sans text-[11px] text-wall-text outline-none placeholder:text-wall-text-dim focus:border-indigo-500"
+                    />
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <span className="text-[9px] text-wall-subtle">Mode:</span>
+                      <span className="rounded bg-wall-muted px-1.5 py-0.5 text-[9px] font-medium text-wall-text">
+                        {selectedTemplate.defaultMode}
+                      </span>
+                      <span className="text-[9px] text-wall-subtle ml-2">
+                        {selectedTemplate.enabledAgentIds.length} agents
+                      </span>
+                      <span className="text-[9px] text-wall-subtle">
+                        &middot; {selectedTemplate.visibleColumnTypes.length} columns
+                      </span>
+                    </div>
                     <button
-                      key={tpl.id}
-                      onClick={() => onStart(tpl.title)}
-                      className="cursor-pointer rounded-lg border border-wall-muted bg-wall-border/50 px-3 py-2.5 text-left hover:border-indigo-500/50 hover:bg-wall-border"
+                      onClick={() => {
+                        onStart({
+                          title: selectedTemplate.name,
+                          templateId: selectedTemplate.id,
+                          goal: templateGoal,
+                        });
+                      }}
+                      className="w-full cursor-pointer rounded-lg border-none py-[9px] text-[12px] font-bold text-white"
+                      style={{
+                        background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+                      }}
                     >
-                      <div className="text-sm mb-0.5">{tpl.icon}</div>
-                      <div className="text-[11px] font-semibold text-wall-text">{tpl.title}</div>
-                      <div className="text-[9px] text-wall-subtle leading-snug mt-0.5">{tpl.description}</div>
+                      Start {selectedTemplate.name} {'\u2192'}
                     </button>
-                  ))}
-                </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 gap-2">
+                      {BUILT_IN_TEMPLATES.map((tpl) => (
+                        <button
+                          key={tpl.id}
+                          onClick={() => { setSelectedTemplate(tpl as SessionTemplate); setTemplateGoal(''); }}
+                          className="cursor-pointer rounded-lg border border-wall-muted bg-wall-border/50 px-3 py-2.5 text-left hover:border-indigo-500/50 hover:bg-wall-border"
+                        >
+                          <div className="mb-0.5"><SvgIcon name={tpl.icon} size={14} /></div>
+                          <div className="text-[11px] font-semibold text-wall-text">{tpl.name}</div>
+                          <div className="text-[9px] text-wall-subtle leading-snug mt-0.5">{tpl.description}</div>
+                        </button>
+                      ))}
+                      {customTemplates.map((tpl) => (
+                        <div key={tpl.id} className="relative group">
+                          <button
+                            onClick={() => { setSelectedTemplate(tpl); setTemplateGoal(''); }}
+                            className="w-full cursor-pointer rounded-lg border border-wall-muted bg-wall-border/50 px-3 py-2.5 text-left hover:border-indigo-500/50 hover:bg-wall-border"
+                          >
+                            <div className="mb-0.5"><SvgIcon name={tpl.icon} size={14} /></div>
+                            <div className="text-[11px] font-semibold text-wall-text">{tpl.name}</div>
+                            <div className="text-[9px] text-wall-subtle leading-snug mt-0.5">{tpl.description}</div>
+                          </button>
+                          <div className="absolute top-1 right-1 hidden group-hover:flex gap-0.5">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setEditingTemplate(tpl); setShowCreateTemplate(true); }}
+                              className="cursor-pointer rounded bg-wall-muted/80 px-1 py-0.5 text-[9px] text-wall-text-muted hover:text-indigo-400"
+                              title="Edit"
+                            >{'\u270E'}</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Create template button */}
+                    {!showCreateTemplate && (
+                      <button
+                        onClick={() => { setShowCreateTemplate(true); setEditingTemplate(null); }}
+                        className="mt-2 w-full cursor-pointer rounded-lg border border-dashed border-wall-muted bg-transparent py-2 text-[10px] text-wall-subtle hover:border-indigo-500/50 hover:text-indigo-400"
+                      >
+                        + Create Custom Template
+                      </button>
+                    )}
+
+                    {/* Template editor (create or edit) */}
+                    {showCreateTemplate && (
+                  <div className="mt-2">
+                    <TemplateEditor
+                      initial={editingTemplate}
+                      onSave={async (tpl) => {
+                        if (window.electronAPI?.db?.saveSessionTemplate) {
+                          await window.electronAPI.db.saveSessionTemplate(tpl);
+                        }
+                        setCustomTemplates(prev => {
+                          const idx = prev.findIndex(t => t.id === tpl.id);
+                          if (idx >= 0) {
+                            const next = [...prev];
+                            next[idx] = tpl;
+                            return next;
+                          }
+                          return [...prev, tpl];
+                        });
+                        setShowCreateTemplate(false);
+                        setEditingTemplate(null);
+                      }}
+                      onCancel={() => { setShowCreateTemplate(false); setEditingTemplate(null); }}
+                      onDelete={editingTemplate ? async (id) => {
+                        if (window.electronAPI?.db?.deleteSessionTemplate) {
+                          await window.electronAPI.db.deleteSessionTemplate(id);
+                        }
+                        setCustomTemplates(prev => prev.filter(t => t.id !== id));
+                        setShowCreateTemplate(false);
+                        setEditingTemplate(null);
+                      } : undefined}
+                    />
+                  </div>
+                )}
+                  </>
+                )}
               </div>
             </div>
           )}

@@ -24,10 +24,11 @@ import { askClaude, loadChatConfig, validateApiKey, getApiKey, getChatProvider }
 import { loadEmbeddingConfig, getEmbeddingProvider } from '@/utils/embedding-service';
 import { loadImageGenConfig } from '@/utils/image-generation';
 import { fetchProviderModels } from '@/utils/providers';
-import type { ApiKeyStatus, EmbeddingProvider } from '@/types';
+import type { ApiKeyStatus, EmbeddingProvider, SessionTemplate } from '@/types';
 import { bus } from '@/events/bus';
 import { uid, now, mid } from '@/utils/ids';
 import { COL_TYPES, SPEAKER_COLORS } from '@/types';
+import { BUILT_IN_TEMPLATES } from '@/templates/built-in';
 import { initOrchestrator, destroyOrchestrator } from '@/agents/orchestrator';
 import { workerPool } from '@/agents/worker-pool';
 import { useAgentConfigStore } from '@/store/agent-config';
@@ -481,16 +482,43 @@ export default function App() {
   }, [cards, speakerColors]);
 
   // ── Session actions ──
-  const mkSession = (title: string, mode: 'silent' | 'active' | 'sidekick' = 'sidekick') => {
+  const mkSession = (opts: {
+    title: string;
+    template?: SessionTemplate | null;
+    goal?: string;
+  }) => {
+    const { title, template, goal } = opts;
+    const mode = template?.defaultMode ?? 'sidekick';
     const sid = uid();
+
+    // Determine which columns are visible based on template
+    const templateVisibleSet = template?.visibleColumnTypes?.length
+      ? new Set(template.visibleColumnTypes)
+      : null;
+
     const cols = COL_TYPES.map((c, i) => ({
       id: uid(), sessionId: sid, type: c.type, title: c.title,
       // Summary column gets sort order 'a' so it appears on the left when visible
       sortOrder: c.type === 'summary' ? 'a' : String.fromCharCode(98 + i * 2),
-      visible: c.type !== 'trash' && c.type !== 'summary', collapsed: false,
+      visible: templateVisibleSet
+        ? templateVisibleSet.has(c.type)
+        : c.type !== 'trash' && c.type !== 'summary',
+      collapsed: false,
     }));
+
     return {
-      session: { id: sid, title, mode, goal: '', status: 'active' as const, createdAt: now(), updatedAt: now() },
+      session: {
+        id: sid,
+        title,
+        mode,
+        goal: goal || '',
+        status: 'active' as const,
+        templateId: template?.id ?? null,
+        systemPrompt: template?.systemPrompt ?? '',
+        enabledAgentIds: template?.enabledAgentIds?.length ? template.enabledAgentIds : null,
+        createdAt: now(),
+        updatedAt: now(),
+      },
       columns: cols,
       cards: [] as Card[],
       audio: { recording: false, paused: false, level: 0, elapsed: 0, autoScroll: true },
@@ -500,8 +528,23 @@ export default function App() {
     };
   };
 
-  const startSession = useCallback(async (title: string) => {
-    const s = mkSession(title);
+  const startSession = useCallback(async (opts: {
+    title: string;
+    templateId?: string | null;
+    goal?: string;
+  }) => {
+    // Resolve template from built-in or custom templates
+    let template: SessionTemplate | null = null;
+    if (opts.templateId) {
+      template = BUILT_IN_TEMPLATES.find(t => t.id === opts.templateId) ?? null;
+      // If not built-in, try loading custom templates from DB
+      if (!template && window.electronAPI?.db?.getSessionTemplates) {
+        const custom = await window.electronAPI.db.getSessionTemplates();
+        template = custom.find(t => t.id === opts.templateId) ?? null;
+      }
+    }
+
+    const s = mkSession({ title: opts.title, template, goal: opts.goal });
     if (window.electronAPI) {
       await window.electronAPI.db.createSession(s.session);
       for (const col of s.columns) {
@@ -558,7 +601,8 @@ export default function App() {
   }, [loadSessions]);
 
   const startSim = useCallback(async (config: SimConfig) => {
-    const s = mkSession('🎭 ' + config.context.slice(0, 40) + '...', 'silent');
+    const s = mkSession({ title: '🎭 ' + config.context.slice(0, 40) + '...' });
+    s.session.mode = 'active'; // Sim needs active mode for agent auto-dispatch
     const colors: Record<string, string> = {};
     config.participants.forEach((p, i) => { colors[p.name] = SPEAKER_COLORS[i % SPEAKER_COLORS.length]; });
     s.speakerColors = colors;

@@ -53,8 +53,40 @@ export interface Session {
   goal: string;
   approach?: string;
   status: SessionStatus;
+  /** Template ID that spawned this session (null for blank sessions). */
+  templateId?: string | null;
+  /** System prompt / guiding context injected into Chat and available to agents. */
+  systemPrompt?: string;
+  /** Agent IDs enabled for this session (null = all globally-enabled agents). */
+  enabledAgentIds?: string[] | null;
   createdAt: string;
   updatedAt: string;
+}
+
+// ----------------------------------------------------------------------------
+// Session Templates
+// ----------------------------------------------------------------------------
+
+/** A session template configures which agents, columns, mode, and context to use. */
+export interface SessionTemplate {
+  id: string;
+  name: string;
+  icon: string;
+  description: string;
+  /** Which agents should run in sessions created from this template. Empty = all. */
+  enabledAgentIds: string[];
+  /** Which column types should be visible. Empty = use defaults. */
+  visibleColumnTypes: ColumnType[];
+  /** Default session mode. */
+  defaultMode: SessionMode;
+  /** System prompt / guiding context for Chat. */
+  systemPrompt: string;
+  /** Placeholder text for the goal input. */
+  goalPlaceholder: string;
+  /** Whether this is a built-in template (not user-editable). */
+  isBuiltIn: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 /** A column is a vertical lane within a session holding cards of a specific type. */
@@ -462,6 +494,11 @@ export interface ElectronDbApi {
   // File processing (Context column)
   processContextFile: () => Promise<FileChunk[]>;
 
+  // Session Templates
+  getSessionTemplates: () => Promise<SessionTemplate[]>;
+  saveSessionTemplate: (template: SessionTemplate) => Promise<void>;
+  deleteSessionTemplate: (id: string) => Promise<void>;
+
   // Agent Configuration
   getAgentConfigs: () => Promise<AgentConfigOverride[]>;
   saveAgentConfig: (agentId: string, config: Partial<AgentConfigOverride>) => Promise<void>;
@@ -559,25 +596,27 @@ declare global {
 // Constants
 // ----------------------------------------------------------------------------
 
-/** All column types with their display metadata, in default sort order. */
+/** All column types with their display metadata, in default sort order.
+ *  `icon` is a string key into the SvgIcon registry (see Icons.tsx).
+ *  Keys match the column `type` so <SvgIcon name={meta.icon} /> just works. */
 export const COL_TYPES: readonly ColumnMeta[] = [
-  { type: 'transcript',    title: 'Transcript',    icon: '\uD83C\uDF99\uFE0F', color: '#ef4444' },
-  { type: 'notes',        title: 'Notes',         icon: '\uD83D\uDCDD',       color: '#8b9cf6' },
-  { type: 'context',      title: 'Context',       icon: '\uD83D\uDCC2',       color: '#10b981' },
-  { type: 'observations', title: 'Observations',  icon: '\uD83D\uDD0D',       color: '#6366f1' },
-  { type: 'concepts',     title: 'Key Concepts',  icon: '\uD83D\uDCA1',       color: '#8b5cf6' },
-  { type: 'ideas',       title: 'Ideas',         icon: '\uD83E\uDDE0',       color: '#a855f7' },
-  { type: 'questions',   title: 'Questions',      icon: '\u2753',             color: '#ec4899' },
-  { type: 'claims',      title: 'Claims',         icon: '\uD83D\uDCCC',       color: '#14b8a6' },
-  { type: 'gaps',        title: 'Gaps & Risks',   icon: '\u26A0\uFE0F',       color: '#f97316' },
-  { type: 'actions',     title: 'Actions',        icon: '\u2705',             color: '#22c55e' },
-  { type: 'alternatives', title: 'Alternatives',  icon: '\uD83D\uDD00',       color: '#0ea5e9' },
-  { type: 'deep_research', title: 'Deep Research', icon: '\uD83D\uDD2C',      color: '#7c3aed' },
-  { type: 'inquiry',     title: 'Inquiry',        icon: '\uD83D\uDD2E',       color: '#06b6d4' },
-  { type: 'agent_queue', title: 'Agent Queue',    icon: '\u26A1',             color: '#eab308' },
-  { type: 'highlights',  title: 'Highlights',     icon: '\u2B50',             color: '#fbbf24' },
-  { type: 'summary',     title: 'Summary',        icon: '\uD83D\uDCCB',       color: '#f59e0b' },
-  { type: 'trash',       title: 'Trash',          icon: '\uD83D\uDDD1\uFE0F', color: '#6b7280' },
+  { type: 'transcript',    title: 'Transcript',    icon: 'transcript',    color: '#ef4444' },
+  { type: 'notes',        title: 'Notes',         icon: 'notes',         color: '#8b9cf6' },
+  { type: 'context',      title: 'Context',       icon: 'context',       color: '#10b981' },
+  { type: 'observations', title: 'Observations',  icon: 'observations',  color: '#6366f1' },
+  { type: 'concepts',     title: 'Key Concepts',  icon: 'concepts',      color: '#8b5cf6' },
+  { type: 'ideas',       title: 'Ideas',         icon: 'ideas',         color: '#a855f7' },
+  { type: 'questions',   title: 'Questions',      icon: 'questions',     color: '#ec4899' },
+  { type: 'claims',      title: 'Claims',         icon: 'claims',        color: '#14b8a6' },
+  { type: 'gaps',        title: 'Gaps & Risks',   icon: 'gaps',          color: '#f97316' },
+  { type: 'actions',     title: 'Actions',        icon: 'actions',       color: '#22c55e' },
+  { type: 'alternatives', title: 'Alternatives',  icon: 'alternatives',  color: '#0ea5e9' },
+  { type: 'deep_research', title: 'Deep Research', icon: 'deep_research', color: '#7c3aed' },
+  { type: 'inquiry',     title: 'Inquiry',        icon: 'inquiry',       color: '#06b6d4' },
+  { type: 'agent_queue', title: 'Agent Queue',    icon: 'agent_queue',   color: '#eab308' },
+  { type: 'highlights',  title: 'Highlights',     icon: 'highlights',    color: '#fbbf24' },
+  { type: 'summary',     title: 'Summary',        icon: 'summary',       color: '#f59e0b' },
+  { type: 'trash',       title: 'Trash',          icon: 'trash',         color: '#6b7280' },
 ] as const;
 
 /** Column types excluding Trash — used for agent target-column pickers. */

@@ -69,6 +69,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // File processing (Context column)
     processContextFile: () => ipcRenderer.invoke('file:processContextFile'),
 
+    // Session Templates
+    getSessionTemplates: () => ipcRenderer.invoke('db:getSessionTemplates'),
+    saveSessionTemplate: (template: any) => ipcRenderer.invoke('db:saveSessionTemplate', template),
+    deleteSessionTemplate: (id: string) => ipcRenderer.invoke('db:deleteSessionTemplate', id),
+
     // Agent Configuration
     getAgentConfigs: () => ipcRenderer.invoke('db:getAgentConfigs'),
     saveAgentConfig: (agentId: string, config: any) =>

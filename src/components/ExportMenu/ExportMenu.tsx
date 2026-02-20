@@ -1,4 +1,5 @@
 import { useSessionStore } from '@/store/session';
+import { SvgIcon } from '@/components/Icons';
 import {
   exportSessionToFile,
   exportSessionToFileCompact,
@@ -36,7 +37,7 @@ export default function ExportMenu({ onClose }: ExportMenuProps) {
 
   const opts: { icon: string; label: string; desc: string; fn: () => void }[] = [
     {
-      icon: '\uD83D\uDCBE',
+      icon: 'json',
       label: 'Save as JSON (full data, re-importable)',
       desc: 'Complete session data including all cards, columns, agent tasks, and metadata. Can be imported back.',
       fn: () => {
@@ -45,7 +46,7 @@ export default function ExportMenu({ onClose }: ExportMenuProps) {
       },
     },
     {
-      icon: '\uD83D\uDCE6',
+      icon: 'package',
       label: 'Save as JSON (compact, re-importable)',
       desc: 'Smaller version keeping just the processed transcript and all other cards. Discards the original raw transcript segments used during processing.',
       fn: () => {
@@ -54,7 +55,7 @@ export default function ExportMenu({ onClose }: ExportMenuProps) {
       },
     },
     {
-      icon: '\uD83D\uDCDD',
+      icon: 'markdown',
       label: 'Export as Markdown',
       desc: 'Human-readable document with all columns and cards.',
       fn: () => {
@@ -63,7 +64,7 @@ export default function ExportMenu({ onClose }: ExportMenuProps) {
       },
     },
     {
-      icon: '\uD83D\uDCCA',
+      icon: 'csv',
       label: 'Export as CSV',
       desc: 'Spreadsheet-compatible tabular format.',
       fn: () => {
@@ -72,7 +73,7 @@ export default function ExportMenu({ onClose }: ExportMenuProps) {
       },
     },
     {
-      icon: '\uD83C\uDF10',
+      icon: 'html',
       label: 'Export as HTML',
       desc: 'Self-contained styled HTML file with dark/light mode support.',
       fn: () => {
@@ -81,7 +82,7 @@ export default function ExportMenu({ onClose }: ExportMenuProps) {
       },
     },
     {
-      icon: '\uD83D\uDC8E',
+      icon: 'obsidian',
       label: 'Export for Obsidian',
       desc: 'Markdown with YAML frontmatter, [[wiki-links]], and #tags.',
       fn: () => {
@@ -90,7 +91,7 @@ export default function ExportMenu({ onClose }: ExportMenuProps) {
       },
     },
     {
-      icon: '\uD83D\uDCCB',
+      icon: 'copy-all',
       label: 'Copy all to clipboard',
       desc: 'Plain text of all cards, grouped by column.',
       fn: () => {
@@ -152,7 +153,7 @@ export default function ExportMenu({ onClose }: ExportMenuProps) {
             className="mb-1.5 block w-full cursor-pointer rounded-lg border border-wall-muted bg-wall-border p-3 text-left hover:bg-wall-muted"
           >
             <div className="text-[13px] font-semibold text-wall-text">
-              {o.icon} {o.label}
+              <span className="flex items-center gap-2"><SvgIcon name={o.icon} size={15} />{o.label}</span>
             </div>
             <div className="mt-0.5 text-[11px] text-wall-text-dim">{o.desc}</div>
           </button>

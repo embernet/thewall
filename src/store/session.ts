@@ -84,6 +84,7 @@ export interface SessionState {
   setSpeakerColors: (colors: Record<string, string>) => void;
   setSaveStatus: (status: SaveStatus) => void;
   setQueuePaused: (reason: QueuePauseReason) => void;
+  setEnabledAgentIds: (ids: string[] | null) => void;
   goToLauncher: () => void;
 }
 
@@ -184,6 +185,13 @@ export const useSessionStore = create<SessionState>()(temporal((set, get) => ({
       session: state.session ? { ...state.session, mode } : state.session,
     }));
     bus.emit('session:modeChanged', { mode });
+  },
+
+  // ── SET_ENABLED_AGENT_IDS ──
+  setEnabledAgentIds: (ids) => {
+    set((state) => ({
+      session: state.session ? { ...state.session, enabledAgentIds: ids } : state.session,
+    }));
   },
 
   // ── ADD_CARD ──

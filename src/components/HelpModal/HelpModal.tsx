@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { SvgIcon } from '@/components/Icons';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -32,7 +33,7 @@ export default function HelpModal({ open, onClose }: HelpModalProps) {
   const sections: HelpSection[] = [
     {
       id: 'getting-started',
-      icon: '🚀',
+      icon: 'getting-started',
       title: 'Getting Started',
       content: (
         <div className="space-y-4">
@@ -48,7 +49,7 @@ export default function HelpModal({ open, onClose }: HelpModalProps) {
           <Section title="2. Start a session">
             <p>From the launcher, choose one of three options:</p>
             <ul className="mt-1 list-disc pl-4 space-y-1">
-              <li><strong>New Session</strong> — blank workspace, or pick a template</li>
+              <li><strong>New Session</strong> — blank workspace, or pick a quick start template</li>
               <li><strong>Recent Sessions</strong> — reopen a previous session</li>
               <li><strong>Simulate Meeting</strong> — generate an AI-driven mock meeting</li>
             </ul>
@@ -56,21 +57,75 @@ export default function HelpModal({ open, onClose }: HelpModalProps) {
           <Section title="3. Choose a mode">
             <p>Select your operating mode in the top bar:</p>
             <ul className="mt-1 list-disc pl-4 space-y-1">
-              <li><strong>Silent</strong> — agents analyse quietly in the background</li>
-              <li><strong>Active</strong> — agents are more proactive and structured</li>
-              <li><strong>Sidekick</strong> — optimised for 1:1 collaboration</li>
+              <li><strong>Silent</strong> — agents only run when explicitly triggered via Chat; no automatic dispatch on transcript</li>
+              <li><strong>Active</strong> — agents auto-run on transcript with fast dispatch (3s); most proactive mode</li>
+              <li><strong>Sidekick</strong> — agents auto-run with a gentler pace (6s debounce); optimised for 1:1 collaboration</li>
             </ul>
+            <p className="mt-1 text-wall-text-dim text-[11px]">
+              You can switch modes at any time. Switching to Silent immediately stops the auto-dispatch pipeline.
+            </p>
           </Section>
           <Section title="4. Add content">
             <p>Type notes, record audio, or paste text into any column. AI agents will automatically
-            begin analysing and generating insight cards across the other columns.</p>
+            begin analysing and generating insight cards across the other columns (unless in Silent mode).</p>
+          </Section>
+        </div>
+      ),
+    },
+    {
+      id: 'templates',
+      icon: 'templates',
+      title: 'Session Templates',
+      content: (
+        <div className="space-y-4">
+          <p className="text-[13px] leading-relaxed text-wall-text">
+            Templates pre-configure your session for a specific use case — selecting the right agents,
+            columns, mode, and AI guidance so you can get started immediately.
+          </p>
+          <Section title="Built-in templates">
+            <ul className="list-disc pl-4 space-y-1">
+              <li><strong>🧠 Brainstorming</strong> — idea generation, pattern finding, creative exploration</li>
+              <li><strong>🔬 Research</strong> — deep research, claim verification, evidence gathering</li>
+              <li><strong>⚖️ Decision Making</strong> — trade-off analysis, risk assessment, structured evaluation</li>
+              <li><strong>🔄 Retrospective</strong> — pattern recognition, gap analysis, actionable improvements</li>
+              <li><strong>🎤 Interview</strong> — question generation, claim tracking, insight extraction</li>
+              <li><strong>🗺️ Strategy</strong> — visionary thinking, constraint mapping, strategic planning</li>
+            </ul>
+          </Section>
+          <Section title="Session goal">
+            <p>Each template includes a <strong>Session Goal</strong> input where you can describe the specific
+            context or objective for this session. This goal is provided to both the AI agents and the
+            Chat panel, so the AI tailors its responses to your needs.</p>
+          </Section>
+          <Section title="Template details">
+            <p>When you select a template, a detail panel shows:</p>
+            <ul className="mt-1 list-disc pl-4 space-y-1">
+              <li>The default mode (silent / active / sidekick)</li>
+              <li>How many agents and columns are enabled</li>
+              <li>A goal input with a contextual placeholder</li>
+            </ul>
+          </Section>
+          <Section title="Custom templates">
+            <p>Click <strong>+ Create Custom Template</strong> in the launcher to build your own. You can configure:</p>
+            <ul className="mt-1 list-disc pl-4 space-y-1">
+              <li>Name, icon, and description</li>
+              <li>Which agents are enabled (multi-select from all 35 built-in agents)</li>
+              <li>Which columns are visible</li>
+              <li>Default operating mode</li>
+              <li>System prompt that guides the AI&rsquo;s behaviour</li>
+              <li>Goal placeholder text</li>
+            </ul>
+            <p className="mt-1 text-wall-text-dim text-[11px]">
+              Custom templates are saved locally and appear alongside the built-in templates.
+              Hover over a custom template to reveal edit and delete controls.
+            </p>
           </Section>
         </div>
       ),
     },
     {
       id: 'columns',
-      icon: '📋',
+      icon: 'columns',
       title: 'Columns',
       content: (
         <div className="space-y-3">
@@ -78,40 +133,47 @@ export default function HelpModal({ open, onClose }: HelpModalProps) {
             The workspace is divided into columns, each focused on a different type of insight.
             Toggle columns on/off in the left sidebar.
           </p>
-          <ColRow icon="🎙️" name="Transcript" desc="Live transcription with speaker diarisation. Record audio or type manually with speaker tagging." />
-          <ColRow icon="📝" name="Notes" desc="Manual and agent-generated notes and observations." />
-          <ColRow icon="💡" name="Concepts" desc="Key themes, ideas, and patterns extracted from the conversation." />
-          <ColRow icon="🌟" name="Ideas" desc="Cross-referenced actionable ideas generated by the Idea Generator agent." />
-          <ColRow icon="❓" name="Questions" desc="Probing questions to deepen understanding and surface ambiguity." />
-          <ColRow icon="⚖️" name="Claims" desc="Assertions, facts, and counter-arguments with source links." />
-          <ColRow icon="🔍" name="Gaps & Risks" desc="Missing information, unstated assumptions, blind spots, and failure modes." />
-          <ColRow icon="🔀" name="Alternatives" desc="Alternative approaches and options to consider." />
-          <ColRow icon="✅" name="Actions" desc="Extracted action items and decisions with owners." />
-          <ColRow icon="⭐" name="Highlights" desc="Cards flagged by you or the AI. Filter by User, AI, or Both." />
-          <ColRow icon="📁" name="Context" desc="Reference documents, PDFs, and background material for the AI to use." />
-          <ColRow icon="🔬" name="Deep Research" desc="Researcher agent output from web searches and retrieval." />
-          <ColRow icon="🤖" name="Agent Queue" desc="Live view of queued, running, and completed agent tasks with controls." />
-          <ColRow icon="🗑️" name="Trash" desc="Deleted cards. Drag back to restore, or empty the trash." />
-          <ColRow icon="📊" name="Summary" desc="Auto-generated summaries for each column using customisable prompts." />
+          <ColRow icon="transcript" name="Transcript" desc="Live transcription with speaker diarisation. Record audio or type manually with speaker tagging. Supports card splitting and renumbering." />
+          <ColRow icon="notes" name="Notes" desc="Manual and agent-generated notes and observations." />
+          <ColRow icon="concepts" name="Concepts" desc="Key themes, ideas, and patterns extracted from the conversation." />
+          <ColRow icon="ideas" name="Ideas" desc="Cross-referenced actionable ideas generated by the Idea Generator agent." />
+          <ColRow icon="questions" name="Questions" desc="Probing questions to deepen understanding and surface ambiguity." />
+          <ColRow icon="claims" name="Claims" desc="Assertions, facts, and counter-arguments with source links." />
+          <ColRow icon="gaps" name="Gaps & Risks" desc="Missing information, unstated assumptions, blind spots, and failure modes." />
+          <ColRow icon="alternatives" name="Alternatives" desc="Alternative approaches and options to consider." />
+          <ColRow icon="actions" name="Actions" desc="Extracted action items and decisions with owners." />
+          <ColRow icon="highlights" name="Highlights" desc="Cards flagged by you or the AI. Filter by User, AI, or Both." />
+          <ColRow icon="context" name="Context" desc="Reference documents, PDFs, and background material for the AI to use." />
+          <ColRow icon="summary" name="Summary" desc="Auto-generated per-column summaries with configurable prompts and change tracking." />
+          <ColRow icon="deep_research" name="Deep Research" desc="Researcher agent output from web searches and retrieval." />
+          <ColRow icon="agent_queue" name="Agent Queue" desc="Live view of queued, running, and completed agent tasks with controls." />
+          <ColRow icon="trash" name="Trash" desc="Deleted cards. Drag back to restore, or empty the trash." />
           <Section title="Managing columns">
             <ul className="list-disc pl-4 space-y-1">
               <li>Toggle visibility in the <strong>left sidebar</strong></li>
               <li>Reorder by dragging in the sidebar</li>
               <li>Collapse/expand individual columns with the arrow button in their header</li>
+              <li>Each column header shows a <strong>filtered/total card count</strong> when filters are active</li>
+              <li>Use the <strong>Copy</strong> and <strong>JSON</strong> buttons in the column header to export column contents</li>
             </ul>
+          </Section>
+          <Section title="Per-column agent filter">
+            <p>Click the agent filter icon in a column header to choose which agents&rsquo; cards are shown.
+            This lets you focus on specific types of output within a column without hiding the column entirely.</p>
           </Section>
         </div>
       ),
     },
     {
       id: 'cards',
-      icon: '🃏',
+      icon: 'cards',
       title: 'Cards',
       content: (
         <div className="space-y-4">
           <p className="text-[13px] leading-relaxed text-wall-text">
             Cards are the core unit of content. Each card has a source (Transcript, User, Agent, or Chat),
-            optional speaker attribution, timestamps, and links back to the cards that inspired it.
+            optional speaker attribution, timestamps, a sequential card number, and links back to the cards
+            that inspired it. Agent-generated cards display the <strong>agent name</strong> at the top.
           </p>
           <Section title="Card actions">
             <p>Hover over a card to reveal its action bar:</p>
@@ -122,6 +184,8 @@ export default function HelpModal({ open, onClose }: HelpModalProps) {
               <li><strong>Highlight</strong> — flag the card (cycles: none → user → AI → both)</li>
               <li><strong>Find Related</strong> — semantically search for similar cards</li>
               <li><strong>Link</strong> — create a source link to another card</li>
+              <li><strong>Split</strong> — split a long card into multiple cards at natural breakpoints</li>
+              <li><strong>Renumber</strong> — renumber cards in the column sequentially</li>
               <li><strong>Delete</strong> — move to Trash</li>
             </ul>
           </Section>
@@ -142,14 +206,31 @@ export default function HelpModal({ open, onClose }: HelpModalProps) {
     },
     {
       id: 'agents',
-      icon: '🤖',
+      icon: 'agents',
       title: 'AI Agents',
       content: (
         <div className="space-y-4">
           <p className="text-[13px] leading-relaxed text-wall-text">
             35 built-in AI agents analyse your content and generate insight cards automatically.
             Agents are triggered by new transcript segments, card creation, or on a timer.
+            The operating mode controls how and when agents are dispatched.
           </p>
+          <Section title="Mode-based dispatch">
+            <ul className="list-disc pl-4 space-y-1">
+              <li><strong>Silent</strong> — agents do not auto-dispatch; only triggered explicitly via Chat commands</li>
+              <li><strong>Active</strong> — agents auto-dispatch 3 seconds after new transcript content</li>
+              <li><strong>Sidekick</strong> — agents auto-dispatch 6 seconds after new transcript content</li>
+            </ul>
+            <p className="mt-1 text-wall-text-dim text-[11px]">
+              Templates can pre-set the mode, and switching to Silent mid-session flushes the pending transcript buffer.
+            </p>
+          </Section>
+          <Section title="Session agent filtering">
+            <p>When you start a session from a template, only the agents specified by that template
+            are active. The top bar shows an <strong>agent count badge</strong> (e.g. &ldquo;12 agents&rdquo;) when a
+            template constrains the agent set. You can view which agents are active in the
+            Agent Configuration → Column Matrix tab using the <strong>Session Enabled</strong> filter.</p>
+          </Section>
           <Section title="Managing agents">
             <ul className="list-disc pl-4 space-y-1">
               <li>Enable/disable individual agents in the <strong>left sidebar → Agents tab</strong></li>
@@ -157,6 +238,13 @@ export default function HelpModal({ open, onClose }: HelpModalProps) {
               <li>Click <Kbd>🤖</Kbd> in the top bar to open the Agent Configuration panel</li>
               <li>Pause/resume the entire agent queue with the <Kbd>⏸ Pause Queue</Kbd> button</li>
             </ul>
+          </Section>
+          <Section title="Agent-Column Matrix">
+            <p>Open Agent Configuration → <strong>Column Matrix</strong> tab to see a grid of all agents
+            vs all columns. Click any cell to reassign which column an agent outputs to.</p>
+            <p className="mt-1">When a session is active with template constraints, use the
+            <strong> All / Session Enabled</strong> filter toggle to show only the agents and columns
+            active in the current session.</p>
           </Section>
           <Section title="Agent Queue column">
             <p>The Agent Queue column shows all running and queued tasks. For each task you can:</p>
@@ -180,7 +268,7 @@ export default function HelpModal({ open, onClose }: HelpModalProps) {
     },
     {
       id: 'transcript',
-      icon: '🎙️',
+      icon: 'transcript',
       title: 'Transcript & Audio',
       content: (
         <div className="space-y-4">
@@ -199,7 +287,15 @@ export default function HelpModal({ open, onClose }: HelpModalProps) {
             <ul className="list-disc pl-4 space-y-1">
               <li>Click the speaker colour dot on a transcript card to assign a speaker name</li>
               <li>Each speaker gets a unique colour for easy visual identification</li>
-              <li>Speaker names appear as coloured badges on cards</li>
+              <li>Speaker names and colours are persisted with the session</li>
+              <li>Manage speakers from the Transcript column header controls</li>
+            </ul>
+          </Section>
+          <Section title="Card splitting & renumbering">
+            <ul className="list-disc pl-4 space-y-1">
+              <li><strong>Split</strong> — break a long transcript card into shorter segments at natural breakpoints</li>
+              <li><strong>Renumber</strong> — re-sequence card numbers after splits, edits, or reordering</li>
+              <li>Card numbers appear on each card for easy reference in discussions</li>
             </ul>
           </Section>
           <Section title="Type-to-transcribe">
@@ -218,7 +314,7 @@ export default function HelpModal({ open, onClose }: HelpModalProps) {
     },
     {
       id: 'chat',
-      icon: '💬',
+      icon: 'chat',
       title: 'Chat / Inquiry',
       content: (
         <div className="space-y-4">
@@ -235,9 +331,19 @@ export default function HelpModal({ open, onClose }: HelpModalProps) {
               <li>Responses appear as cards with source links to the cards they drew from</li>
             </ul>
           </Section>
+          <Section title="Session context">
+            <p>When a session is started from a template, the Chat automatically incorporates
+            the template&rsquo;s <strong>system prompt</strong> and your <strong>session goal</strong> into
+            its responses, ensuring the AI stays focused on your objectives.</p>
+          </Section>
+          <Section title="Chat history">
+            <p>Chat history is persisted per session. Each message has individual controls for
+            copying, editing, and deletion. Your conversation picks up where you left off when
+            you reopen a session.</p>
+          </Section>
           <Section title="Context scope">
             <p>The chat uses all non-deleted cards in the current session as context.
-            The most semantically relevant cards are selected to fit within the model's
+            The most semantically relevant cards are selected to fit within the model&rsquo;s
             context window.</p>
           </Section>
         </div>
@@ -245,7 +351,7 @@ export default function HelpModal({ open, onClose }: HelpModalProps) {
     },
     {
       id: 'knowledge-graph',
-      icon: '🕸️',
+      icon: 'knowledge-graph',
       title: 'Knowledge Graph',
       content: (
         <div className="space-y-4">
@@ -267,6 +373,15 @@ export default function HelpModal({ open, onClose }: HelpModalProps) {
           <Section title="Edge types">
             <p>Relationships between nodes: Related To, Supports, Contradicts, Depends On, Part Of, Derived From.</p>
           </Section>
+          <Section title="Graph toolbar">
+            <p>The toolbar above the graph provides controls for:</p>
+            <ul className="mt-1 list-disc pl-4 space-y-1">
+              <li><strong>Display modes</strong> — switch between force-directed, radial, and hierarchical layouts</li>
+              <li><strong>Labels toggle</strong> — show or hide node labels for a cleaner view</li>
+              <li><strong>Physics toggle</strong> — freeze the simulation to manually position nodes, or re-enable to let them settle</li>
+              <li><strong>Node spacing</strong> — adjust the repulsion force to spread nodes apart or bring them closer</li>
+            </ul>
+          </Section>
           <Section title="Interaction">
             <ul className="list-disc pl-4 space-y-1">
               <li>Drag nodes to rearrange the layout</li>
@@ -279,7 +394,7 @@ export default function HelpModal({ open, onClose }: HelpModalProps) {
     },
     {
       id: 'search',
-      icon: '🔍',
+      icon: 'search',
       title: 'Search',
       content: (
         <div className="space-y-4">
@@ -294,7 +409,8 @@ export default function HelpModal({ open, onClose }: HelpModalProps) {
             </p>
           </Section>
           <Section title="Per-column search">
-            <p>Click the <Kbd>🔍</Kbd> icon in any column header to filter cards within that column by text.</p>
+            <p>Click the <Kbd>🔍</Kbd> icon in any column header to filter cards within that column by text.
+            The column badge updates to show the filtered count vs total.</p>
           </Section>
           <Section title="Find Related">
             <p>Right-click any card or use its action menu → <strong>Find Related</strong> to semantically
@@ -305,7 +421,7 @@ export default function HelpModal({ open, onClose }: HelpModalProps) {
     },
     {
       id: 'export',
-      icon: '📤',
+      icon: 'export',
       title: 'Export',
       content: (
         <div className="space-y-4">
@@ -321,6 +437,9 @@ export default function HelpModal({ open, onClose }: HelpModalProps) {
               <li><strong>HTML</strong> — styled web page</li>
               <li><strong>Obsidian</strong> — wiki-link format for Obsidian vaults</li>
             </ul>
+            <p className="mt-1 text-wall-text-dim text-[11px]">
+              Agent names appear at the front of exported card text for clear attribution.
+            </p>
           </Section>
           <Section title="Quick save">
             <p>Click <Kbd>💾</Kbd> in the top bar to instantly save a JSON snapshot to disk.</p>
@@ -338,7 +457,7 @@ export default function HelpModal({ open, onClose }: HelpModalProps) {
     },
     {
       id: 'settings',
-      icon: '⚙️',
+      icon: 'settings',
       title: 'Settings',
       content: (
         <div className="space-y-4">
@@ -353,7 +472,7 @@ export default function HelpModal({ open, onClose }: HelpModalProps) {
               <li><strong>Transcription</strong> — OpenAI Whisper</li>
               <li><strong>Image Generation</strong> — DALL-E or Flux</li>
             </ul>
-            <p className="mt-1 text-wall-text-dim text-[11px]">All keys are stored encrypted in your local SQLite database.</p>
+            <p className="mt-1 text-wall-text-dim text-[11px]">All keys are stored encrypted in your local SQLite database. Available models are fetched dynamically from each provider&rsquo;s API.</p>
           </Section>
           <Section title="Summaries tab">
             <p>Customise the AI prompts used to generate column summaries. Each column type
@@ -367,12 +486,16 @@ export default function HelpModal({ open, onClose }: HelpModalProps) {
             <p>Click <Kbd>💰</Kbd> in the top bar to view your API usage and estimated costs
             broken down by provider and model.</p>
           </Section>
+          <Section title="Appearance">
+            <p>Switch between <strong>light and dark themes</strong> from the settings panel or status bar.
+            The interface uses SVG icons for crisp rendering at all sizes.</p>
+          </Section>
         </div>
       ),
     },
     {
       id: 'simulation',
-      icon: '🎭',
+      icon: 'simulation',
       title: 'Meeting Simulation',
       content: (
         <div className="space-y-4">
@@ -395,14 +518,15 @@ export default function HelpModal({ open, onClose }: HelpModalProps) {
           </Section>
           <Section title="During simulation">
             <p>The simulation status appears in the top bar. Click <Kbd>Stop</Kbd> to end it early.
-            AI agents analyse the transcript in real time as the conversation progresses.</p>
+            AI agents analyse the transcript in real time as the conversation progresses.
+            Simulations run in Active mode for maximum agent responsiveness.</p>
           </Section>
         </div>
       ),
     },
     {
       id: 'shortcuts',
-      icon: '⌨️',
+      icon: 'shortcuts',
       title: 'Keyboard Shortcuts',
       content: (
         <div className="space-y-4">
@@ -438,7 +562,7 @@ export default function HelpModal({ open, onClose }: HelpModalProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
       <div
         className="flex overflow-hidden rounded-xl border border-wall-border bg-wall-surface shadow-2xl"
-        style={{ width: 780, height: 560 }}
+        style={{ width: 780, height: 600 }}
       >
         {/* ── Sidebar nav ── */}
         <div className="flex w-[200px] shrink-0 flex-col border-r border-wall-border bg-wall-bg/50">
@@ -466,7 +590,7 @@ export default function HelpModal({ open, onClose }: HelpModalProps) {
                     : 'bg-transparent text-wall-text-dim hover:bg-wall-border hover:text-wall-text'
                 }`}
               >
-                <span className="text-[13px]">{s.icon}</span>
+                <SvgIcon name={s.icon} size={13} className="shrink-0" />
                 {s.title}
               </button>
             ))}
@@ -477,7 +601,7 @@ export default function HelpModal({ open, onClose }: HelpModalProps) {
         <div className="flex flex-1 flex-col overflow-hidden">
           <div className="flex items-center justify-between border-b border-wall-border px-5 py-3.5">
             <h2 className="text-[14px] font-bold text-wall-text">
-              {active.icon} {active.title}
+              <span className="flex items-center gap-2"><SvgIcon name={active.icon} size={15} />{active.title}</span>
             </h2>
             <button
               onClick={onClose}
@@ -512,7 +636,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function ColRow({ icon, name, desc }: { icon: string; name: string; desc: string }) {
   return (
     <div className="flex items-start gap-2.5">
-      <span className="shrink-0 text-[14px] leading-5">{icon}</span>
+      <SvgIcon name={icon} size={14} className="shrink-0 mt-0.5" />
       <div>
         <span className="text-[12px] font-semibold text-wall-text">{name}</span>
         <span className="ml-1.5 text-[11px] text-wall-text-dim">{desc}</span>

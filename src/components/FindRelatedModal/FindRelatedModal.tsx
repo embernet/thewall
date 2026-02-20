@@ -6,6 +6,7 @@ import { useSessionStore } from '@/store/session';
 import { embed, searchSimilar, blobToVector } from '@/utils/embedding-service';
 import type { EmbeddingVector } from '@/utils/embedding-service';
 import { getNodes, getEdges } from '@/graph/graph-service';
+import { SvgIcon } from '@/components/Icons';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -387,6 +388,7 @@ export default function FindRelatedView({ open, initialCard, onClose, onNavigate
                   badgeColor="#6366f1"
                   columnName={getColumnName(r.card.columnId)}
                   columnIcon={colMap.get(r.card.columnId)?.icon}
+                  columnColor={colMap.get(r.card.columnId)?.color}
                   onClick={() => navigateToFocus(r.card, history.length === 0)}
                   onNavigate={onNavigate}
                 />
@@ -468,6 +470,7 @@ export default function FindRelatedView({ open, initialCard, onClose, onNavigate
                       badgeColor="#6366f1"
                       columnName={getColumnName(r.card.columnId)}
                       columnIcon={colMap.get(r.card.columnId)?.icon}
+                      columnColor={colMap.get(r.card.columnId)?.color}
                       onClick={() => navigateToFocus(r.card)}
                       onNavigate={onNavigate}
                     />
@@ -503,6 +506,7 @@ export default function FindRelatedView({ open, initialCard, onClose, onNavigate
                       badgeColor="#a855f7"
                       columnName={getColumnName(r.card.columnId)}
                       columnIcon={colMap.get(r.card.columnId)?.icon}
+                      columnColor={colMap.get(r.card.columnId)?.color}
                       onClick={() => navigateToFocus(r.card)}
                       onNavigate={onNavigate}
                     />
@@ -569,6 +573,7 @@ function CardRow({
   badgeColor,
   columnName,
   columnIcon,
+  columnColor,
   onClick,
   onNavigate,
 }: {
@@ -577,6 +582,7 @@ function CardRow({
   badgeColor: string;
   columnName: string;
   columnIcon?: string;
+  columnColor?: string;
   onClick: () => void;
   onNavigate?: (cardId: string) => void;
 }) {
@@ -586,7 +592,7 @@ function CardRow({
       onClick={onClick}
     >
       {columnIcon && (
-        <span className="text-[11px] mt-0.5 shrink-0">{columnIcon}</span>
+        <SvgIcon name={columnIcon} size={14} className="mt-0.5 shrink-0" style={{ color: columnColor || '#64748b' }} />
       )}
       <div className="flex-1 min-w-0">
         <div className="card-markdown text-[11px] text-wall-text leading-snug break-words line-clamp-2">

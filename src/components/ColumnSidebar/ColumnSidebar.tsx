@@ -5,6 +5,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import type { Column, AgentConfigOverride } from '@/types';
 import { COL_TYPES } from '@/types';
+import { SvgIcon } from '@/components/Icons';
 import AgentsTab from './AgentsTab';
 
 type SidebarTab = 'columns' | 'agents';
@@ -25,6 +26,8 @@ interface ColumnSidebarProps {
   onConcurrencyChange: (n: number) => void;
 }
 
+type ViewFilter = 'all' | 'selected';
+
 const ColumnSidebar: React.FC<ColumnSidebarProps> = ({
   columns,
   open,
@@ -37,6 +40,7 @@ const ColumnSidebar: React.FC<ColumnSidebarProps> = ({
   onConcurrencyChange,
 }) => {
   const [activeTab, setActiveTab] = useState<SidebarTab>('columns');
+  const [viewFilter, setViewFilter] = useState<ViewFilter>('selected');
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [dropIdx, setDropIdx] = useState<number | null>(null);
   const dragRef = useRef<number | null>(null);
@@ -120,8 +124,19 @@ const ColumnSidebar: React.FC<ColumnSidebarProps> = ({
     <div className="flex h-full w-[200px] min-w-[200px] flex-col border-r border-wall-border bg-wall-surface">
       {/* ── Header with title + tabs ── */}
       <div className="flex shrink-0 flex-col border-b border-wall-border">
-        <div className="px-2 pt-1.5 pb-0">
+        <div className="flex items-center justify-between px-2 pt-1.5 pb-0">
           <span className="text-[9px] font-bold uppercase tracking-widest text-wall-subtle">Tools</span>
+          <button
+            onClick={() => setViewFilter(v => v === 'all' ? 'selected' : 'all')}
+            className="cursor-pointer rounded-md border border-wall-muted px-1.5 py-px text-[8px] font-semibold transition-colors"
+            style={{
+              background: viewFilter === 'selected' ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
+              color: viewFilter === 'selected' ? '#a5b4fc' : 'var(--wall-text-dim-hex)',
+            }}
+            title={viewFilter === 'all' ? 'Show only enabled items' : 'Show all items'}
+          >
+            {viewFilter === 'all' ? 'All' : 'Active'}
+          </button>
         </div>
         <div className="flex items-center justify-between px-1 pb-1 pt-0.5">
         <div className="flex gap-0.5">
@@ -164,7 +179,7 @@ const ColumnSidebar: React.FC<ColumnSidebarProps> = ({
           className="flex-1 overflow-auto px-1 py-1"
           style={{ scrollbarWidth: 'thin', scrollbarColor: 'var(--scrollbar-thumb) transparent' }}
         >
-          {sorted.map((col, idx) => {
+          {sorted.filter(col => viewFilter === 'all' || col.visible).map((col, idx) => {
             const meta = getMeta(col);
             const isDragging = dragIdx === idx;
             const isDropTarget = dropIdx === idx;
@@ -200,7 +215,7 @@ const ColumnSidebar: React.FC<ColumnSidebarProps> = ({
                 />
 
                 {/* Icon + title */}
-                <span className="text-[11px]">{meta.icon}</span>
+                <SvgIcon name={meta.icon} size={12} style={{ color: meta.color }} />
                 <span
                   className="min-w-0 flex-1 truncate text-[10px]"
                   style={{
@@ -221,6 +236,7 @@ const ColumnSidebar: React.FC<ColumnSidebarProps> = ({
             onToggleAgent={onToggleAgent}
             concurrency={concurrency}
             onConcurrencyChange={onConcurrencyChange}
+            viewFilter={viewFilter}
           />
         </div>
       )}

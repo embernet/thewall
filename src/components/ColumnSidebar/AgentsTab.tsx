@@ -5,6 +5,7 @@
 import React, { useMemo, useCallback, useState } from 'react';
 import { agentRegistry } from '@/agents/registry';
 import { COL_TYPES } from '@/types';
+import { SvgIcon } from '@/components/Icons';
 import type { AgentConfigOverride } from '@/types';
 
 interface AgentsTabProps {
@@ -12,6 +13,8 @@ interface AgentsTabProps {
   onToggleAgent: (agentId: string, enabled: boolean) => void;
   concurrency: number;
   onConcurrencyChange: (n: number) => void;
+  /** When 'selected', only show enabled agents. */
+  viewFilter?: 'all' | 'selected';
 }
 
 /** Badge for agent type: 1st-pass, 2nd-pass, utility */
@@ -95,6 +98,7 @@ const AgentsTab: React.FC<AgentsTabProps> = ({
   onToggleAgent,
   concurrency,
   onConcurrencyChange,
+  viewFilter = 'all',
 }) => {
   const [expandedAgent, setExpandedAgent] = useState<string | null>(null);
 
@@ -168,11 +172,15 @@ const AgentsTab: React.FC<AgentsTabProps> = ({
         {grouped.map(([colType, agents]) => {
           const meta = getColMeta(colType);
           const enabled = enabledCount(agents);
+          const visibleAgents = viewFilter === 'selected'
+            ? agents.filter(a => isEnabled(a.id))
+            : agents;
+          if (visibleAgents.length === 0) return null;
           return (
             <div key={colType} className="mb-1.5">
               {/* Group header */}
               <div className="flex items-center gap-1 px-1.5 py-1">
-                <span className="text-[10px]">{meta.icon}</span>
+                <SvgIcon name={meta.icon} size={11} style={{ color: meta.color }} />
                 <span className="text-[9px] font-semibold text-wall-subtle">
                   {meta.title}
                 </span>
@@ -182,7 +190,7 @@ const AgentsTab: React.FC<AgentsTabProps> = ({
               </div>
 
               {/* Agent rows */}
-              {agents.map(agent => {
+              {visibleAgents.map(agent => {
                 const enabled = isEnabled(agent.id);
                 const isExpanded = expandedAgent === agent.id;
                 return (

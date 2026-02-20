@@ -220,6 +220,16 @@ export default function TopBar({
         ))}
       </div>
 
+      {/* ── Session agent filter badge ── */}
+      {session.enabledAgentIds && session.enabledAgentIds.length > 0 && (
+        <span
+          className="rounded-full bg-cyan-500/20 px-1.5 py-0.5 text-[8px] font-medium text-cyan-300"
+          title={`Session has ${session.enabledAgentIds.length} agents enabled (template-configured)`}
+        >
+          {session.enabledAgentIds.length} agents
+        </span>
+      )}
+
       {/* ── Sim status ── */}
       {simRunning && (
         <div className="flex items-center gap-1 rounded-md border border-red-900/30 bg-red-900/10 px-[7px] py-0.5">

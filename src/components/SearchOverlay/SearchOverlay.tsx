@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import { useSessionStore } from '@/store/session';
 import { COL_TYPES } from '@/types';
 import type { Card } from '@/types';
+import { SvgIcon } from '@/components/Icons';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -153,7 +154,7 @@ const SearchOverlay: React.FC<SearchOverlayProps> = ({ open, onClose, onNavigate
                   i === selected ? 'bg-indigo-900/40' : 'bg-transparent hover:bg-wall-border/50'
                 }`}
               >
-                <span className="mt-0.5 text-sm shrink-0">{col?.icon || '\uD83D\uDCCC'}</span>
+                <SvgIcon name={col?.icon || 'pin'} size={14} className="mt-0.5 shrink-0" style={{ color: col?.color || '#64748b' }} />
                 <div className="flex-1 min-w-0">
                   <div className="text-[11px] text-wall-text leading-snug line-clamp-2">{snippet}</div>
                   <div className="mt-0.5 flex items-center gap-2 text-[9px] text-wall-subtle">

@@ -51,15 +51,15 @@ export const getFileType = (fileName: string): string => {
   return EXT_MAP[ext] || ext.toUpperCase();
 };
 
-/** File-type emoji icon. */
+/** File-type icon key (maps to SvgIcon names). */
 export const FILE_ICONS: Record<string, string> = {
-  pdf: '\uD83D\uDCC4',
-  csv: '\uD83D\uDCCA',
-  md: '\uD83D\uDCDD',
-  txt: '\uD83D\uDCC3',
+  pdf: 'document',
+  csv: 'csv',
+  md: 'markdown',
+  txt: 'document',
 };
 
 export const getFileIcon = (fileName: string): string => {
   const ext = fileName.split('.').pop()?.toLowerCase() || '';
-  return FILE_ICONS[ext] || '\uD83D\uDCC4';
+  return FILE_ICONS[ext] || 'document';
 };

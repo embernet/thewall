@@ -39,6 +39,10 @@ export interface AgentContext {
   isRefresh?: boolean;
   /** Pre-LLM similarity hits: most similar existing cards to the current batch. */
   similarExistingCards?: { content: string; score: number }[];
+  /** Agent IDs enabled for this session (null = all globally-enabled agents). */
+  enabledAgentIds?: string[] | null;
+  /** Session-level system prompt / guiding context. */
+  sessionSystemPrompt?: string;
 }
 
 // ----------------------------------------------------------------------------

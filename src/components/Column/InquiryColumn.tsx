@@ -6,6 +6,7 @@ import { uid, now, mid } from '@/utils/ids';
 import { askClaude } from '@/utils/llm';
 import { findSimilar } from '@/utils/embeddings';
 import Card from '@/components/Card/Card';
+import { SvgIcon } from '@/components/Icons';
 
 interface InquiryColumnProps {
   column: Column;
@@ -102,7 +103,7 @@ const InquiryColumn: React.FC<InquiryColumnProps> = ({
       return {
         id: r.card.id,
         label,
-        icon: meta?.icon || '\uD83D\uDCCB',
+        icon: meta?.icon || 'clipboard',
         color: meta?.color || '#6b7280',
       };
     });

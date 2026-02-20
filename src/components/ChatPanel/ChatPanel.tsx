@@ -16,6 +16,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { v4 as uid } from 'uuid';
 import type { Card, ChatMessage, ImageAttachment } from '@/types';
+import { useSessionStore } from '@/store/session';
 import { findSimilar } from '@/utils/embeddings';
 import { askClaude, askClaudeMultimodal } from '@/utils/llm';
 import { agentMCPAdapter, buildHelpContent } from '@/agents/mcp';
@@ -252,10 +253,19 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ open, onToggle, allCards, session
           })
           .join('\n\n');
 
-        const sys =
+        // Build system prompt — include session-level guiding context if set
+        const sessionPrompt = useSessionStore.getState().session?.systemPrompt;
+        const sessionGoal = useSessionStore.getState().session?.goal;
+        let sys =
           'You are an AI assistant for The Wall, a collaborative meeting & research tool. ' +
           'Answer the user\'s question using the session context below when relevant. ' +
           'Be concise and specific. If context doesn\'t contain relevant information, say so.';
+        if (sessionPrompt) {
+          sys += '\n\nSession guidance: ' + sessionPrompt;
+        }
+        if (sessionGoal) {
+          sys += '\n\nSession goal: ' + sessionGoal;
+        }
 
         // Build conversation history for multi-turn context (exclude hidden/deleted)
         const visibleHistory = messages.filter(m => !m.hiddenFromLlm && !m.isDeleted);

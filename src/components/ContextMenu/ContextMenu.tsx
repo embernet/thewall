@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { SvgIcon } from '@/components/Icons';
 
 // ---------------------------------------------------------------------------
 // Generic Context Menu
@@ -83,7 +84,7 @@ export default function ContextMenu({ x, y, items, onClose }: ContextMenuProps) 
                   : 'text-wall-text hover:bg-wall-border'
             }`}
           >
-            {item.icon && <span className="w-4 text-center text-xs">{item.icon}</span>}
+            {item.icon && <span className="w-4 flex items-center justify-center"><SvgIcon name={item.icon} size={12} /></span>}
             {item.label}
           </button>
         );
@@ -121,7 +122,7 @@ function SubMenu({ item, onClose }: { item: MenuItem; onClose: () => void }) {
       <button
         className="flex w-full cursor-pointer items-center gap-2 border-none bg-transparent px-3 py-1.5 text-left text-[11px] text-wall-text hover:bg-wall-border"
       >
-        {item.icon && <span className="w-4 text-center text-xs">{item.icon}</span>}
+        {item.icon && <span className="w-4 flex items-center justify-center"><SvgIcon name={item.icon} size={12} /></span>}
         <span className="flex-1">{item.label}</span>
         <span className="text-[9px] text-wall-subtle">{'\u25B8'}</span>
       </button>
@@ -148,7 +149,7 @@ function SubMenu({ item, onClose }: { item: MenuItem; onClose: () => void }) {
                 <span className="w-4 text-center text-[10px]">
                   {child.checked ? '\u2713' : ''}
                 </span>
-                {child.icon && <span className="text-xs">{child.icon}</span>}
+                {child.icon && <SvgIcon name={child.icon} size={12} />}
                 {child.color ? (
                   <span
                     className="text-[10px] font-bold rounded-lg px-1.5 py-px"

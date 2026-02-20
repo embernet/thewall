@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import type { Column as ColumnType, Card as CardType, AudioState } from '@/types';
 import { COL_TYPES, SPEAKER_COLORS } from '@/types';
+import { SvgIcon } from '@/components/Icons';
 import { useSessionStore } from '@/store/session';
 import { uid, now, mid } from '@/utils/ids';
 import { fmtTime } from '@/utils/ids';
@@ -312,7 +313,7 @@ const Column: React.FC<ColumnProps> = ({
         className="flex min-w-[44px] w-[44px] cursor-pointer flex-col items-center border-r border-wall-border bg-wall-surface pt-2.5"
         onClick={() => toggleColumnCollapsed(column.id)}
       >
-        <span className="text-sm">{meta.icon}</span>
+        <SvgIcon name={meta.icon} size={14} className="shrink-0" style={{ color: meta.color }} />
         <span
           className="mt-1.5 text-[10px] text-wall-text-dim"
           style={{ writingMode: 'vertical-rl', letterSpacing: 1 }}
@@ -348,7 +349,7 @@ const Column: React.FC<ColumnProps> = ({
       <div className="shrink-0 border-b border-wall-border px-2.5 pt-2 pb-1">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-[5px]">
-            <span className="text-sm">{meta.icon}</span>
+            <SvgIcon name={meta.icon} size={14} style={{ color: meta.color }} />
             <span className="text-xs font-semibold text-wall-text">
               {column.title}
             </span>

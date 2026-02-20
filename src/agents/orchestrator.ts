@@ -20,7 +20,14 @@ import type { Card, ApiKeyStatus } from '@/types';
 // Replaces the inline runAgents/scheduleAgents logic from App.tsx.
 // ---------------------------------------------------------------------------
 
-const DEBOUNCE_MS = 4000;
+/** Debounce delay per mode. Silent uses longer delay; active is fastest. */
+const DEBOUNCE_MS_BY_MODE = {
+  silent:   0,      // silent mode: agents don't auto-dispatch (0 = skip)
+  active:   3000,   // active mode: fast dispatch
+  sidekick: 6000,   // sidekick mode: slower, less intrusive
+} as const;
+const DEBOUNCE_MS_DEFAULT = 4000;
+
 const ROLLING_WINDOW_SIZE = 10; // keep last ~10 batches (~40s of transcript)
 
 let transcriptBuf: string[] = [];
@@ -82,6 +89,9 @@ export async function initOrchestrator(): Promise<void> {
   // Listen for agent config changes → hot-reload
   bus.on('agentConfig:changed', handleAgentConfigChanged);
 
+  // Listen for mode changes → flush buffer on switch to silent, adjust debounce
+  bus.on('session:modeChanged', handleModeChanged);
+
   // Start periodic 2nd-pass refresh checker
   secondPassTimer = setInterval(checkSecondPassAgents, SECOND_PASS_CHECK_INTERVAL);
 }
@@ -92,6 +102,7 @@ export function destroyOrchestrator(): void {
   bus.off('agent:completed', handleAgentCompleted);
   bus.off('api:statusChanged', handleApiStatusChanged);
   bus.off('agentConfig:changed', handleAgentConfigChanged);
+  bus.off('session:modeChanged', handleModeChanged);
   if (debounceTimer) clearTimeout(debounceTimer);
   if (secondPassTimer) clearInterval(secondPassTimer);
   secondPassTimer = null;
@@ -111,6 +122,16 @@ function handleAgentConfigChanged(): void {
   applyAgentConfigs().catch(e =>
     console.warn('Failed to reload agent configs:', e)
   );
+}
+
+function handleModeChanged({ mode }: { mode: string }): void {
+  if (mode === 'silent') {
+    // When switching to silent, clear any pending transcript dispatch
+    if (debounceTimer) clearTimeout(debounceTimer);
+    transcriptBuf = [];
+  }
+  // When switching away from silent, the next handleCardCreated will
+  // start dispatching normally with the new mode's debounce timing.
 }
 
 /**
@@ -154,15 +175,20 @@ function handleCardCreated({ card }: { card: Card }): void {
   // creates clean cards with proper sentence boundaries and no filler.
   if (!card.userTags.includes('transcript:clean')) return;
 
+  // In silent mode, agents only run when explicitly triggered (e.g. via Chat)
+  const mode = useSessionStore.getState().session?.mode ?? 'sidekick';
+  if (mode === 'silent') return;
+
   transcriptBuf.push(card.content);
 
-  // Debounce: wait for 4s of silence before dispatching agents
+  // Debounce delay varies by mode: active is faster, sidekick is slower
+  const debounceMs = DEBOUNCE_MS_BY_MODE[mode] || DEBOUNCE_MS_DEFAULT;
   if (debounceTimer) clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => {
     const batch = transcriptBuf.join('\n');
     transcriptBuf = [];
     if (batch.trim()) dispatchAgents(batch);
-  }, DEBOUNCE_MS);
+  }, debounceMs);
 }
 
 function handleAgentCompleted(_event: { taskId: string; agentKey: string; cardsCreated: number }): void {
@@ -182,6 +208,10 @@ function handleAgentCompleted(_event: { taskId: string; agentKey: string; cardsC
 
 function checkSecondPassAgents(): void {
   const store = useSessionStore.getState();
+
+  // In silent mode, no automatic agent runs
+  if (store.session?.mode === 'silent') return;
+
   const completedTasks = store.agentTasks.filter(t => t.status === 'completed');
   const completedKeys = new Set(completedTasks.map(t => t.agentKey));
 
@@ -197,8 +227,12 @@ function checkSecondPassAgents(): void {
 
   if (totalDepCards === 0) return;
 
-  // Find eligible 2nd-pass agents
-  const secondPassAgents = agentRegistry.list().filter(a => a.dependsOn.length > 0);
+  // Find eligible 2nd-pass agents, respecting session-level agent filter
+  const sessionAgentIds = store.session?.enabledAgentIds;
+  const sessionAgentSet = sessionAgentIds?.length ? new Set(sessionAgentIds) : null;
+  const secondPassAgents = agentRegistry.list().filter(a =>
+    a.dependsOn.length > 0 && (!sessionAgentSet || sessionAgentSet.has(a.id))
+  );
 
   for (const agent of secondPassAgents) {
     // All dependencies must have completed at least once
@@ -272,6 +306,8 @@ function buildContext(recentTranscript: string): AgentContext {
     columns: store.columns,
     meetingPhase,
     rollingContext,
+    enabledAgentIds: store.session?.enabledAgentIds ?? null,
+    sessionSystemPrompt: store.session?.systemPrompt ?? '',
   };
 }
 

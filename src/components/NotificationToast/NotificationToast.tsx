@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { bus } from '@/events/bus';
 import { COL_TYPES } from '@/types';
 import { useSessionStore } from '@/store/session';
+import { SvgIcon } from '@/components/Icons';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -91,7 +92,7 @@ const NotificationToast: React.FC<NotificationToastProps> = ({ onNavigate, panel
 
       const n: Notification = {
         id: taskId,
-        icon: meta?.icon || '\u26A0\uFE0F',
+        icon: meta?.icon || 'gaps',
         title: agent.charAt(0).toUpperCase() + agent.slice(1),
         body: latestCard
           ? latestCard.content.slice(0, 100) + (latestCard.content.length > 100 ? '...' : '')
@@ -123,7 +124,7 @@ const NotificationToast: React.FC<NotificationToastProps> = ({ onNavigate, panel
               dismiss(n.id);
             }}
           >
-            <span className="text-base shrink-0">{n.icon}</span>
+            <SvgIcon name={n.icon} size={16} className="shrink-0" style={{ color: n.color }} />
             <div className="flex-1 min-w-0">
               <div className="text-[10px] font-semibold" style={{ color: n.color }}>{n.title}</div>
               <div className="text-[11px] text-wall-text-dim leading-snug line-clamp-2">{n.body}</div>
@@ -186,7 +187,7 @@ const NotificationToast: React.FC<NotificationToastProps> = ({ onNavigate, panel
                     }}
                     className="w-full text-left px-3 py-2 border-none border-b border-wall-border/50 cursor-pointer bg-transparent hover:bg-wall-border/30 flex items-start gap-2"
                   >
-                    <span className="text-sm shrink-0">{n.icon}</span>
+                    <SvgIcon name={n.icon} size={16} className="shrink-0" style={{ color: n.color }} />
                     <div className="flex-1 min-w-0">
                       <div className="text-[9px] font-semibold" style={{ color: n.color }}>{n.title}</div>
                       <div className="text-[10px] text-wall-text-dim leading-snug line-clamp-2">{n.body}</div>

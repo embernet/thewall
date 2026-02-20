@@ -6,6 +6,7 @@ import { useSessionStore } from '@/store/session';
 import { askClaude } from '@/utils/llm';
 import { loadSummaryPrompts } from '@/utils/summary-prompts';
 import type { SummaryPrompt } from '@/utils/summary-prompts';
+import { SvgIcon } from '@/components/Icons';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -225,7 +226,7 @@ const SummaryColumn: React.FC<SummaryColumnProps> = ({
         className="flex min-w-[44px] w-[44px] cursor-pointer flex-col items-center border-r border-wall-border bg-wall-surface pt-2.5"
         onClick={() => toggleColumnCollapsed(column.id)}
       >
-        <span className="text-sm">{meta.icon}</span>
+        <SvgIcon name={meta.icon} size={14} style={{ color: meta.color }} />
         <span
           className="mt-1.5 text-[10px] text-wall-text-dim"
           style={{ writingMode: 'vertical-rl', letterSpacing: 1 }}
@@ -243,7 +244,7 @@ const SummaryColumn: React.FC<SummaryColumnProps> = ({
       <div className="shrink-0 border-b border-wall-border px-2.5 pt-2 pb-1">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-[5px]">
-            <span className="text-sm">{meta.icon}</span>
+            <SvgIcon name={meta.icon} size={14} style={{ color: meta.color }} />
             <span className="text-xs font-semibold text-wall-text">{column.title}</span>
           </div>
           <button
@@ -376,7 +377,7 @@ const SummaryColumn: React.FC<SummaryColumnProps> = ({
                     key={col.id}
                     className="flex items-center gap-1.5 rounded-md border border-wall-border bg-wall-bg px-2 py-1"
                   >
-                    <span className="text-[10px]">{colMeta?.icon}</span>
+                    <SvgIcon name={colMeta?.icon || 'clipboard'} size={11} style={{ color: colMeta?.color }} />
                     <span className="flex-1 text-[10px] text-wall-text-dim truncate">
                       {col.title}
                     </span>
