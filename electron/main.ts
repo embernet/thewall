@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { initDatabase, getDatabase } from './ipc/database';
@@ -49,6 +49,12 @@ app.whenReady().then(() => {
   initDatabase(userDataPath);
   registerDbHandlers();
   registerFileHandlers();
+
+  ipcMain.handle('app:quit', () => {
+    const db = getDatabase();
+    if (db) db.close();
+    app.quit();
+  });
 
   createWindow();
 });

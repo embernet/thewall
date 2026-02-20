@@ -8,7 +8,7 @@ import { fmtTime } from '@/utils/ids';
 import {
   IconMenu, IconPause, IconPlay, IconBell, IconSearch, IconDollar, IconBot,
   IconClipboard, IconGraph, IconSave, IconExport, IconSun, IconMoon,
-  IconHelp, IconGear, IconInfo,
+  IconHelp, IconGear, IconInfo, IconClose, IconPower,
 } from '@/components/Icons';
 
 // ---------------------------------------------------------------------------
@@ -138,6 +138,9 @@ export default function TopBar({
     { label: 'Help', icon: <IconHelp width={14} height={14} />, action: () => { onOpenHelp(); setMenuOpen(false); } },
     { label: 'About', icon: <IconInfo width={14} height={14} />, action: () => { onOpenAbout(); setMenuOpen(false); } },
     { label: 'Settings', icon: <IconGear width={14} height={14} />, action: () => { onOpenSettings(); setMenuOpen(false); } },
+    { divider: true },
+    { label: 'Close Session', icon: <IconClose width={14} height={14} />, action: () => { goToLauncher(); setMenuOpen(false); } },
+    { label: 'Quit', icon: <IconPower className="text-red-400" width={14} height={14} />, action: () => { (window as any).electronAPI?.quit(); } },
   ];
 
   return (

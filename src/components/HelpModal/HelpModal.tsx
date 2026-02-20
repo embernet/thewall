@@ -84,12 +84,12 @@ export default function HelpModal({ open, onClose }: HelpModalProps) {
           </p>
           <Section title="Built-in templates">
             <ul className="list-disc pl-4 space-y-1">
-              <li><strong>🧠 Brainstorming</strong> — idea generation, pattern finding, creative exploration</li>
-              <li><strong>🔬 Research</strong> — deep research, claim verification, evidence gathering</li>
-              <li><strong>⚖️ Decision Making</strong> — trade-off analysis, risk assessment, structured evaluation</li>
-              <li><strong>🔄 Retrospective</strong> — pattern recognition, gap analysis, actionable improvements</li>
-              <li><strong>🎤 Interview</strong> — question generation, claim tracking, insight extraction</li>
-              <li><strong>🗺️ Strategy</strong> — visionary thinking, constraint mapping, strategic planning</li>
+              <li><strong><SvgIcon name="brainstorm" size={13} className="inline-block align-[-2px] text-yellow-400 mr-1" />Brainstorming</strong> — idea generation, pattern finding, creative exploration</li>
+              <li><strong><SvgIcon name="research" size={13} className="inline-block align-[-2px] text-cyan-400 mr-1" />Research</strong> — deep research, claim verification, evidence gathering</li>
+              <li><strong><SvgIcon name="decision" size={13} className="inline-block align-[-2px] text-indigo-400 mr-1" />Decision Making</strong> — trade-off analysis, risk assessment, structured evaluation</li>
+              <li><strong><SvgIcon name="retro" size={13} className="inline-block align-[-2px] text-green-400 mr-1" />Retrospective</strong> — pattern recognition, gap analysis, actionable improvements</li>
+              <li><strong><SvgIcon name="interview" size={13} className="inline-block align-[-2px] text-red-400 mr-1" />Interview</strong> — question generation, claim tracking, insight extraction</li>
+              <li><strong><SvgIcon name="strategy" size={13} className="inline-block align-[-2px] text-orange-400 mr-1" />Strategy</strong> — visionary thinking, constraint mapping, strategic planning</li>
             </ul>
           </Section>
           <Section title="Session goal">

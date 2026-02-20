@@ -1103,6 +1103,16 @@ export function IconImport(props: IconProps) {
   );
 }
 
+/** Power / quit */
+export function IconPower(props: IconProps) {
+  return (
+    <svg {...defaults} {...props}>
+      <path d="M8 2v5" />
+      <path d="M4.2 4.9A6 6 0 1011.8 4.9" />
+    </svg>
+  );
+}
+
 /** Database backup — Export All */
 export function IconBackup(props: IconProps) {
   return (
@@ -1175,6 +1185,7 @@ const ICON_MAP: Record<string, (props: IconProps) => JSX.Element> = {
   document: IconDocument,
   more: IconMore,
   close: IconClose,
+  power: IconPower,
   'find-related': IconSearch,
   delete: IconTrash,
 

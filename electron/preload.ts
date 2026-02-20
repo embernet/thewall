@@ -107,4 +107,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   shell: {
     openPath: (filePath: string) => ipcRenderer.invoke('file:openPath', filePath),
   },
+
+  // App lifecycle
+  quit: () => ipcRenderer.invoke('app:quit'),
 });
