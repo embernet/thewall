@@ -317,12 +317,13 @@ export function registerDbHandlers() {
   ipcMain.handle('db:logApiUsage', (_e, usage: any) => {
     db()
       .prepare(
-        `INSERT INTO api_usage (id, agent_task_id, provider, model, input_tokens, output_tokens, cost_usd, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO api_usage (id, agent_task_id, session_id, provider, model, input_tokens, output_tokens, cost_usd, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         usage.id,
         usage.agentTaskId || null,
+        usage.sessionId || null,
         usage.provider,
         usage.model,
         usage.inputTokens || 0,
@@ -356,6 +357,35 @@ export function registerDbHandlers() {
          FROM api_usage`
       )
       .get() as any;
+    return { byModel: rows, totals: total || { total_cost: 0, total_input: 0, total_output: 0, total_calls: 0 } };
+  });
+
+  ipcMain.handle('db:getApiUsageSummaryForSession', (_e, sessionId: string) => {
+    const rows = db()
+      .prepare(
+        `SELECT provider, model,
+                SUM(input_tokens) as input_tokens,
+                SUM(output_tokens) as output_tokens,
+                SUM(cost_usd) as cost_usd,
+                COUNT(*) as call_count,
+                MIN(created_at) as first_call,
+                MAX(created_at) as last_call
+         FROM api_usage
+         WHERE session_id = ?
+         GROUP BY provider, model
+         ORDER BY cost_usd DESC`
+      )
+      .all(sessionId);
+    const total = db()
+      .prepare(
+        `SELECT SUM(cost_usd) as total_cost,
+                SUM(input_tokens) as total_input,
+                SUM(output_tokens) as total_output,
+                COUNT(*) as total_calls
+         FROM api_usage
+         WHERE session_id = ?`
+      )
+      .get(sessionId) as any;
     return { byModel: rows, totals: total || { total_cost: 0, total_input: 0, total_output: 0, total_calls: 0 } };
   });
 
@@ -1061,6 +1091,9 @@ export function registerDbHandlers() {
       speakerColors[row.speaker] = row.color;
     }
 
+    const apiUsageRows = d.prepare('SELECT * FROM api_usage WHERE session_id = ? ORDER BY created_at').all(sessionId) as any[];
+    const apiUsage = apiUsageRows.map(mapApiUsageFromDb);
+
     return {
       _format: 'the-wall-session',
       _version: 1,
@@ -1070,6 +1103,7 @@ export function registerDbHandlers() {
       cards,
       speakerColors,
       agentTasks,
+      apiUsage,
     };
   });
 
@@ -1217,6 +1251,20 @@ function mapChatMessageFromDb(row: any) {
     collapsed: !!row.collapsed,
     isDeleted: !!row.is_deleted,
     timestamp: row.timestamp_ms,
+  };
+}
+
+function mapApiUsageFromDb(row: any) {
+  return {
+    id: row.id,
+    agentTaskId: row.agent_task_id ?? undefined,
+    sessionId: row.session_id ?? undefined,
+    provider: row.provider,
+    model: row.model,
+    inputTokens: row.input_tokens,
+    outputTokens: row.output_tokens,
+    costUsd: row.cost_usd,
+    createdAt: row.created_at,
   };
 }
 

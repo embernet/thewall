@@ -946,7 +946,7 @@ export default function App() {
         onTogglePanel={() => setNotifPanelOpen(o => !o)}
         onHistoryCount={setNotifCount}
       />
-      <CostDashboard open={costOpen} onClose={() => setCostOpen(false)} />
+      <CostDashboard open={costOpen} onClose={() => setCostOpen(false)} sessionId={session?.id} />
       <AgentConfig open={agentConfigOpen} onClose={() => setAgentConfigOpen(false)} />
       <FindRelatedView
         open={findRelatedOpen}

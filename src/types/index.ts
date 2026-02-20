@@ -347,6 +347,7 @@ export interface Asset {
 export interface ApiUsageRecord {
   id: string;
   agentTaskId?: string;
+  sessionId?: string;
   provider: string;
   model: string;
   inputTokens: number;
@@ -368,6 +369,7 @@ export interface SessionExport {
   cards: Card[];
   speakerColors: Record<string, string>;
   agentTasks?: AgentTask[];
+  apiUsage?: ApiUsageRecord[];
 }
 
 export interface BackupExport {
@@ -459,6 +461,15 @@ export interface ElectronDbApi {
   // API Usage
   logApiUsage: (usage: ApiUsageRecord) => Promise<void>;
   getApiUsageSummary: () => Promise<{
+    byModel: {
+      provider: string; model: string;
+      input_tokens: number; output_tokens: number;
+      cost_usd: number; call_count: number;
+      first_call: string; last_call: string;
+    }[];
+    totals: { total_cost: number; total_input: number; total_output: number; total_calls: number };
+  }>;
+  getApiUsageSummaryForSession: (sessionId: string) => Promise<{
     byModel: {
       provider: string; model: string;
       input_tokens: number; output_tokens: number;

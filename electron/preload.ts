@@ -40,6 +40,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // API Usage
     logApiUsage: (usage: any) => ipcRenderer.invoke('db:logApiUsage', usage),
     getApiUsageSummary: () => ipcRenderer.invoke('db:getApiUsageSummary'),
+    getApiUsageSummaryForSession: (sessionId: string) =>
+      ipcRenderer.invoke('db:getApiUsageSummaryForSession', sessionId),
 
     // API Key Management
     getApiKeyConfigs: () => ipcRenderer.invoke('db:getApiKeyConfigs'),

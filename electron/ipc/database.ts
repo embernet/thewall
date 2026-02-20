@@ -387,4 +387,14 @@ const migrations: Migration[] = [
       -- SQLite doesn't support DROP COLUMN easily; ignore added columns
     `,
   },
+  {
+    name: '011_api_usage_session_id',
+    up: `
+      ALTER TABLE api_usage ADD COLUMN session_id TEXT REFERENCES sessions(id);
+      CREATE INDEX IF NOT EXISTS idx_api_usage_session ON api_usage(session_id);
+    `,
+    down: `
+      -- SQLite doesn't support DROP COLUMN easily; ignore
+    `,
+  },
 ];

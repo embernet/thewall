@@ -2,6 +2,7 @@ import { v4 as uuid } from 'uuid';
 import type { ApiKeyStatus, ApiKeyConfig, ApiProvider, ImageAttachment } from '@/types';
 import { getModelDef } from '@/utils/providers';
 import type { ModelDef } from '@/utils/providers';
+import { useSessionStore } from '@/store/session';
 
 export interface LLMMessage {
   role: string;
@@ -161,6 +162,14 @@ async function validateOpenAIKey(key: string, _model: string): Promise<ApiKeySta
 }
 
 // ---------------------------------------------------------------------------
+// Session ID helper (for usage tracking)
+// ---------------------------------------------------------------------------
+
+function getCurrentSessionId(): string | undefined {
+  return useSessionStore.getState().session?.id;
+}
+
+// ---------------------------------------------------------------------------
 // Provider implementations
 // ---------------------------------------------------------------------------
 
@@ -246,6 +255,7 @@ const openaiChatProvider: LLMProvider = {
         window.electronAPI.db.logApiUsage({
           id: uuid(),
           agentTaskId,
+          sessionId: getCurrentSessionId(),
           provider: 'openai',
           model: model.id,
           inputTokens,
@@ -281,6 +291,7 @@ function logUsage(
     window.electronAPI.db.logApiUsage({
       id: uuid(),
       agentTaskId,
+      sessionId: getCurrentSessionId(),
       provider,
       model: model.id,
       inputTokens,
@@ -420,6 +431,7 @@ export const askClaudeMultimodal = async (
         const costUsd = inputTokens * model.inputCost + outputTokens * model.outputCost;
         window.electronAPI.db.logApiUsage({
           id: uuid(),
+          sessionId: getCurrentSessionId(),
           provider: 'openai',
           model: model.id,
           inputTokens,
