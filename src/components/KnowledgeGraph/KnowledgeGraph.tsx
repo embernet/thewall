@@ -8,14 +8,18 @@ import {
   clearGraph,
 } from '@/graph/graph-service';
 import { useSessionStore } from '@/store/session';
+import WindowPortal from '@/components/WindowPortal/WindowPortal';
 import type { KnowledgeGraphNode, KnowledgeGraphEdge, KGNodeType } from '@/types';
 
 // ---------------------------------------------------------------------------
 // Knowledge Graph Panel
 //
 // Canvas-based force-directed graph visualization.
-// Toggle-able panel rendered as an overlay / side panel.
+// Supports three display modes: panel (600px sidebar), full (100% width), window (detached).
+// Toolbar controls: labels, physics, node spacing, layout modes.
 // ---------------------------------------------------------------------------
+
+export type GraphMode = 'panel' | 'full' | 'window';
 
 const NODE_COLORS: Record<KGNodeType, string> = {
   concept: '#8b5cf6',
@@ -25,9 +29,11 @@ const NODE_COLORS: Record<KGNodeType, string> = {
 };
 
 const NODE_RADIUS_BASE = 8;
+const DEFAULT_REPULSION = 2000;
+const DEFAULT_EDGE_REST = 100;
 
-const getThemeHex = (v: string) =>
-  getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const getThemeHex = (v: string, doc?: Document) =>
+  getComputedStyle((doc ?? document).documentElement).getPropertyValue(v).trim();
 
 interface SimNode {
   id: string;
@@ -49,9 +55,311 @@ interface SimEdge {
 interface Props {
   open: boolean;
   onClose: () => void;
+  mode: GraphMode;
+  onModeChange: (mode: GraphMode) => void;
 }
 
-export default function KnowledgeGraph({ open, onClose }: Props) {
+// ── SVG icons ──
+
+function IconSidebar({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <line x1="15" y1="3" x2="15" y2="21" />
+    </svg>
+  );
+}
+
+function IconMaximize({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+    </svg>
+  );
+}
+
+function IconExternalLink({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+      <polyline points="15 3 21 3 21 9" />
+      <line x1="10" y1="14" x2="21" y2="3" />
+    </svg>
+  );
+}
+
+function IconLabel({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
+      <path d="M4 7V4h16v3" />
+      <line x1="12" y1="4" x2="12" y2="20" />
+      <path d="M8 20h8" />
+    </svg>
+  );
+}
+
+function IconPhysics({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
+      <circle cx="12" cy="12" r="3" />
+      <ellipse cx="12" cy="12" rx="10" ry="4" />
+      <ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(60 12 12)" />
+      <ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(120 12 12)" />
+    </svg>
+  );
+}
+
+function IconExpand({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
+      <polyline points="15 3 21 3 21 9" />
+      <polyline points="9 21 3 21 3 15" />
+      <line x1="21" y1="3" x2="14" y2="10" />
+      <line x1="3" y1="21" x2="10" y2="14" />
+    </svg>
+  );
+}
+
+function IconCompress({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
+      <polyline points="4 14 10 14 10 20" />
+      <polyline points="20 10 14 10 14 4" />
+      <line x1="14" y1="10" x2="21" y2="3" />
+      <line x1="3" y1="21" x2="10" y2="14" />
+    </svg>
+  );
+}
+
+// ── Toolbar button helper ──
+
+function ToolbarBtn({
+  title,
+  active,
+  onClick,
+  children,
+}: {
+  title: string;
+  active?: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      title={title}
+      onClickCapture={onClick}
+      className={`cursor-pointer rounded p-1 transition-colors ${
+        active
+          ? 'bg-wall-border text-wall-text'
+          : 'bg-transparent text-wall-text-dim hover:text-wall-text hover:bg-wall-border/50'
+      }`}
+    >
+      <span className="pointer-events-none flex">{children}</span>
+    </button>
+  );
+}
+
+// ── Inner graph content (shared by all modes) ──
+
+function GraphContent({
+  nodes,
+  edges,
+  hovered,
+  setHovered,
+  dragging,
+  setDragging,
+  canvasRef,
+  panRef,
+  zoomRef,
+  onClose,
+  mode,
+  onModeChange,
+  showLabels,
+  onToggleLabels,
+  physicsEnabled,
+  onTogglePhysics,
+  onSpreadOut,
+  onPullIn,
+}: {
+  nodes: SimNode[];
+  edges: SimEdge[];
+  hovered: SimNode | null;
+  setHovered: (n: SimNode | null) => void;
+  dragging: SimNode | null;
+  setDragging: (n: SimNode | null) => void;
+  canvasRef: React.MutableRefObject<HTMLCanvasElement | null>;
+  panRef: React.MutableRefObject<{ x: number; y: number }>;
+  zoomRef: React.MutableRefObject<number>;
+  onClose: () => void;
+  mode: GraphMode;
+  onModeChange: (mode: GraphMode) => void;
+  showLabels: boolean;
+  onToggleLabels: () => void;
+  physicsEnabled: boolean;
+  onTogglePhysics: () => void;
+  onSpreadOut: () => void;
+  onPullIn: () => void;
+}) {
+  // Mouse interactions
+  const getNodeAt = useCallback((clientX: number, clientY: number): SimNode | null => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    const mx = (clientX - rect.left - rect.width / 2 - panRef.current.x) / zoomRef.current;
+    const my = (clientY - rect.top - rect.height / 2 - panRef.current.y) / zoomRef.current;
+
+    for (const n of nodes) {
+      const r = NODE_RADIUS_BASE + Math.min(n.degree, 10) * 1.5 + 4;
+      const dx = mx - n.x;
+      const dy = my - n.y;
+      if (dx * dx + dy * dy <= r * r) return n;
+    }
+    return null;
+  }, [nodes, canvasRef, panRef, zoomRef]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (dragging) {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      dragging.x = (e.clientX - rect.left - rect.width / 2 - panRef.current.x) / zoomRef.current;
+      dragging.y = (e.clientY - rect.top - rect.height / 2 - panRef.current.y) / zoomRef.current;
+      dragging.vx = 0;
+      dragging.vy = 0;
+    } else {
+      setHovered(getNodeAt(e.clientX, e.clientY));
+    }
+  }, [dragging, getNodeAt, canvasRef, panRef, zoomRef, setHovered]);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    const node = getNodeAt(e.clientX, e.clientY);
+    if (node) setDragging(node);
+  }, [getNodeAt, setDragging]);
+
+  const handleMouseUp = useCallback(() => {
+    setDragging(null);
+  }, [setDragging]);
+
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    zoomRef.current = Math.max(0.2, Math.min(3, zoomRef.current - e.deltaY * 0.001));
+  }, [zoomRef]);
+
+  return (
+    <div className="flex h-full w-full flex-col bg-wall-bg">
+      {/* Header */}
+      <div className="flex h-[42px] shrink-0 items-center justify-between border-b border-wall-border px-4">
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-wall-text">Knowledge Graph</span>
+          <span className="rounded bg-wall-border px-1.5 py-0.5 text-[10px] text-wall-subtle">
+            {nodes.length} nodes &middot; {edges.length} edges
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {/* View mode buttons */}
+          <div className="flex items-center gap-0.5">
+            <ToolbarBtn title="Side panel" active={mode === 'panel'} onClick={() => onModeChange('panel')}>
+              <IconSidebar />
+            </ToolbarBtn>
+            <ToolbarBtn title="Full width" active={mode === 'full'} onClick={() => onModeChange('full')}>
+              <IconMaximize />
+            </ToolbarBtn>
+            <ToolbarBtn title="Detach to window" active={mode === 'window'} onClick={() => onModeChange('window')}>
+              <IconExternalLink />
+            </ToolbarBtn>
+          </div>
+
+          {/* Separator */}
+          <div className="h-4 w-px bg-wall-border" />
+
+          {/* Graph controls */}
+          <div className="flex items-center gap-0.5">
+            <ToolbarBtn title={showLabels ? 'Hide labels' : 'Show labels'} active={showLabels} onClick={onToggleLabels}>
+              <IconLabel />
+            </ToolbarBtn>
+            <ToolbarBtn title={physicsEnabled ? 'Pause physics' : 'Resume physics'} active={physicsEnabled} onClick={onTogglePhysics}>
+              <IconPhysics />
+            </ToolbarBtn>
+          </div>
+
+          {/* Separator */}
+          <div className="h-4 w-px bg-wall-border" />
+
+          {/* Spacing controls */}
+          <div className="flex items-center gap-0.5">
+            <ToolbarBtn title="Spread nodes apart" onClick={onSpreadOut}>
+              <IconExpand />
+            </ToolbarBtn>
+            <ToolbarBtn title="Pull nodes closer" onClick={onPullIn}>
+              <IconCompress />
+            </ToolbarBtn>
+          </div>
+
+          {/* Separator */}
+          <div className="h-4 w-px bg-wall-border" />
+
+          <button
+            onClick={onClose}
+            className="cursor-pointer border-none bg-transparent text-lg text-wall-text-dim hover:text-wall-text"
+          >
+            &times;
+          </button>
+        </div>
+      </div>
+
+      {/* Legend */}
+      <div className="flex shrink-0 gap-3 border-b border-wall-border px-4 py-1.5">
+        {(Object.entries(NODE_COLORS) as [KGNodeType, string][]).map(([type, color]) => (
+          <div key={type} className="flex items-center gap-1">
+            <div className="h-2.5 w-2.5 rounded-full" style={{ background: color }} />
+            <span className="text-[9px] capitalize text-wall-subtle">{type}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Canvas */}
+      <div className="relative flex-1">
+        {nodes.length === 0 ? (
+          <div className="flex h-full items-center justify-center text-sm text-wall-subtle">
+            No nodes yet. The Knowledge Manager agent will populate the graph as you talk.
+          </div>
+        ) : (
+          <canvas
+            ref={canvasRef}
+            className="h-full w-full"
+            style={{ cursor: hovered ? 'pointer' : dragging ? 'grabbing' : 'default' }}
+            onMouseMove={handleMouseMove}
+            onMouseDown={handleMouseDown}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            onWheel={handleWheel}
+          />
+        )}
+      </div>
+
+      {/* Hovered node details */}
+      {hovered && (
+        <div className="shrink-0 border-t border-wall-border px-4 py-2">
+          <div className="flex items-center gap-2">
+            <div
+              className="h-3 w-3 rounded-full"
+              style={{ background: NODE_COLORS[hovered.type] || NODE_COLORS.concept }}
+            />
+            <span className="text-xs font-semibold text-wall-text">{hovered.label}</span>
+            <span className="text-[10px] capitalize text-wall-subtle">{hovered.type}</span>
+          </div>
+          <div className="mt-1 text-[10px] text-wall-subtle">
+            {hovered.degree} connection{hovered.degree !== 1 ? 's' : ''}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main exported component ──
+
+export default function KnowledgeGraph({ open, onClose, mode, onModeChange }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const session = useSessionStore(s => s.session);
   const [nodes, setNodes] = useState<SimNode[]>([]);
@@ -61,6 +369,30 @@ export default function KnowledgeGraph({ open, onClose }: Props) {
   const animRef = useRef<number>(0);
   const panRef = useRef({ x: 0, y: 0 });
   const zoomRef = useRef(1);
+
+  // ── Graph control state ──
+  const [showLabels, setShowLabels] = useState(true);
+  const [physicsEnabled, setPhysicsEnabled] = useState(true);
+  const [spacingMultiplier, setSpacingMultiplier] = useState(1);
+
+  // Use refs so the animation loop reads the latest values without re-running the effect
+  const showLabelsRef = useRef(showLabels);
+  const physicsRef = useRef(physicsEnabled);
+  const spacingRef = useRef(spacingMultiplier);
+  useEffect(() => { showLabelsRef.current = showLabels; }, [showLabels]);
+  useEffect(() => { physicsRef.current = physicsEnabled; }, [physicsEnabled]);
+  useEffect(() => { spacingRef.current = spacingMultiplier; }, [spacingMultiplier]);
+
+  const handleToggleLabels = useCallback(() => setShowLabels(v => !v), []);
+  const handleTogglePhysics = useCallback(() => setPhysicsEnabled(v => !v), []);
+
+  const handleSpreadOut = useCallback(() => {
+    setSpacingMultiplier(m => Math.min(m * 1.5, 8));
+  }, []);
+
+  const handlePullIn = useCallback(() => {
+    setSpacingMultiplier(m => Math.max(m / 1.5, 0.15));
+  }, []);
 
   // Load graph data
   const refreshData = useCallback(() => {
@@ -138,58 +470,70 @@ export default function KnowledgeGraph({ open, onClose }: Props) {
       const cy = h / 2 + panRef.current.y * window.devicePixelRatio;
       const scale = zoomRef.current * window.devicePixelRatio;
 
-      // Simple force simulation step
-      for (const n of nodes) {
-        // Center gravity
-        n.vx += -n.x * 0.01;
-        n.vy += -n.y * 0.01;
-      }
+      // Read current settings from refs
+      const doPhysics = physicsRef.current;
+      const doLabels = showLabelsRef.current;
+      const spacing = spacingRef.current;
+      const repulsion = DEFAULT_REPULSION * spacing;
+      const edgeRest = DEFAULT_EDGE_REST * spacing;
 
-      // Node repulsion
-      for (let i = 0; i < nodes.length; i++) {
-        for (let j = i + 1; j < nodes.length; j++) {
-          const a = nodes[i], b = nodes[j];
-          let dx = a.x - b.x;
-          let dy = a.y - b.y;
-          let dist = Math.sqrt(dx * dx + dy * dy) || 1;
-          const force = 2000 / (dist * dist);
+      if (doPhysics) {
+        // Simple force simulation step
+        for (const n of nodes) {
+          // Center gravity
+          n.vx += -n.x * 0.01;
+          n.vy += -n.y * 0.01;
+        }
+
+        // Node repulsion
+        for (let i = 0; i < nodes.length; i++) {
+          for (let j = i + 1; j < nodes.length; j++) {
+            const a = nodes[i], b = nodes[j];
+            const dx = a.x - b.x;
+            const dy = a.y - b.y;
+            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+            const force = repulsion / (dist * dist);
+            const fx = (dx / dist) * force;
+            const fy = (dy / dist) * force;
+            a.vx += fx;
+            a.vy += fy;
+            b.vx -= fx;
+            b.vy -= fy;
+          }
+        }
+
+        // Edge attraction
+        for (const e of edges) {
+          const s = nodesMap.get(e.sourceId);
+          const t = nodesMap.get(e.targetId);
+          if (!s || !t) continue;
+          const dx = t.x - s.x;
+          const dy = t.y - s.y;
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+          const force = (dist - edgeRest) * 0.005;
           const fx = (dx / dist) * force;
           const fy = (dy / dist) * force;
-          a.vx += fx;
-          a.vy += fy;
-          b.vx -= fx;
-          b.vy -= fy;
+          s.vx += fx;
+          s.vy += fy;
+          t.vx -= fx;
+          t.vy -= fy;
+        }
+
+        // Apply velocities with damping
+        for (const n of nodes) {
+          if (dragging && n.id === dragging.id) continue;
+          n.vx *= 0.85;
+          n.vy *= 0.85;
+          n.x += n.vx;
+          n.y += n.vy;
         }
       }
 
-      // Edge attraction
-      for (const e of edges) {
-        const s = nodesMap.get(e.sourceId);
-        const t = nodesMap.get(e.targetId);
-        if (!s || !t) continue;
-        const dx = t.x - s.x;
-        const dy = t.y - s.y;
-        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        const force = (dist - 100) * 0.005;
-        const fx = (dx / dist) * force;
-        const fy = (dy / dist) * force;
-        s.vx += fx;
-        s.vy += fy;
-        t.vx -= fx;
-        t.vy -= fy;
-      }
-
-      // Apply velocities with damping
-      for (const n of nodes) {
-        if (dragging && n.id === dragging.id) continue;
-        n.vx *= 0.85;
-        n.vy *= 0.85;
-        n.x += n.vx;
-        n.y += n.vy;
-      }
+      // Determine which document owns the canvas for theme resolution
+      const ownerDoc = canvas.ownerDocument ?? document;
 
       // Clear
-      ctx.fillStyle = getThemeHex('--wall-surface-hex') || '#0f172a';
+      ctx.fillStyle = getThemeHex('--wall-surface-hex', ownerDoc) || '#0f172a';
       ctx.fillRect(0, 0, w, h);
 
       ctx.save();
@@ -197,7 +541,7 @@ export default function KnowledgeGraph({ open, onClose }: Props) {
       ctx.scale(scale, scale);
 
       // Draw edges
-      ctx.strokeStyle = getThemeHex('--wall-subtle-hex') || 'rgba(100, 116, 139, 0.4)';
+      ctx.strokeStyle = getThemeHex('--wall-subtle-hex', ownerDoc) || 'rgba(100, 116, 139, 0.4)';
       ctx.globalAlpha = 0.4;
       ctx.lineWidth = 1;
       for (const e of edges) {
@@ -210,14 +554,16 @@ export default function KnowledgeGraph({ open, onClose }: Props) {
         ctx.stroke();
 
         // Edge label
-        const mx = (s.x + t.x) / 2;
-        const my = (s.y + t.y) / 2;
-        ctx.globalAlpha = 0.5;
-        ctx.fillStyle = getThemeHex('--wall-text-muted-hex') || '#94a3b8';
-        ctx.font = '8px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(e.relationship, mx, my - 3);
-        ctx.globalAlpha = 0.4;
+        if (doLabels) {
+          const mx = (s.x + t.x) / 2;
+          const my = (s.y + t.y) / 2;
+          ctx.globalAlpha = 0.5;
+          ctx.fillStyle = getThemeHex('--wall-text-muted-hex', ownerDoc) || '#94a3b8';
+          ctx.font = '8px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(e.relationship, mx, my - 3);
+          ctx.globalAlpha = 0.4;
+        }
       }
       ctx.globalAlpha = 1;
 
@@ -239,10 +585,12 @@ export default function KnowledgeGraph({ open, onClose }: Props) {
         ctx.fill();
 
         // Label
-        ctx.fillStyle = getThemeHex('--wall-text-muted-hex') || '#e2e8f0';
-        ctx.font = '10px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(n.label, n.x, n.y + r + 14);
+        if (doLabels) {
+          ctx.fillStyle = getThemeHex('--wall-text-muted-hex', ownerDoc) || '#e2e8f0';
+          ctx.font = '10px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(n.label, n.x, n.y + r + 14);
+        }
       }
 
       ctx.restore();
@@ -257,122 +605,63 @@ export default function KnowledgeGraph({ open, onClose }: Props) {
     };
   }, [open, nodes, edges, hovered, dragging]);
 
-  // Mouse interactions
-  const getNodeAt = useCallback((clientX: number, clientY: number): SimNode | null => {
-    const canvas = canvasRef.current;
-    if (!canvas) return null;
-    const rect = canvas.getBoundingClientRect();
-    const mx = (clientX - rect.left - rect.width / 2 - panRef.current.x) / zoomRef.current;
-    const my = (clientY - rect.top - rect.height / 2 - panRef.current.y) / zoomRef.current;
-
-    for (const n of nodes) {
-      const r = NODE_RADIUS_BASE + Math.min(n.degree, 10) * 1.5 + 4;
-      const dx = mx - n.x;
-      const dy = my - n.y;
-      if (dx * dx + dy * dy <= r * r) return n;
-    }
-    return null;
-  }, [nodes]);
-
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (dragging) {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const rect = canvas.getBoundingClientRect();
-      dragging.x = (e.clientX - rect.left - rect.width / 2 - panRef.current.x) / zoomRef.current;
-      dragging.y = (e.clientY - rect.top - rect.height / 2 - panRef.current.y) / zoomRef.current;
-      dragging.vx = 0;
-      dragging.vy = 0;
-    } else {
-      setHovered(getNodeAt(e.clientX, e.clientY));
-    }
-  }, [dragging, getNodeAt]);
-
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    const node = getNodeAt(e.clientX, e.clientY);
-    if (node) setDragging(node);
-  }, [getNodeAt]);
-
-  const handleMouseUp = useCallback(() => {
-    setDragging(null);
-  }, []);
-
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    zoomRef.current = Math.max(0.2, Math.min(3, zoomRef.current - e.deltaY * 0.001));
-  }, []);
-
   if (!open) return null;
 
+  const content = (
+    <GraphContent
+      nodes={nodes}
+      edges={edges}
+      hovered={hovered}
+      setHovered={setHovered}
+      dragging={dragging}
+      setDragging={setDragging}
+      canvasRef={canvasRef}
+      panRef={panRef}
+      zoomRef={zoomRef}
+      onClose={onClose}
+      mode={mode}
+      onModeChange={onModeChange}
+      showLabels={showLabels}
+      onToggleLabels={handleToggleLabels}
+      physicsEnabled={physicsEnabled}
+      onTogglePhysics={handleTogglePhysics}
+      onSpreadOut={handleSpreadOut}
+      onPullIn={handlePullIn}
+    />
+  );
+
+  // Detached window mode
+  if (mode === 'window') {
+    return (
+      <WindowPortal
+        title="Knowledge Graph"
+        width={1000}
+        height={750}
+        onClose={onClose}
+      >
+        {content}
+      </WindowPortal>
+    );
+  }
+
+  // Full-width mode — no backdrop, fills entire viewport
+  if (mode === 'full') {
+    return (
+      <div className="fixed inset-0 z-50 flex">
+        {content}
+      </div>
+    );
+  }
+
+  // Panel mode (default) — 600px right sidebar with backdrop
   return (
     <div className="fixed inset-0 z-50 flex">
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
       {/* Panel */}
-      <div className="relative ml-auto flex h-full w-[600px] flex-col border-l border-wall-border bg-wall-bg">
-        {/* Header */}
-        <div className="flex h-[42px] items-center justify-between border-b border-wall-border px-4">
-          <div className="flex items-center gap-2">
-            <span className="text-sm">Knowledge Graph</span>
-            <span className="rounded bg-wall-border px-1.5 py-0.5 text-[10px] text-wall-subtle">
-              {nodes.length} nodes &middot; {edges.length} edges
-            </span>
-          </div>
-          <button
-            onClick={onClose}
-            className="cursor-pointer border-none bg-transparent text-lg text-wall-text-dim hover:text-wall-text"
-          >
-            &times;
-          </button>
-        </div>
-
-        {/* Legend */}
-        <div className="flex gap-3 border-b border-wall-border px-4 py-1.5">
-          {(Object.entries(NODE_COLORS) as [KGNodeType, string][]).map(([type, color]) => (
-            <div key={type} className="flex items-center gap-1">
-              <div className="h-2.5 w-2.5 rounded-full" style={{ background: color }} />
-              <span className="text-[9px] capitalize text-wall-subtle">{type}</span>
-            </div>
-          ))}
-        </div>
-
-        {/* Canvas */}
-        <div className="relative flex-1">
-          {nodes.length === 0 ? (
-            <div className="flex h-full items-center justify-center text-sm text-wall-subtle">
-              No nodes yet. The Knowledge Manager agent will populate the graph as you talk.
-            </div>
-          ) : (
-            <canvas
-              ref={canvasRef}
-              className="h-full w-full"
-              style={{ cursor: hovered ? 'pointer' : dragging ? 'grabbing' : 'default' }}
-              onMouseMove={handleMouseMove}
-              onMouseDown={handleMouseDown}
-              onMouseUp={handleMouseUp}
-              onMouseLeave={handleMouseUp}
-              onWheel={handleWheel}
-            />
-          )}
-        </div>
-
-        {/* Hovered node details */}
-        {hovered && (
-          <div className="border-t border-wall-border px-4 py-2">
-            <div className="flex items-center gap-2">
-              <div
-                className="h-3 w-3 rounded-full"
-                style={{ background: NODE_COLORS[hovered.type] || NODE_COLORS.concept }}
-              />
-              <span className="text-xs font-semibold text-wall-text">{hovered.label}</span>
-              <span className="text-[10px] capitalize text-wall-subtle">{hovered.type}</span>
-            </div>
-            <div className="mt-1 text-[10px] text-wall-subtle">
-              {hovered.degree} connection{hovered.degree !== 1 ? 's' : ''}
-            </div>
-          </div>
-        )}
+      <div className="relative ml-auto flex h-full w-[600px] flex-col border-l border-wall-border">
+        {content}
       </div>
     </div>
   );

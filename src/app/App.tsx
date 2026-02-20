@@ -9,6 +9,7 @@ import ColumnSidebar from '@/components/ColumnSidebar/ColumnSidebar';
 import SettingsPanel from '@/components/SettingsPanel/SettingsPanel';
 import ExportMenu from '@/components/ExportMenu/ExportMenu';
 import KnowledgeGraph from '@/components/KnowledgeGraph/KnowledgeGraph';
+import type { GraphMode } from '@/components/KnowledgeGraph/KnowledgeGraph';
 import SearchOverlay from '@/components/SearchOverlay/SearchOverlay';
 import NotificationToast from '@/components/NotificationToast/NotificationToast';
 import CostDashboard from '@/components/CostDashboard/CostDashboard';
@@ -67,6 +68,7 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [graphOpen, setGraphOpen] = useState(false);
+  const [graphMode, setGraphMode] = useState<GraphMode>('panel');
   const [searchOpen, setSearchOpen] = useState(false);
   const [costOpen, setCostOpen] = useState(false);
   const [agentConfigOpen, setAgentConfigOpen] = useState(false);
@@ -872,7 +874,12 @@ export default function App() {
 
       <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} onOpenAgentConfig={() => setAgentConfigOpen(true)} />
       {exportOpen && <ExportMenu onClose={() => setExportOpen(false)} />}
-      <KnowledgeGraph open={graphOpen} onClose={() => setGraphOpen(false)} />
+      <KnowledgeGraph
+        open={graphOpen}
+        onClose={() => setGraphOpen(false)}
+        mode={graphMode}
+        onModeChange={setGraphMode}
+      />
       <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} onNavigate={navigateToCard} />
       <NotificationToast
         onNavigate={navigateToCard}
