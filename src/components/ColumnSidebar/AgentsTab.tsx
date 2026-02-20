@@ -163,7 +163,7 @@ const AgentsTab: React.FC<AgentsTabProps> = ({
       {/* Agent groups */}
       <div
         className="flex-1 overflow-auto px-1 py-1"
-        style={{ scrollbarWidth: 'thin', scrollbarColor: '#334155 transparent' }}
+        style={{ scrollbarWidth: 'thin', scrollbarColor: 'var(--scrollbar-thumb) transparent' }}
       >
         {grouped.map(([colType, agents]) => {
           const meta = getColMeta(colType);
@@ -204,7 +204,7 @@ const AgentsTab: React.FC<AgentsTabProps> = ({
                       <span
                         className="min-w-0 flex-1 truncate text-[10px]"
                         style={{
-                          color: enabled ? '#e2e8f0' : '#64748b',
+                          color: enabled ? 'var(--wall-text-hex)' : 'var(--wall-text-dim-hex)',
                           fontWeight: enabled ? 500 : 400,
                         }}
                       >

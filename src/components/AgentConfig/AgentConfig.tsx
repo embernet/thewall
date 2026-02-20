@@ -45,7 +45,7 @@ const AgentConfig: React.FC<AgentConfigProps> = ({ open, onClose }) => {
     <>
       <div
         className="fixed inset-0 z-[9998] flex items-center justify-center"
-        style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+        style={{ background: 'var(--modal-overlay)', backdropFilter: 'blur(4px)' }}
         onClick={e => { if (e.target === e.currentTarget) onClose(); }}
       >
         <div className="w-[900px] max-h-[80vh] rounded-xl border border-wall-border bg-wall-surface shadow-2xl flex flex-col overflow-hidden">
@@ -67,8 +67,8 @@ const AgentConfig: React.FC<AgentConfigProps> = ({ open, onClose }) => {
               </button>
               <button
                 onClick={onClose}
-                className="cursor-pointer border-none bg-transparent text-wall-subtle hover:text-wall-text text-sm"
-              >{'\u2715'}</button>
+                className="flex h-6 w-6 cursor-pointer items-center justify-center rounded border-none bg-transparent text-sm text-wall-subtle hover:text-wall-text hover:bg-wall-border"
+              ><span className="pointer-events-none">{'\u2715'}</span></button>
             </div>
           </div>
 

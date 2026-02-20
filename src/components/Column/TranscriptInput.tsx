@@ -100,7 +100,7 @@ const TranscriptInput: React.FC<TranscriptInputProps> = ({
           disabled={!text.trim()}
           className="shrink-0 self-stretch rounded-md border-none px-2.5 text-[11px] font-bold text-white"
           style={{
-            background: text.trim() ? '#ef4444' : '#334155',
+            background: text.trim() ? '#ef4444' : 'var(--wall-muted-hex)',
             cursor: text.trim() ? 'pointer' : 'default',
           }}
         >
@@ -120,15 +120,15 @@ const TranscriptInput: React.FC<TranscriptInputProps> = ({
                 onClick={() => toggleSpeaker(s)}
                 className="cursor-pointer rounded-md px-1.5 py-0.5 text-[9px] flex items-center gap-1"
                 style={{
-                  border: active ? `1px solid ${color}` : '1px solid #334155',
+                  border: active ? `1px solid ${color}` : '1px solid var(--wall-muted-hex)',
                   background: active ? `${color}20` : 'transparent',
-                  color: active ? color : '#64748b',
+                  color: active ? color : 'var(--wall-text-dim-hex)',
                 }}
               >
                 <span
                   className="inline-block w-[10px] h-[10px] rounded-sm border text-[8px] leading-[10px] text-center"
                   style={{
-                    borderColor: active ? color : '#475569',
+                    borderColor: active ? color : 'var(--wall-subtle-hex)',
                     background: active ? `${color}40` : 'transparent',
                     color: active ? color : 'transparent',
                   }}

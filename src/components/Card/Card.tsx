@@ -278,7 +278,7 @@ export default function Card({
       }}
       className={`bg-wall-surface rounded-lg px-2.5 py-2 mb-1.5 transition-all duration-150 ${card.pinned ? 'ring-1 ring-amber-600/40' : ''} ${isLinkSource ? 'ring-2 ring-purple-500' : ''} ${isLinkTarget ? 'cursor-crosshair hover:ring-1 hover:ring-purple-400' : ''} `}
       style={{
-        border: `1px solid ${highlighted ? borderColor : isLinkSource ? '#a855f7' : '#1e293b'}`,
+        border: `1px solid ${highlighted ? borderColor : isLinkSource ? '#a855f7' : 'var(--wall-border-hex)'}`,
         borderLeft: isRawTranscript
           ? '3px solid #f97316'
           : highlighted
@@ -374,7 +374,7 @@ export default function Card({
               <button
                 onClick={handleOpenFile}
                 className="cursor-pointer rounded-md border-none px-2 py-0.5 text-[10px] font-medium text-white"
-                style={{ background: '#334155' }}
+                style={{ background: 'var(--wall-muted-hex)' }}
                 title="Open in default application"
               >
                 {'\uD83D\uDCC1'} Open
@@ -423,7 +423,7 @@ export default function Card({
                 style={{
                   color: '#94a3b8',
                   background: '#94a3b818',
-                  border: '1px solid #334155',
+                  border: '1px solid var(--wall-muted-hex)',
                 }}
               >
                 {'\u2715'} None
@@ -615,7 +615,7 @@ export default function Card({
                 onNavigate?.(src.id);
               }}
               className="text-[9px] text-white border-none rounded-[5px] px-[7px] py-0.5 cursor-pointer flex items-center gap-0.5 opacity-85"
-              style={{ background: src.color || '#1e293b' }}
+              style={{ background: src.color || 'var(--wall-border-hex)' }}
             >
               <span>{src.icon || '\uD83D\uDCCC'}</span>
               <span className="max-w-[120px] overflow-hidden text-ellipsis whitespace-nowrap">

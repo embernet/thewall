@@ -118,7 +118,7 @@ const ImagePromptCard: React.FC<ImagePromptCardProps> = ({
       {showBreakdown && (
         <pre
           className="mb-2 max-h-64 overflow-y-auto rounded border border-wall-border bg-wall-bg p-2 text-[10px] leading-relaxed text-wall-subtle whitespace-pre-wrap"
-          style={{ scrollbarWidth: 'thin', scrollbarColor: '#334155 transparent' }}
+          style={{ scrollbarWidth: 'thin', scrollbarColor: 'var(--scrollbar-thumb) transparent' }}
         >
           {structuredText}
         </pre>
@@ -137,7 +137,7 @@ const ImagePromptCard: React.FC<ImagePromptCardProps> = ({
           className="w-full resize-y rounded border border-wall-border bg-wall-bg px-2 py-1.5 text-[10px] leading-relaxed text-wall-text focus:outline-none focus:border-indigo-500 transition-colors"
           style={{
             scrollbarWidth: 'thin',
-            scrollbarColor: '#334155 transparent',
+            scrollbarColor: 'var(--scrollbar-thumb) transparent',
             minHeight: '6rem',
           }}
         />
@@ -181,8 +181,8 @@ const ImagePromptCard: React.FC<ImagePromptCardProps> = ({
               onClick={() => setSelectedImageIdx(null)}
               className="rounded border px-2 py-0.5 text-[10px] transition-colors cursor-pointer"
               style={{
-                borderColor: selectedImageIdx === null ? '#6366f1' : '#334155',
-                color: selectedImageIdx === null ? '#a5b4fc' : '#64748b',
+                borderColor: selectedImageIdx === null ? '#6366f1' : 'var(--wall-muted-hex)',
+                color: selectedImageIdx === null ? '#a5b4fc' : 'var(--wall-text-dim-hex)',
                 background: selectedImageIdx === null ? 'rgba(99,102,241,0.15)' : 'transparent',
               }}
             >
@@ -194,7 +194,7 @@ const ImagePromptCard: React.FC<ImagePromptCardProps> = ({
                 onClick={() => setSelectedImageIdx(i)}
                 className="relative cursor-pointer rounded border transition-colors p-0 overflow-hidden"
                 style={{
-                  borderColor: selectedImageIdx === i ? '#6366f1' : '#334155',
+                  borderColor: selectedImageIdx === i ? '#6366f1' : 'var(--wall-muted-hex)',
                   outline: selectedImageIdx === i ? '2px solid #6366f1' : 'none',
                 }}
                 title={img.name ?? `Image ${i + 1}`}

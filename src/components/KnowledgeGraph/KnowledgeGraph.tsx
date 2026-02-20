@@ -25,9 +25,9 @@ const NODE_COLORS: Record<KGNodeType, string> = {
 };
 
 const NODE_RADIUS_BASE = 8;
-const LINK_COLOR = 'rgba(100, 116, 139, 0.4)';
-const LABEL_COLOR = '#e2e8f0';
-const BG_COLOR = '#0f172a';
+
+const getThemeHex = (v: string) =>
+  getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 
 interface SimNode {
   id: string;
@@ -189,7 +189,7 @@ export default function KnowledgeGraph({ open, onClose }: Props) {
       }
 
       // Clear
-      ctx.fillStyle = BG_COLOR;
+      ctx.fillStyle = getThemeHex('--wall-surface-hex') || '#0f172a';
       ctx.fillRect(0, 0, w, h);
 
       ctx.save();
@@ -197,7 +197,8 @@ export default function KnowledgeGraph({ open, onClose }: Props) {
       ctx.scale(scale, scale);
 
       // Draw edges
-      ctx.strokeStyle = LINK_COLOR;
+      ctx.strokeStyle = getThemeHex('--wall-subtle-hex') || 'rgba(100, 116, 139, 0.4)';
+      ctx.globalAlpha = 0.4;
       ctx.lineWidth = 1;
       for (const e of edges) {
         const s = nodesMap.get(e.sourceId);
@@ -211,11 +212,14 @@ export default function KnowledgeGraph({ open, onClose }: Props) {
         // Edge label
         const mx = (s.x + t.x) / 2;
         const my = (s.y + t.y) / 2;
-        ctx.fillStyle = 'rgba(148, 163, 184, 0.5)';
+        ctx.globalAlpha = 0.5;
+        ctx.fillStyle = getThemeHex('--wall-text-muted-hex') || '#94a3b8';
         ctx.font = '8px sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText(e.relationship, mx, my - 3);
+        ctx.globalAlpha = 0.4;
       }
+      ctx.globalAlpha = 1;
 
       // Draw nodes
       for (const n of nodes) {
@@ -235,7 +239,7 @@ export default function KnowledgeGraph({ open, onClose }: Props) {
         ctx.fill();
 
         // Label
-        ctx.fillStyle = LABEL_COLOR;
+        ctx.fillStyle = getThemeHex('--wall-text-muted-hex') || '#e2e8f0';
         ctx.font = '10px sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText(n.label, n.x, n.y + r + 14);

@@ -275,14 +275,15 @@ const SummaryColumn: React.FC<SummaryColumnProps> = ({
             placeholder="Enter your summary instructions or template..."
             rows={4}
             className={`w-full resize-y rounded-md border px-2 py-1.5 text-[11px] text-wall-text outline-none font-inherit ${
-              isCustom
-                ? 'border-amber-700/50 bg-amber-950/20'
-                : 'border-wall-muted bg-wall-border'
+              isCustom ? '' : 'border-wall-muted bg-wall-border'
             }`}
-            style={{ minHeight: 60, maxHeight: 180, boxSizing: 'border-box' }}
+            style={{
+              minHeight: 60, maxHeight: 180, boxSizing: 'border-box',
+              ...(isCustom ? { borderColor: 'var(--summary-textarea-border)', backgroundColor: 'var(--summary-textarea-bg)' } : {}),
+            }}
           />
           {isCustom && selectedPromptId === 'custom' && (
-            <div className="text-[9px] text-amber-400/70">
+            <div className="text-[9px]" style={{ color: 'var(--summary-hint)' }}>
               Custom prompt — select a style above to reset
             </div>
           )}
@@ -299,17 +300,17 @@ const SummaryColumn: React.FC<SummaryColumnProps> = ({
       </div>
 
       {/* ── Summary output ── */}
-      <div ref={scrollRef} className="flex-1 overflow-auto px-2.5 py-2" style={{ scrollbarWidth: 'thin', scrollbarColor: '#334155 transparent' }}>
+      <div ref={scrollRef} className="flex-1 overflow-auto px-2.5 py-2" style={{ scrollbarWidth: 'thin', scrollbarColor: 'var(--scrollbar-thumb) transparent' }}>
         {overallSummary ? (
-          <div className="rounded-md border border-amber-800/40 bg-amber-950/30 px-3 py-2.5">
+          <div className="rounded-md border px-3 py-2.5" style={{ borderColor: 'var(--summary-border)', backgroundColor: 'var(--summary-bg)' }}>
             <div className="mb-1.5 flex items-center justify-between">
-              <span className="text-[9px] font-semibold uppercase tracking-wide text-amber-400">
+              <span className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: 'var(--summary-heading)' }}>
                 Session Summary
               </span>
               <div className="flex gap-1">
                 <button
                   onClick={() => navigator.clipboard?.writeText(overallSummary)}
-                  className="cursor-pointer border-none bg-transparent text-[9px] text-amber-500 hover:text-amber-300"
+                  className="cursor-pointer border-none bg-transparent text-[9px] summary-action"
                   title="Copy"
                 >
                   {'\uD83D\uDCCB'}
@@ -317,14 +318,14 @@ const SummaryColumn: React.FC<SummaryColumnProps> = ({
                 <button
                   onClick={handleSummariseAll}
                   disabled={summarizing}
-                  className="cursor-pointer border-none bg-transparent text-[9px] text-amber-500 hover:text-amber-300"
+                  className="cursor-pointer border-none bg-transparent text-[9px] summary-action"
                   title="Regenerate"
                 >
                   {summarizing ? '\u23F3' : '\uD83D\uDD04'}
                 </button>
                 <button
                   onClick={() => setSummaryOpen(o => !o)}
-                  className="cursor-pointer border-none bg-transparent text-[9px] text-amber-500 hover:text-amber-300"
+                  className="cursor-pointer border-none bg-transparent text-[9px] summary-action"
                   title={summaryOpen ? 'Collapse' : 'Expand'}
                 >
                   {summaryOpen ? '\u25B2' : '\u25BC'}
@@ -336,7 +337,7 @@ const SummaryColumn: React.FC<SummaryColumnProps> = ({
                       config: { ...column.config, overallSummary: undefined },
                     });
                   }}
-                  className="cursor-pointer border-none bg-transparent text-[9px] text-amber-500 hover:text-amber-300"
+                  className="cursor-pointer border-none bg-transparent text-[9px] summary-action"
                   title="Clear"
                 >
                   {'\uD83D\uDDD1\uFE0F'}
@@ -344,7 +345,7 @@ const SummaryColumn: React.FC<SummaryColumnProps> = ({
               </div>
             </div>
             {summaryOpen && (
-              <div className="card-markdown text-[11px] leading-relaxed text-amber-200/80" style={{ scrollbarWidth: 'thin', scrollbarColor: '#92400e transparent' }}>
+              <div className="card-markdown text-[11px] leading-relaxed summary-text" style={{ scrollbarWidth: 'thin', scrollbarColor: 'var(--summary-scrollbar) transparent' }}>
                 <ReactMarkdown>{overallSummary}</ReactMarkdown>
               </div>
             )}

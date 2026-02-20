@@ -213,7 +213,7 @@ const ContextColumn: React.FC<ContextColumnProps> = ({
         >
           {column.title}
         </span>
-        <span className="mt-[3px] rounded-[7px] bg-wall-border px-1 py-[1px] text-[9px] text-wall-subtle">
+        <span className="mt-[3px] rounded-[7px] bg-wall-border px-1 py-[1px] text-[9px] text-wall-text-muted font-medium">
           {cards.length}
         </span>
       </div>
@@ -231,7 +231,7 @@ const ContextColumn: React.FC<ContextColumnProps> = ({
             <span className="text-xs font-semibold text-wall-text">
               Context
             </span>
-            <span className="rounded-lg bg-wall-border px-[5px] text-[10px] text-wall-subtle">
+            <span className="rounded-lg bg-wall-border px-[5px] text-[10px] text-wall-text-muted font-medium">
               {cards.length}
             </span>
             {uploading && (
@@ -245,7 +245,7 @@ const ContextColumn: React.FC<ContextColumnProps> = ({
               onClick={handleUpload}
               disabled={uploading}
               className="cursor-pointer rounded-md border-none px-2 py-0.5 text-[10px] font-medium text-white"
-              style={{ background: uploading ? '#334155' : '#10b981' }}
+              style={{ background: uploading ? 'var(--wall-muted-hex)' : '#10b981' }}
               title="Upload PDF, CSV, MD, or TXT files"
             >
               {uploading ? '\u23F3' : '\uD83D\uDCC4'} Upload
@@ -273,7 +273,7 @@ const ContextColumn: React.FC<ContextColumnProps> = ({
         className="flex-1 overflow-auto px-2 py-1.5"
         style={{
           scrollbarWidth: 'thin',
-          scrollbarColor: '#334155 transparent',
+          scrollbarColor: 'var(--scrollbar-thumb) transparent',
         }}
       >
         {sorted.map((card) => (

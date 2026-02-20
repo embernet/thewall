@@ -142,7 +142,7 @@ const InquiryColumn: React.FC<InquiryColumnProps> = ({
         <div className="flex items-center gap-[5px]">
           <span className="text-sm">{'\uD83D\uDD2E'}</span>
           <span className="text-xs font-semibold text-wall-text">Inquiry</span>
-          <span className="rounded-lg bg-wall-border px-[5px] text-[10px] text-wall-subtle">
+          <span className="rounded-lg bg-wall-border px-[5px] text-[10px] text-wall-text-muted font-medium">
             {cards.length}
           </span>
           {loading && (
@@ -158,8 +158,8 @@ const InquiryColumn: React.FC<InquiryColumnProps> = ({
               onClick={() => setScope(s)}
               className="cursor-pointer rounded-md border-none px-[7px] py-0.5 text-[9px] font-medium capitalize"
               style={{
-                background: scope === s ? '#06b6d4' : '#1e293b',
-                color: scope === s ? '#fff' : '#64748b',
+                background: scope === s ? '#06b6d4' : 'var(--wall-border-hex)',
+                color: scope === s ? '#fff' : 'var(--wall-text-dim-hex)',
               }}
             >
               {s}
@@ -174,7 +174,7 @@ const InquiryColumn: React.FC<InquiryColumnProps> = ({
         className="flex-1 overflow-auto px-2 py-1.5"
         style={{
           scrollbarWidth: 'thin',
-          scrollbarColor: '#334155 transparent',
+          scrollbarColor: 'var(--scrollbar-thumb) transparent',
         }}
       >
         {iCards.map((card) => (
@@ -220,7 +220,7 @@ const InquiryColumn: React.FC<InquiryColumnProps> = ({
             disabled={loading || !query.trim()}
             className="shrink-0 rounded-md border-none px-2.5 text-xs font-bold text-white"
             style={{
-              background: loading ? '#334155' : '#06b6d4',
+              background: loading ? 'var(--wall-muted-hex)' : '#06b6d4',
               cursor: loading ? 'wait' : 'pointer',
             }}
           >

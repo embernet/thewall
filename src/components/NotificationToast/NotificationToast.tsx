@@ -130,8 +130,8 @@ const NotificationToast: React.FC<NotificationToastProps> = ({ onNavigate, panel
             </div>
             <button
               onClick={(e) => { e.stopPropagation(); dismiss(n.id); }}
-              className="shrink-0 cursor-pointer border-none bg-transparent text-[10px] text-wall-subtle hover:text-wall-text"
-            >{'\u2715'}</button>
+              className="flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded border-none bg-transparent text-[10px] text-wall-subtle hover:text-wall-text hover:bg-wall-border"
+            ><span className="pointer-events-none">{'\u2715'}</span></button>
           </div>
         ))}
       </div>
@@ -173,7 +173,7 @@ const NotificationToast: React.FC<NotificationToastProps> = ({ onNavigate, panel
                 >Clear all</button>
               )}
             </div>
-            <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: '#334155 transparent' }}>
+            <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: 'var(--scrollbar-thumb) transparent' }}>
               {history.length === 0 ? (
                 <div className="px-3 py-8 text-center text-[11px] text-wall-muted">No notifications yet</div>
               ) : (

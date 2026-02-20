@@ -369,9 +369,9 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ open, onToggle, allCards, session
 
       {/* Hint bar */}
       <div className="shrink-0 border-b border-wall-border bg-wall-bg px-3 py-1">
-        <span className="text-[9px] text-wall-muted">
-          Tip: <strong className="text-wall-subtle">@help</strong> lists all agents ·{' '}
-          <strong className="text-wall-subtle">@agent-id</strong> invokes an agent ·{' '}
+        <span className="text-[9px] text-wall-text-dim">
+          Tip: <strong className="text-wall-text-muted">@help</strong> lists all agents ·{' '}
+          <strong className="text-wall-text-muted">@agent-id</strong> invokes an agent ·{' '}
           Paste or attach images · Ask about the session
         </span>
       </div>
@@ -380,16 +380,16 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ open, onToggle, allCards, session
       <div
         ref={scrollRef}
         className="flex-1 overflow-y-auto"
-        style={{ scrollbarWidth: 'thin', scrollbarColor: '#334155 transparent' }}
+        style={{ scrollbarWidth: 'thin', scrollbarColor: 'var(--scrollbar-thumb) transparent' }}
       >
         {messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
             <span className="text-4xl">💬</span>
-            <p className="text-[11px] text-wall-subtle">
+            <p className="text-[11px] text-wall-text-muted">
               Ask questions about the session, invoke agents with @mentions, or generate images.
             </p>
-            <p className="text-[10px] text-wall-muted">
-              Type <strong>@help</strong> to see what&apos;s available.
+            <p className="text-[10px] text-wall-text-dim">
+              Type <strong className="text-wall-text-muted">@help</strong> to see what&apos;s available.
             </p>
           </div>
         ) : (

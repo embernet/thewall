@@ -367,7 +367,7 @@ export default function FindRelatedView({ open, initialCard, onClose, onNavigate
           </div>
 
           {/* Search results */}
-          <div className="flex-1 overflow-y-auto px-6 pb-6" style={{ scrollbarWidth: 'thin', scrollbarColor: '#334155 transparent' }}>
+          <div className="flex-1 overflow-y-auto px-6 pb-6" style={{ scrollbarWidth: 'thin', scrollbarColor: 'var(--scrollbar-thumb) transparent' }}>
             <div className="max-w-[640px] mx-auto flex flex-col gap-1">
               {!searchQuery.trim() && (
                 <div className="text-center text-[11px] text-wall-muted py-12">
@@ -455,7 +455,7 @@ export default function FindRelatedView({ open, initialCard, onClose, onNavigate
                   )}
                 </div>
               </div>
-              <div className="flex-1 overflow-y-auto px-3 py-2" style={{ scrollbarWidth: 'thin', scrollbarColor: '#334155 transparent' }}>
+              <div className="flex-1 overflow-y-auto px-3 py-2" style={{ scrollbarWidth: 'thin', scrollbarColor: 'var(--scrollbar-thumb) transparent' }}>
                 {!loadingEmbeddings && embeddingResults.length === 0 && (
                   <div className="text-[10px] text-wall-muted py-8 text-center">No similar cards found</div>
                 )}
@@ -490,7 +490,7 @@ export default function FindRelatedView({ open, initialCard, onClose, onNavigate
                   )}
                 </div>
               </div>
-              <div className="flex-1 overflow-y-auto px-3 py-2" style={{ scrollbarWidth: 'thin', scrollbarColor: '#334155 transparent' }}>
+              <div className="flex-1 overflow-y-auto px-3 py-2" style={{ scrollbarWidth: 'thin', scrollbarColor: 'var(--scrollbar-thumb) transparent' }}>
                 {!loadingGraph && graphResults.length === 0 && (
                   <div className="text-[10px] text-wall-muted py-8 text-center">No graph connections found</div>
                 )}

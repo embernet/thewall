@@ -80,7 +80,7 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({ open, onClose, on
   return (
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center"
-      style={{ background: 'rgba(0,0,0,0.5)' }}
+      style={{ background: 'var(--modal-overlay)' }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className="w-[480px] rounded-xl border border-wall-border bg-wall-surface shadow-2xl flex flex-col overflow-hidden">
@@ -89,8 +89,8 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({ open, onClose, on
           <span className="text-sm font-semibold text-wall-text">Create Custom Agent</span>
           <button
             onClick={onClose}
-            className="cursor-pointer border-none bg-transparent text-wall-subtle hover:text-wall-text text-sm"
-          >{'\u2715'}</button>
+            className="flex h-6 w-6 cursor-pointer items-center justify-center rounded border-none bg-transparent text-sm text-wall-subtle hover:text-wall-text hover:bg-wall-border"
+          ><span className="pointer-events-none">{'\u2715'}</span></button>
         </div>
 
         {/* Form */}

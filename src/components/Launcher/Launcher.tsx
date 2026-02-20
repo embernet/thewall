@@ -274,9 +274,9 @@ export default function Launcher({
     <div className="flex h-screen w-full items-center justify-center bg-wall-bg font-sans">
       {/* Drag region for window movement */}
       <div className="drag-region fixed inset-x-0 top-0 h-10" />
-      <div className="w-[580px] max-h-[90vh] overflow-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-wall-muted">
+      <div className="w-[580px] max-h-[90vh] flex flex-col">
         {/* ── Header ── */}
-        <div className="mb-7 text-center">
+        <div className="mb-7 text-center shrink-0">
           <div
             className="mb-1.5 text-4xl font-extrabold tracking-tighter"
             style={{
@@ -293,7 +293,7 @@ export default function Launcher({
         </div>
 
         {/* ── Tab switcher ── */}
-        <div className="mb-4 flex justify-center gap-1">
+        <div className="mb-4 flex justify-center gap-1 shrink-0">
           {tabs.map((t) => (
             <button
               key={t.k}
@@ -311,7 +311,7 @@ export default function Launcher({
         </div>
 
         {/* ── Panel ── */}
-        <div className="rounded-xl border border-wall-border bg-wall-surface p-5 relative">
+        <div className="rounded-xl border border-wall-border bg-wall-surface p-5 relative min-h-0 overflow-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: 'var(--scrollbar-thumb) transparent' }}>
           {/* ─── Recent Sessions Tab ─── */}
           {tab === 'recent' && (
             <div>
@@ -546,25 +546,25 @@ export default function Launcher({
             </div>
           )}
         </div>
-      </div>
 
-      {/* ── Footer ── */}
-      <div className="mt-4 flex items-center justify-center gap-4 text-[10px] text-wall-subtle">
-        <button
-          onClick={onOpenHelp}
-          className="cursor-pointer border-none bg-transparent text-wall-subtle hover:text-wall-text-muted"
-        >
-          ? Help
-        </button>
-        <span>·</span>
-        <button
-          onClick={onOpenAbout}
-          className="cursor-pointer border-none bg-transparent text-wall-subtle hover:text-wall-text-muted"
-        >
-          About
-        </button>
-        <span>·</span>
-        <span>v0.1.0</span>
+        {/* ── Footer ── */}
+        <div className="mt-4 flex shrink-0 items-center justify-center gap-4 text-[10px] text-wall-subtle">
+          <button
+            onClick={onOpenHelp}
+            className="cursor-pointer border-none bg-transparent text-wall-subtle hover:text-wall-text-muted"
+          >
+            ? Help
+          </button>
+          <span>·</span>
+          <button
+            onClick={onOpenAbout}
+            className="cursor-pointer border-none bg-transparent text-wall-subtle hover:text-wall-text-muted"
+          >
+            About
+          </button>
+          <span>·</span>
+          <span>v0.1.0</span>
+        </div>
       </div>
     </div>
   );

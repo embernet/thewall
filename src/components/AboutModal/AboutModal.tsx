@@ -52,7 +52,7 @@ export default function AboutModal({ open, onClose }: AboutModalProps) {
         {/* Header gradient band */}
         <div
           className="w-full py-10 flex flex-col items-center"
-          style={{ background: 'linear-gradient(160deg, #0f0b1e 0%, #1a0f2e 50%, #0c111f 100%)' }}
+          style={{ background: 'var(--about-gradient)' }}
         >
           <div
             className="text-[42px] font-extrabold tracking-tighter leading-none"

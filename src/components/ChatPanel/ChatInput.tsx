@@ -160,12 +160,12 @@ const ChatInput: React.FC<ChatInputProps> = ({
           placeholder={loading ? 'Thinking…' : 'Ask or @agent-id…'}
           disabled={loading}
           rows={1}
-          className="flex-1 resize-none rounded-md border border-wall-border bg-wall-bg px-2 py-1.5 text-[11px] text-wall-text placeholder:text-wall-muted focus:outline-none focus:border-indigo-500 transition-colors"
+          className="flex-1 resize-none rounded-md border border-wall-border bg-wall-bg px-2 py-1.5 text-[11px] text-wall-text placeholder:text-wall-text-dim focus:outline-none focus:border-indigo-500 transition-colors"
           style={{
             minHeight: '32px',
             maxHeight: '120px',
             scrollbarWidth: 'thin',
-            scrollbarColor: '#334155 transparent',
+            scrollbarColor: 'var(--scrollbar-thumb) transparent',
           }}
           onInput={(e) => {
             // Auto-resize

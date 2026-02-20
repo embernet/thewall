@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { MODE_COLORS } from '@/types';
-import type { SessionMode, ApiKeyStatus, QueuePauseReason } from '@/types';
-import { getChatModels } from '@/utils/providers';
-import { getChatProvider } from '@/utils/llm';
+import type { SessionMode, QueuePauseReason } from '@/types';
 import { useSessionStore } from '@/store/session';
 import { workerPool } from '@/agents/worker-pool';
 import { exportSessionToFile } from '@/utils/export';
 import { fmtTime } from '@/utils/ids';
-import { setModel, getModel } from '@/utils/llm';
+import {
+  IconMenu, IconPause, IconPlay, IconBell, IconSearch, IconDollar, IconBot,
+  IconClipboard, IconGraph, IconSave, IconExport, IconSun, IconMoon,
+  IconHelp, IconGear, IconInfo,
+} from '@/components/Icons';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -29,29 +31,21 @@ interface TopBarProps {
   onOpenAbout: () => void;
   summaryVisible: boolean;
   notificationCount: number;
-  apiKeyStatus: ApiKeyStatus;
+  darkMode: boolean;
+  onToggleDarkMode: () => void;
 }
+
+// ---------------------------------------------------------------------------
+// Shared toolbar button style
+// ---------------------------------------------------------------------------
+
+const TB = 'cursor-pointer rounded-md border border-wall-muted/60 bg-wall-border/50 p-[5px] text-wall-text-dim hover:bg-wall-muted hover:text-wall-text transition-colors';
 
 // ---------------------------------------------------------------------------
 // Mode options
 // ---------------------------------------------------------------------------
 
 const MODES: SessionMode[] = ['silent', 'active', 'sidekick'];
-
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// Status color for API key
-// ---------------------------------------------------------------------------
-
-const STATUS_COLORS: Record<ApiKeyStatus, string> = {
-  unchecked: '#3b82f6', // blue
-  checking:  '#3b82f6', // blue
-  valid:     '#22c55e', // green
-  invalid:   '#ef4444', // red
-};
 
 export default function TopBar({
   simRunning,
@@ -69,14 +63,14 @@ export default function TopBar({
   onOpenAbout,
   summaryVisible,
   notificationCount,
-  apiKeyStatus,
+  darkMode,
+  onToggleDarkMode,
 }: TopBarProps) {
   const session = useSessionStore((s) => s.session);
   const cards = useSessionStore((s) => s.cards);
   const audio = useSessionStore((s) => s.audio);
   const agentBusy = useSessionStore((s) => s.agentBusy);
   const agentTasks = useSessionStore((s) => s.agentTasks);
-  const saveStatus = useSessionStore((s) => s.saveStatus);
   const speakerColors = useSessionStore((s) => s.speakerColors);
   const columns = useSessionStore((s) => s.columns);
   const queuePauseReason = useSessionStore((s) => s.queuePauseReason);
@@ -84,11 +78,23 @@ export default function TopBar({
   const setTitle = useSessionStore((s) => s.setTitle);
   const setMode = useSessionStore((s) => s.setMode);
   const goToLauncher = useSessionStore((s) => s.goToLauncher);
-  const setSaveStatus = useSessionStore((s) => s.setSaveStatus);
   const setQueuePaused = useSessionStore((s) => s.setQueuePaused);
 
   const [editTitle, setEditTitle] = useState(false);
-  const [selectedModel, setSelectedModel] = useState(getModel());
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close hamburger menu on outside click
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [menuOpen]);
 
   // Derived pause state
   const isQueuePaused = queuePauseReason !== null;
@@ -102,11 +108,9 @@ export default function TopBar({
 
   const toggleUserPause = () => {
     if (queuePauseReason === 'user') {
-      // Unpause
       setQueuePaused(null);
       workerPool.setPaused(false);
     } else if (!isAutoPaused) {
-      // Pause
       setQueuePaused('user');
       workerPool.setPaused(true);
     }
@@ -119,15 +123,55 @@ export default function TopBar({
   const runningAgents = Object.values(agentBusy).filter(Boolean).length;
   const queuedAgents = agentTasks.filter((t) => t.status === 'queued').length;
 
+  // Hamburger menu items use SVG components for consistency
+  const menuItems: Array<{ divider: true } | { label: string; icon: React.ReactNode; action: () => void; disabled?: boolean }> = [
+    { label: summaryVisible ? 'Hide Summary' : 'Show Summary', icon: <IconClipboard className="text-wall-text-muted" width={14} height={14} />, action: () => { onToggleSummary(); setMenuOpen(false); } },
+    { label: 'Knowledge Graph', icon: <IconGraph className="text-purple-400" width={14} height={14} />, action: () => { onToggleGraph(); setMenuOpen(false); } },
+    { label: 'Export', icon: <IconExport className="text-indigo-300" width={14} height={14} />, action: () => { onOpenExport(); setMenuOpen(false); } },
+    { label: isQueuePaused ? 'Resume Queue' : 'Pause Queue', icon: isQueuePaused ? <IconPlay width={14} height={14} /> : <IconPause width={14} height={14} />, action: () => { toggleUserPause(); setMenuOpen(false); }, disabled: isAutoPaused },
+    { divider: true },
+    { label: 'Search (Cmd+K)', icon: <IconSearch width={14} height={14} />, action: () => { onOpenSearch(); setMenuOpen(false); } },
+    { label: 'Notifications', icon: <IconBell width={14} height={14} />, action: () => { onToggleNotifications(); setMenuOpen(false); } },
+    { label: 'API Costs', icon: <IconDollar className="text-amber-400" width={14} height={14} />, action: () => { onOpenCost(); setMenuOpen(false); } },
+    { label: 'Agent Config', icon: <IconBot className="text-cyan-400" width={14} height={14} />, action: () => { onOpenAgentConfig(); setMenuOpen(false); } },
+    { divider: true },
+    { label: 'Help', icon: <IconHelp width={14} height={14} />, action: () => { onOpenHelp(); setMenuOpen(false); } },
+    { label: 'About', icon: <IconInfo width={14} height={14} />, action: () => { onOpenAbout(); setMenuOpen(false); } },
+    { label: 'Settings', icon: <IconGear width={14} height={14} />, action: () => { onOpenSettings(); setMenuOpen(false); } },
+  ];
+
   return (
-    <div className="drag-region flex h-[42px] min-h-[42px] shrink-0 items-center gap-2 border-b border-wall-border bg-wall-surface pr-3 pl-[70px]">
-      {/* ── Logo (click to return to launcher) ── */}
-      <button
-        onClick={goToLauncher}
-        className="cursor-pointer border-none bg-transparent p-0"
-      >
+    <div className="drag-region flex h-[42px] min-h-[42px] shrink-0 items-center gap-1.5 border-b border-wall-border bg-wall-surface pr-3 pl-[70px]">
+      {/* ── Hamburger menu ── */}
+      <div className="relative" ref={menuRef}>
+        <button onClick={() => setMenuOpen((o) => !o)} className={TB} title="Menu">
+          <IconMenu />
+        </button>
+        {menuOpen && (
+          <div className="absolute left-0 top-[34px] z-50 min-w-[190px] rounded-lg border border-wall-border bg-wall-surface py-1 shadow-xl shadow-black/40">
+            {menuItems.map((item, i) =>
+              'divider' in item ? (
+                <div key={i} className="my-1 border-t border-wall-border" />
+              ) : (
+                <button
+                  key={i}
+                  onClick={item.action}
+                  disabled={item.disabled}
+                  className="flex w-full cursor-pointer items-center gap-2.5 border-none bg-transparent px-3 py-1.5 text-left text-[11px] text-wall-text hover:bg-wall-muted/50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <span className="flex w-[16px] items-center justify-center">{item.icon}</span>
+                  {item.label}
+                </button>
+              ),
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Logo ── */}
+      <button onClick={goToLauncher} className="cursor-pointer border-none bg-transparent p-0">
         <span
-          className="text-[15px] font-extrabold tracking-tight"
+          className="whitespace-nowrap text-[15px] font-extrabold tracking-tight"
           style={{
             background: 'linear-gradient(135deg, #6366f1, #ec4899)',
             WebkitBackgroundClip: 'text',
@@ -138,7 +182,6 @@ export default function TopBar({
         </span>
       </button>
 
-      {/* Divider */}
       <div className="h-[18px] w-px bg-wall-border" />
 
       {/* ── Editable title ── */}
@@ -168,52 +211,13 @@ export default function TopBar({
             onClick={() => setMode(m)}
             className="cursor-pointer rounded-[7px] border-none px-[7px] py-0.5 text-[9px] font-semibold capitalize"
             style={{
-              background: session.mode === m ? MODE_COLORS[m] : '#1e293b',
-              color: session.mode === m ? '#fff' : '#64748b',
+              background: session.mode === m ? MODE_COLORS[m] : 'var(--wall-border-hex)',
+              color: session.mode === m ? '#fff' : 'var(--wall-text-dim-hex)',
             }}
           >
             {m}
           </button>
         ))}
-      </div>
-
-      {/* ── Model selector ── */}
-      <div className="flex items-center gap-1">
-        <div
-          className="h-[7px] w-[7px] rounded-full"
-          style={{
-            backgroundColor: STATUS_COLORS[apiKeyStatus],
-            boxShadow: apiKeyStatus === 'checking' ? '0 0 4px #3b82f6' : 'none',
-            animation: apiKeyStatus === 'checking' ? 'pulse 1.5s ease-in-out infinite' : 'none',
-          }}
-          title={
-            apiKeyStatus === 'unchecked' ? 'API key not checked'
-              : apiKeyStatus === 'checking' ? 'Verifying API key...'
-              : apiKeyStatus === 'valid' ? 'API key valid'
-              : 'API key invalid'
-          }
-        />
-        <select
-          value={selectedModel}
-          onChange={(e) => {
-            const id = e.target.value;
-            setSelectedModel(id);
-            setModel(id);
-          }}
-          className="cursor-pointer appearance-none rounded-md border border-wall-muted bg-wall-border px-2 py-[2px] pr-5 text-[10px] font-semibold outline-none"
-          style={{
-            color: STATUS_COLORS[apiKeyStatus],
-            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2364748b'/%3E%3C/svg%3E")`,
-            backgroundRepeat: 'no-repeat',
-            backgroundPosition: 'right 6px center',
-          }}
-        >
-          {getChatModels(getChatProvider()).map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.label}
-            </option>
-          ))}
-        </select>
       </div>
 
       {/* ── Sim status ── */}
@@ -245,7 +249,10 @@ export default function TopBar({
       {/* ── Queue pause info banner ── */}
       {isQueuePaused && (
         <div className="flex items-center gap-1.5 rounded-md border border-amber-700/30 bg-amber-900/15 px-2 py-0.5">
-          <span className="text-[10px]">{isAutoPaused ? '\u23F8\uFE0F' : '\u270B'}</span>
+          {isAutoPaused
+            ? <IconPause width={10} height={10} className="text-amber-400" />
+            : <span className="text-[10px]">{'\u270B'}</span>
+          }
           <span className="text-[9px] font-medium text-amber-300">
             {PAUSE_LABELS[queuePauseReason!]}
           </span>
@@ -255,7 +262,7 @@ export default function TopBar({
       {/* ── Agent status infographic ── */}
       {(agentCount > 0 || runningAgents > 0 || queuedAgents > 0) && (
         <div className="flex items-center gap-1.5 rounded-lg border border-cyan-700/20 bg-cyan-700/10 px-2.5 py-0.5">
-          <span className="text-[11px]">{'\uD83E\uDD16'}</span>
+          <IconBot width={12} height={12} className="text-cyan-400" />
           <span className="text-[10px] font-semibold text-cyan-300">{agentCount}</span>
           <span className="text-[9px] text-wall-subtle">insights</span>
           {runningAgents > 0 && (
@@ -276,167 +283,101 @@ export default function TopBar({
         </div>
       )}
 
-      {/* ── Queue pause toggle button ── */}
+      {/* ── Queue pause toggle ── */}
       <button
         onClick={toggleUserPause}
         disabled={isAutoPaused}
-        className="cursor-pointer rounded-md border px-2 py-[3px] text-[10px] font-semibold disabled:cursor-not-allowed disabled:opacity-40"
+        className="cursor-pointer rounded-md border p-[5px] disabled:cursor-not-allowed disabled:opacity-40 transition-colors"
         style={{
-          borderColor: isQueuePaused ? '#b45309' : '#374151',
-          backgroundColor: isQueuePaused ? (isAutoPaused ? '#451a03' : '#78350f') : '#1e293b',
-          color: isQueuePaused ? '#fbbf24' : '#64748b',
+          borderColor: isQueuePaused ? '#b45309' : 'rgb(var(--wall-muted) / 0.6)',
+          backgroundColor: isQueuePaused ? (isAutoPaused ? '#451a03' : '#78350f') : 'rgb(var(--wall-border) / 0.5)',
+          color: isQueuePaused ? '#fbbf24' : 'var(--wall-text-dim-hex)',
         }}
         title={
           isAutoPaused
             ? `Queue auto-paused: ${PAUSE_LABELS[queuePauseReason!]}`
-            : isQueuePaused
-              ? 'Resume agent queue'
-              : 'Pause agent queue'
+            : isQueuePaused ? 'Resume agent queue' : 'Pause agent queue'
         }
       >
-        {isQueuePaused ? '\u25B6 Resume' : '\u23F8 Pause'} Queue
+        {isQueuePaused ? <IconPlay /> : <IconPause />}
       </button>
 
       {/* ── Spacer ── */}
       <div className="flex-1" />
 
       {/* ── Notifications ── */}
-      <button
-        onClick={onToggleNotifications}
-        className="relative cursor-pointer rounded-md border border-wall-muted bg-wall-border px-2 py-[3px] text-[13px] text-wall-text-dim hover:bg-wall-muted"
-        title="Notifications"
-      >
-        {'\uD83D\uDD14'}
+      <button onClick={onToggleNotifications} className={`relative ${TB}`} title="Notifications">
+        <IconBell />
         {notificationCount > 0 && (
-          <span className="absolute -top-1 -right-1 h-[12px] min-w-[12px] rounded-full bg-amber-500 text-[7px] text-white flex items-center justify-center font-bold px-0.5">
+          <span className="absolute -top-1 -right-1 flex h-[13px] min-w-[13px] items-center justify-center rounded-full bg-amber-500 px-0.5 text-[7px] font-bold text-white">
             {notificationCount > 9 ? '9+' : notificationCount}
           </span>
         )}
       </button>
 
-      {/* ── Search (Cmd+K) ── */}
-      <button
-        onClick={onOpenSearch}
-        className="cursor-pointer rounded-md border border-wall-muted bg-wall-border px-2 py-[3px] text-[10px] font-semibold text-wall-text-dim hover:bg-wall-muted flex items-center gap-1"
-        title="Search all cards (Cmd+K)"
-      >
-        {'\uD83D\uDD0D'}
+      {/* ── Search ── */}
+      <button onClick={onOpenSearch} className={`${TB} flex items-center gap-1`} title="Search all cards (Cmd+K)">
+        <IconSearch />
         <kbd className="rounded border border-wall-muted bg-wall-border/80 px-1 text-[8px] text-wall-subtle">{'\u2318'}K</kbd>
       </button>
 
       {/* ── Cost Dashboard ── */}
-      <button
-        onClick={onOpenCost}
-        className="cursor-pointer rounded-md border border-wall-muted bg-wall-border px-2 py-[3px] text-[10px] font-semibold text-amber-400 hover:bg-wall-muted"
-        title="API Cost Dashboard"
-      >
-        {'\uD83D\uDCB0'}
+      <button onClick={onOpenCost} className={`${TB} text-amber-400 hover:text-amber-300`} title="API Cost Dashboard">
+        <IconDollar />
       </button>
 
       {/* ── Agent Config ── */}
-      <button
-        onClick={onOpenAgentConfig}
-        className="cursor-pointer rounded-md border border-wall-muted bg-wall-border px-2 py-[3px] text-[10px] font-semibold text-cyan-400 hover:bg-wall-muted"
-        title="Agent Configuration"
-      >
-        {'\uD83E\uDD16'}
+      <button onClick={onOpenAgentConfig} className={`${TB} text-cyan-400 hover:text-cyan-300`} title="Agent Configuration">
+        <IconBot />
       </button>
 
       {/* ── Summary toggle ── */}
       <button
         onClick={onToggleSummary}
-        className={`cursor-pointer rounded-md border px-2 py-[3px] text-[10px] font-semibold hover:bg-wall-muted ${
+        className={`cursor-pointer rounded-md border p-[5px] transition-colors ${
           summaryVisible
-            ? 'border-amber-600 bg-amber-900/30 text-amber-400'
-            : 'border-wall-muted bg-wall-border text-amber-400'
+            ? 'border-indigo-500/60 bg-indigo-950/30 text-wall-text hover:bg-indigo-950/50'
+            : 'border-wall-muted/60 bg-wall-border/50 text-wall-text-dim hover:bg-wall-muted hover:text-wall-text'
         }`}
         title={summaryVisible ? 'Hide Summary' : 'Show Summary'}
       >
-        {'\uD83D\uDCCB'} Summary
+        <IconClipboard />
       </button>
 
-      {/* ── Knowledge Graph toggle ── */}
-      <button
-        onClick={onToggleGraph}
-        className="cursor-pointer rounded-md border border-wall-muted bg-wall-border px-2 py-[3px] text-[10px] font-semibold text-purple-400 hover:bg-wall-muted"
-        title="Knowledge Graph"
-      >
-        {'\uD83D\uDD78\uFE0F'} Graph
+      {/* ── Knowledge Graph ── */}
+      <button onClick={onToggleGraph} className={`${TB} text-purple-400 hover:text-purple-300`} title="Knowledge Graph">
+        <IconGraph />
       </button>
 
       {/* ── Quick save ── */}
       <button
         onClick={() =>
-          exportSessionToFile({
-            session,
-            columns,
-            cards,
-            speakerColors,
-            agentTasks,
-          })
+          exportSessionToFile({ session, columns, cards, speakerColors, agentTasks })
         }
-        className="cursor-pointer rounded-md border border-wall-muted bg-wall-border px-2 py-[3px] text-[10px] font-semibold text-green-500 hover:bg-wall-muted"
+        className={`${TB} text-green-500 hover:text-green-400`}
         title="Quick save to disk"
       >
-        {'\uD83D\uDCBE'}
+        <IconSave />
       </button>
 
-      {/* ── Export button ── */}
-      <button
-        onClick={onOpenExport}
-        className="cursor-pointer rounded-md border border-wall-muted bg-wall-border px-2 py-[3px] text-[10px] font-semibold text-indigo-300 hover:bg-wall-muted"
-        title="Export options"
-      >
-        {'\uD83D\uDCE4'} Export
+      {/* ── Export ── */}
+      <button onClick={onOpenExport} className={`${TB} text-indigo-300 hover:text-indigo-200`} title="Export options">
+        <IconExport />
       </button>
 
-      {/* ── Save status indicator ── */}
-      <span
-        className="text-[9px] font-medium"
-        style={{
-          color:
-            saveStatus === 'saved'
-              ? '#22c55e'
-              : saveStatus === 'saving'
-                ? '#f59e0b'
-                : saveStatus === 'error'
-                  ? '#ef4444'
-                  : '#475569',
-        }}
-      >
-        {saveStatus === 'saved'
-          ? '\u25CF synced'
-          : saveStatus === 'saving'
-            ? '\u25CF syncing...'
-            : saveStatus === 'error'
-              ? '\u25CF sync error'
-              : '\u25CB unsaved'}
-      </span>
+      {/* ── Dark / Light mode ── */}
+      <button onClick={onToggleDarkMode} className={TB} title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}>
+        {darkMode ? <IconSun /> : <IconMoon />}
+      </button>
 
       {/* ── Help ── */}
-      <button
-        onClick={onOpenHelp}
-        className="cursor-pointer rounded-md border border-wall-muted bg-wall-border px-2 py-[3px] text-[10px] font-semibold text-wall-text-dim hover:bg-wall-muted"
-        title="Help"
-      >
-        ? Help
-      </button>
-
-      {/* ── About ── */}
-      <button
-        onClick={onOpenAbout}
-        className="cursor-pointer rounded-md border border-wall-muted bg-wall-border px-2 py-[3px] text-[10px] font-semibold text-wall-text-dim hover:bg-wall-muted"
-        title="About The Wall"
-      >
-        About
+      <button onClick={onOpenHelp} className={TB} title="Help">
+        <IconHelp />
       </button>
 
       {/* ── Settings ── */}
-      <button
-        onClick={onOpenSettings}
-        className="cursor-pointer border-none bg-transparent text-[13px] text-wall-text-dim hover:text-wall-text-muted"
-      >
-        {'\u2699\uFE0F'}
+      <button onClick={onOpenSettings} className={TB} title="Settings">
+        <IconGear />
       </button>
     </div>
   );

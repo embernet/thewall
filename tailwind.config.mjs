@@ -6,14 +6,14 @@ export default {
     extend: {
       colors: {
         wall: {
-          bg: '#020617',
-          surface: '#0f172a',
-          border: '#1e293b',
-          muted: '#334155',
-          subtle: '#475569',
-          text: '#e2e8f0',
-          'text-muted': '#94a3b8',
-          'text-dim': '#64748b',
+          bg: 'rgb(var(--wall-bg) / <alpha-value>)',
+          surface: 'rgb(var(--wall-surface) / <alpha-value>)',
+          border: 'rgb(var(--wall-border) / <alpha-value>)',
+          muted: 'rgb(var(--wall-muted) / <alpha-value>)',
+          subtle: 'rgb(var(--wall-subtle) / <alpha-value>)',
+          text: 'rgb(var(--wall-text) / <alpha-value>)',
+          'text-muted': 'rgb(var(--wall-text-muted) / <alpha-value>)',
+          'text-dim': 'rgb(var(--wall-text-dim) / <alpha-value>)',
         },
       },
       animation: {

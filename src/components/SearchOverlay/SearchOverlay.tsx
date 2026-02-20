@@ -116,7 +116,7 @@ const SearchOverlay: React.FC<SearchOverlayProps> = ({ open, onClose, onNavigate
   return (
     <div
       className="fixed inset-0 z-[9999] flex items-start justify-center pt-[15vh]"
-      style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+      style={{ background: 'var(--modal-overlay)', backdropFilter: 'blur(4px)' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className="w-[560px] max-h-[60vh] rounded-xl border border-wall-border bg-wall-surface shadow-2xl flex flex-col overflow-hidden">
@@ -136,7 +136,7 @@ const SearchOverlay: React.FC<SearchOverlayProps> = ({ open, onClose, onNavigate
         </div>
 
         {/* Results */}
-        <div ref={listRef} className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: '#334155 transparent' }}>
+        <div ref={listRef} className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: 'var(--scrollbar-thumb) transparent' }}>
           {query.trim() && results.length === 0 && (
             <div className="px-4 py-8 text-center text-[11px] text-wall-muted">No matches found</div>
           )}

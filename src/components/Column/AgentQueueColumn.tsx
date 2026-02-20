@@ -78,7 +78,7 @@ const AgentQueueColumn: React.FC<AgentQueueColumnProps> = ({
         className="flex-1 overflow-auto px-2 py-1.5"
         style={{
           scrollbarWidth: 'thin',
-          scrollbarColor: '#334155 transparent',
+          scrollbarColor: 'var(--scrollbar-thumb) transparent',
         }}
       >
         {/* Running agents */}
@@ -126,14 +126,14 @@ const AgentQueueColumn: React.FC<AgentQueueColumnProps> = ({
                   key={t.id}
                   className="mb-[5px] overflow-hidden rounded-md"
                   style={{
-                    background: '#0f172a',
-                    border: `1px solid ${isFail ? '#7f1d1d' : '#1e293b'}`,
+                    background: 'var(--wall-surface-hex)',
+                    border: `1px solid ${isFail ? '#7f1d1d' : 'var(--wall-border-hex)'}`,
                     borderLeft: `3px solid ${
                       t.status === 'completed'
                         ? '#22c55e'
                         : isFail
                           ? '#ef4444'
-                          : '#64748b'
+                          : 'var(--wall-text-dim-hex)'
                     }`,
                   }}
                 >
@@ -155,7 +155,7 @@ const AgentQueueColumn: React.FC<AgentQueueColumnProps> = ({
                                 ? '#22c55e'
                                 : isFail
                                   ? '#ef4444'
-                                  : '#64748b',
+                                  : 'var(--wall-text-dim-hex)',
                           }}
                         >
                           {t.status}
@@ -196,7 +196,7 @@ const AgentQueueColumn: React.FC<AgentQueueColumnProps> = ({
                   {isExp && (
                     <div
                       className="border-t border-wall-border p-2"
-                      style={{ background: '#0a0f1a' }}
+                      style={{ background: 'var(--wall-bg-hex)' }}
                     >
                       {/* Error details */}
                       {isFail && t.error && (

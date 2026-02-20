@@ -133,7 +133,7 @@ const AgentDetail: React.FC<AgentDetailProps> = ({
   return (
     <div
       className="flex-1 overflow-y-auto px-4 py-3"
-      style={{ scrollbarWidth: 'thin', scrollbarColor: '#334155 transparent' }}
+      style={{ scrollbarWidth: 'thin', scrollbarColor: 'var(--scrollbar-thumb) transparent' }}
     >
       {/* Header */}
       <div className="flex items-center gap-2 mb-3">

@@ -297,9 +297,9 @@ export default function SettingsPanel({ open, onClose, onOpenAgentConfig }: Sett
           <h2 className="m-0 text-[15px] font-semibold text-wall-text">Settings</h2>
           <button
             onClick={onClose}
-            className="cursor-pointer border-none bg-transparent text-base text-wall-text-dim hover:text-wall-text-muted"
+            className="flex h-6 w-6 cursor-pointer items-center justify-center rounded border-none bg-transparent text-base text-wall-text-dim hover:text-wall-text-muted hover:bg-wall-border"
           >
-            {'\u2715'}
+            <span className="pointer-events-none">{'\u2715'}</span>
           </button>
         </div>
 

@@ -82,6 +82,17 @@ export default function App() {
   const [findRelatedInitialCard, setFindRelatedInitialCard] = useState<Card | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => {
+    const stored = localStorage.getItem('wall:dark-mode');
+    return stored !== 'false'; // default to dark
+  });
+
+  // Apply dark mode class to document
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', darkMode);
+    document.documentElement.classList.toggle('light', !darkMode);
+    localStorage.setItem('wall:dark-mode', String(darkMode));
+  }, [darkMode]);
 
   // Agent config store (for sidebar Agents tab)
   const agentConfigStore = useAgentConfigStore();
@@ -738,7 +749,8 @@ export default function App() {
         onOpenAbout={() => setAboutOpen(true)}
         summaryVisible={summaryColumnVisible}
         notificationCount={notifCount}
-        apiKeyStatus={apiKeyStatus}
+        darkMode={darkMode}
+        onToggleDarkMode={() => setDarkMode(d => !d)}
       />
 
       {/* ── Linking mode banner ── */}
@@ -856,7 +868,7 @@ export default function App() {
         />
       </div>
 
-      <StatusBar simRunning={simRunning} embeddingProvider={embeddingProvider} />
+      <StatusBar simRunning={simRunning} embeddingProvider={embeddingProvider} apiKeyStatus={apiKeyStatus} />
 
       <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} onOpenAgentConfig={() => setAgentConfigOpen(true)} />
       {exportOpen && <ExportMenu onClose={() => setExportOpen(false)} />}

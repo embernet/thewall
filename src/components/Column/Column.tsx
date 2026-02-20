@@ -310,7 +310,7 @@ const Column: React.FC<ColumnProps> = ({
         >
           {column.title}
         </span>
-        <span className="mt-[3px] rounded-[7px] bg-wall-border px-1 py-[1px] text-[9px] text-wall-subtle">
+        <span className="mt-[3px] rounded-[7px] bg-wall-border px-1 py-[1px] text-[9px] text-wall-text-muted font-medium">
           {cards.length}
         </span>
       </div>
@@ -323,14 +323,14 @@ const Column: React.FC<ColumnProps> = ({
       className="flex h-full min-w-[340px] w-[340px] flex-col border-r border-wall-border bg-wall-surface"
       onDragOver={(e) => {
         e.preventDefault();
-        e.currentTarget.style.background = '#1a1f35';
+        e.currentTarget.style.background = 'var(--wall-surface-hover-hex)';
       }}
       onDragLeave={(e) => {
-        e.currentTarget.style.background = '#0f172a';
+        e.currentTarget.style.background = 'var(--wall-surface-hex)';
       }}
       onDrop={(e) => {
         e.preventDefault();
-        e.currentTarget.style.background = '#0f172a';
+        e.currentTarget.style.background = 'var(--wall-surface-hex)';
         const cid = e.dataTransfer.getData('text/plain');
         if (cid) handleDrop(column.id, cid);
       }}
@@ -343,7 +343,7 @@ const Column: React.FC<ColumnProps> = ({
             <span className="text-xs font-semibold text-wall-text">
               {column.title}
             </span>
-            <span className="rounded-lg bg-wall-border px-[5px] text-[10px] text-wall-subtle">
+            <span className="rounded-lg bg-wall-border px-[5px] text-[10px] text-wall-text-muted font-medium">
               {cards.length}
             </span>
             {isBusy && (
@@ -369,8 +369,8 @@ const Column: React.FC<ColumnProps> = ({
                 disabled={summarizing}
                 className={`cursor-pointer border-none bg-transparent text-[11px] ${
                   summaryUpToDate
-                    ? 'text-green-400 hover:text-green-300'
-                    : 'text-wall-subtle hover:text-amber-400'
+                    ? 'text-wall-text-muted hover:text-wall-text'
+                    : 'text-wall-subtle hover:text-wall-text-muted'
                 }`}
                 title={summaryUpToDate ? 'Summary up to date (click to regenerate)' : 'Summarize cards'}
               >
@@ -500,9 +500,9 @@ const Column: React.FC<ColumnProps> = ({
                   border:
                     audio?.recording || simRunning
                       ? '2px solid #ef4444'
-                      : '2px solid #334155',
+                      : `2px solid var(--wall-muted-hex)`,
                   background:
-                    audio?.recording || simRunning ? '#7f1d1d' : '#1e293b',
+                    audio?.recording || simRunning ? '#7f1d1d' : 'var(--wall-border-hex)',
                 }}
               >
                 {(audio?.recording || simRunning) && !audio?.paused && (
@@ -521,7 +521,7 @@ const Column: React.FC<ColumnProps> = ({
                     borderRadius:
                       audio?.recording || simRunning ? 2 : '50%',
                     background:
-                      audio?.recording || simRunning ? '#ef4444' : '#64748b',
+                      audio?.recording || simRunning ? '#ef4444' : 'var(--wall-text-dim-hex)',
                   }}
                 />
               </button>
@@ -623,8 +623,8 @@ const Column: React.FC<ColumnProps> = ({
                         : f === 'ai'
                           ? '#3b82f6'
                           : '#6366f1'
-                      : '#1e293b',
-                  color: hlF === f ? '#fff' : '#64748b',
+                      : 'var(--wall-border-hex)',
+                  color: hlF === f ? '#fff' : 'var(--wall-text-dim-hex)',
                 }}
               >
                 {f === 'all' ? 'All' : f === 'user' ? '\u2B50 User' : '\uD83E\uDD16 AI'}
@@ -636,15 +636,15 @@ const Column: React.FC<ColumnProps> = ({
 
       {/* ── Summary panel ── */}
       {summary && (
-        <div className="mx-2 mt-1.5 rounded-md border border-amber-800/40 bg-amber-950/30 px-2.5 py-2 max-h-[33%] flex flex-col">
+        <div className="mx-2 mt-1.5 rounded-md border px-2.5 py-2 max-h-[33%] flex flex-col" style={{ borderColor: 'var(--summary-border)', backgroundColor: 'var(--summary-bg)' }}>
           <div className="mb-1 flex items-center justify-between shrink-0">
-            <span className="text-[9px] font-semibold uppercase tracking-wide text-amber-400">
+            <span className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: 'var(--summary-heading)' }}>
               Summary
             </span>
             <div className="flex gap-1">
               <button
                 onClick={() => navigator.clipboard?.writeText(summary)}
-                className="cursor-pointer border-none bg-transparent text-[9px] text-amber-500 hover:text-amber-300"
+                className="cursor-pointer border-none bg-transparent text-[9px] summary-action"
                 title="Copy"
               >
                 {'\uD83D\uDCCB'}
@@ -654,7 +654,7 @@ const Column: React.FC<ColumnProps> = ({
                   setSummaryDraft(summary);
                   setEditingSummary(true);
                 }}
-                className="cursor-pointer border-none bg-transparent text-[9px] text-amber-500 hover:text-amber-300"
+                className="cursor-pointer border-none bg-transparent text-[9px] summary-action"
                 title="Edit"
               >
                 {'\u270F\uFE0F'}
@@ -662,14 +662,14 @@ const Column: React.FC<ColumnProps> = ({
               <button
                 onClick={handleSummarize}
                 disabled={summarizing}
-                className="cursor-pointer border-none bg-transparent text-[9px] text-amber-500 hover:text-amber-300"
+                className="cursor-pointer border-none bg-transparent text-[9px] summary-action"
                 title="Regenerate"
               >
                 {summarizing ? '\u23F3' : '\uD83D\uDD04'}
               </button>
               <button
                 onClick={() => setSummaryOpen((o) => !o)}
-                className="cursor-pointer border-none bg-transparent text-[9px] text-amber-500 hover:text-amber-300"
+                className="cursor-pointer border-none bg-transparent text-[9px] summary-action"
                 title={summaryOpen ? 'Collapse' : 'Expand'}
               >
                 {summaryOpen ? '\u25B2' : '\u25BC'}
@@ -682,7 +682,7 @@ const Column: React.FC<ColumnProps> = ({
                     config: { ...column.config, summary: undefined, summaryHash: undefined },
                   });
                 }}
-                className="cursor-pointer border-none bg-transparent text-[9px] text-amber-500 hover:text-amber-300"
+                className="cursor-pointer border-none bg-transparent text-[9px] summary-action"
                 title="Delete"
               >
                 {'\uD83D\uDDD1\uFE0F'}
@@ -694,8 +694,8 @@ const Column: React.FC<ColumnProps> = ({
               <textarea
                 value={summaryDraft}
                 onChange={(e) => setSummaryDraft(e.target.value)}
-                className="w-full rounded-md border border-amber-800/40 bg-amber-950/60 p-1.5 text-[11px] text-amber-200/80 resize-y font-[inherit] outline-none"
-                style={{ minHeight: 60, boxSizing: 'border-box' }}
+                className="w-full rounded-md border p-1.5 text-[11px] resize-y font-[inherit] outline-none summary-text"
+                style={{ minHeight: 60, boxSizing: 'border-box', borderColor: 'var(--summary-border)', backgroundColor: 'var(--summary-textarea-bg)' }}
                 autoFocus
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && e.metaKey) {
@@ -717,7 +717,7 @@ const Column: React.FC<ColumnProps> = ({
                       config: { ...column.config, summary: summaryDraft },
                     });
                   }}
-                  className="text-[10px] bg-amber-700 text-white border-none rounded px-2 py-0.5 cursor-pointer"
+                  className="text-[10px] bg-amber-600 text-white border-none rounded px-2 py-0.5 cursor-pointer"
                 >
                   Save
                 </button>
@@ -730,7 +730,7 @@ const Column: React.FC<ColumnProps> = ({
               </div>
             </div>
           ) : summaryOpen ? (
-            <div className="card-markdown text-[11px] leading-relaxed text-amber-200/80 overflow-y-auto min-h-0" style={{ scrollbarWidth: 'thin', scrollbarColor: '#92400e transparent' }}>
+            <div className="card-markdown text-[11px] leading-relaxed summary-text overflow-y-auto min-h-0" style={{ scrollbarWidth: 'thin', scrollbarColor: 'var(--summary-scrollbar) transparent' }}>
               <ReactMarkdown>{summary}</ReactMarkdown>
             </div>
           ) : null}
@@ -743,7 +743,7 @@ const Column: React.FC<ColumnProps> = ({
         className="flex-1 overflow-auto px-2 py-1.5"
         style={{
           scrollbarWidth: 'thin',
-          scrollbarColor: '#334155 transparent',
+          scrollbarColor: 'var(--scrollbar-thumb) transparent',
         }}
       >
         {filtered

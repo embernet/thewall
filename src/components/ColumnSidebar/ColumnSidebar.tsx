@@ -130,7 +130,7 @@ const ColumnSidebar: React.FC<ColumnSidebarProps> = ({
             className="cursor-pointer rounded px-2 py-1 text-[10px] font-medium transition-colors"
             style={{
               background: activeTab === 'columns' ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
-              color: activeTab === 'columns' ? '#a5b4fc' : '#64748b',
+              color: activeTab === 'columns' ? '#a5b4fc' : 'var(--wall-text-dim-hex)',
               border: 'none',
             }}
           >
@@ -141,7 +141,7 @@ const ColumnSidebar: React.FC<ColumnSidebarProps> = ({
             className="cursor-pointer rounded px-2 py-1 text-[10px] font-medium transition-colors"
             style={{
               background: activeTab === 'agents' ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
-              color: activeTab === 'agents' ? '#a5b4fc' : '#64748b',
+              color: activeTab === 'agents' ? '#a5b4fc' : 'var(--wall-text-dim-hex)',
               border: 'none',
             }}
           >
@@ -162,7 +162,7 @@ const ColumnSidebar: React.FC<ColumnSidebarProps> = ({
       {activeTab === 'columns' ? (
         <div
           className="flex-1 overflow-auto px-1 py-1"
-          style={{ scrollbarWidth: 'thin', scrollbarColor: '#334155 transparent' }}
+          style={{ scrollbarWidth: 'thin', scrollbarColor: 'var(--scrollbar-thumb) transparent' }}
         >
           {sorted.map((col, idx) => {
             const meta = getMeta(col);
@@ -204,7 +204,7 @@ const ColumnSidebar: React.FC<ColumnSidebarProps> = ({
                 <span
                   className="min-w-0 flex-1 truncate text-[10px]"
                   style={{
-                    color: col.visible ? '#e2e8f0' : '#64748b',
+                    color: col.visible ? 'var(--wall-text-hex)' : 'var(--wall-text-dim-hex)',
                     fontWeight: col.visible ? 500 : 400,
                   }}
                 >

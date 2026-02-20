@@ -2,6 +2,89 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Theme CSS Variables ──────────────────────────────────────────────── */
+/* RGB triplets for Tailwind's <alpha-value> support + hex for inline styles */
+
+.dark {
+  --wall-bg: 2 6 23;
+  --wall-surface: 15 23 42;
+  --wall-border: 30 41 59;
+  --wall-muted: 51 65 85;
+  --wall-subtle: 71 85 105;
+  --wall-text: 226 232 240;
+  --wall-text-muted: 148 163 184;
+  --wall-text-dim: 100 116 139;
+
+  --wall-bg-hex: #020617;
+  --wall-surface-hex: #0f172a;
+  --wall-surface-hover-hex: #1a1f35;
+  --wall-border-hex: #1e293b;
+  --wall-muted-hex: #334155;
+  --wall-subtle-hex: #475569;
+  --wall-text-hex: #e2e8f0;
+  --wall-text-muted-hex: #94a3b8;
+  --wall-text-dim-hex: #64748b;
+
+  --scrollbar-thumb: #334155;
+  --scrollbar-thumb-hover: #475569;
+  --modal-overlay: rgba(0, 0, 0, 0.6);
+  --about-gradient: linear-gradient(160deg, #0f0b1e 0%, #1a0f2e 50%, #0c111f 100%);
+  --code-color: #22d3ee;
+  --link-color: #818cf8;
+
+  /* Summary amber palette */
+  --summary-bg: rgba(69, 26, 3, 0.3);
+  --summary-border: rgba(146, 64, 14, 0.4);
+  --summary-heading: #fbbf24;
+  --summary-text: rgba(253, 230, 138, 0.8);
+  --summary-action: #f59e0b;
+  --summary-action-hover: #fcd34d;
+  --summary-scrollbar: #92400e;
+  --summary-hint: rgba(251, 191, 36, 0.7);
+  --summary-textarea-border: rgba(180, 83, 9, 0.5);
+  --summary-textarea-bg: rgba(69, 26, 3, 0.2);
+}
+
+.light {
+  --wall-bg: 248 250 252;
+  --wall-surface: 255 255 255;
+  --wall-border: 226 232 240;
+  --wall-muted: 203 213 225;
+  --wall-subtle: 148 163 184;
+  --wall-text: 30 41 59;
+  --wall-text-muted: 71 85 105;
+  --wall-text-dim: 148 163 184;
+
+  --wall-bg-hex: #f8fafc;
+  --wall-surface-hex: #ffffff;
+  --wall-surface-hover-hex: #f1f5f9;
+  --wall-border-hex: #e2e8f0;
+  --wall-muted-hex: #cbd5e1;
+  --wall-subtle-hex: #94a3b8;
+  --wall-text-hex: #1e293b;
+  --wall-text-muted-hex: #475569;
+  --wall-text-dim-hex: #94a3b8;
+
+  --scrollbar-thumb: #cbd5e1;
+  --scrollbar-thumb-hover: #94a3b8;
+  --modal-overlay: rgba(0, 0, 0, 0.3);
+  --about-gradient: linear-gradient(160deg, #eef2ff 0%, #f0e6ff 50%, #f0f4ff 100%);
+  --code-color: #0891b2;
+  --link-color: #4f46e5;
+
+  /* Summary amber palette — darker shades for light backgrounds */
+  --summary-bg: rgba(255, 251, 235, 1);
+  --summary-border: rgba(217, 119, 6, 0.3);
+  --summary-heading: #92400e;
+  --summary-text: #78350f;
+  --summary-action: #b45309;
+  --summary-action-hover: #92400e;
+  --summary-scrollbar: #d97706;
+  --summary-hint: #b45309;
+  --summary-textarea-border: rgba(217, 119, 6, 0.4);
+  --summary-textarea-bg: rgba(255, 251, 235, 0.5);
+}
+
 @layer base {
   body {
     @apply bg-wall-bg text-wall-text antialiased;
@@ -20,17 +103,17 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #334155;
+    background: var(--scrollbar-thumb);
     border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #475569;
+    background: var(--scrollbar-thumb-hover);
   }
 
   /* Firefox scrollbar */
   * {
     scrollbar-width: thin;
-    scrollbar-color: #334155 transparent;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
   }
 }
 
@@ -79,7 +162,8 @@
     @apply my-0.5;
   }
   .card-markdown code {
-    @apply bg-wall-border rounded px-1 py-px text-[10px] font-mono text-cyan-400;
+    @apply bg-wall-border rounded px-1 py-px text-[10px] font-mono;
+    color: var(--code-color);
   }
   .card-markdown pre {
     @apply bg-wall-border rounded-md p-2 my-1 overflow-x-auto;
@@ -91,7 +175,8 @@
     @apply border-l-2 border-wall-muted pl-2 my-1 text-wall-subtle italic;
   }
   .card-markdown a {
-    @apply text-indigo-400 underline;
+    @apply underline;
+    color: var(--link-color);
   }
   .card-markdown hr {
     @apply border-wall-border my-2;
@@ -104,6 +189,19 @@
   }
   .card-markdown td {
     @apply border-b border-wall-border py-0.5 pr-2;
+  }
+}
+
+@layer components {
+  /* ── Summary theme-aware colors ─────────────────────────────────── */
+  .summary-action {
+    color: var(--summary-action);
+  }
+  .summary-action:hover {
+    color: var(--summary-action-hover);
+  }
+  .summary-text {
+    color: var(--summary-text);
   }
 }
 

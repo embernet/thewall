@@ -101,7 +101,7 @@ const AgentList: React.FC<AgentListProps> = ({ selectedId, onSelect, configs, cu
       {/* Agent list */}
       <div
         className="flex-1 overflow-y-auto px-1 py-1"
-        style={{ scrollbarWidth: 'thin', scrollbarColor: '#334155 transparent' }}
+        style={{ scrollbarWidth: 'thin', scrollbarColor: 'var(--scrollbar-thumb) transparent' }}
       >
         {/* Built-in agents */}
         {agents.map(agent => {
