@@ -68,7 +68,7 @@ export default function AboutModal({ open, onClose }: AboutModalProps) {
             AI-powered intelligence surface for meetings, research &amp; thinking
           </div>
           <div className="mt-3 rounded-full border border-wall-border bg-wall-surface/60 px-3 py-1 text-[10px] font-mono text-wall-subtle">
-            v0.1.0
+            v0.2.0
           </div>
         </div>
 

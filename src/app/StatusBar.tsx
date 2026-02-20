@@ -123,7 +123,7 @@ export default function StatusBar({ simRunning, embeddingProvider, apiKeyStatus 
         </select>
       </div>
 
-      <span>The Wall &mdash; v0.1.0</span>
+      <span>The Wall &mdash; v0.2.0</span>
     </div>
   );
 }

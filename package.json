@@ -1,6 +1,6 @@
 {
   "name": "the-wall",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "AI-powered intelligence surface for meetings, research & thinking",
   "main": "dist-electron/main.js",
   "scripts": {
