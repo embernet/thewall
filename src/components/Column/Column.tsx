@@ -40,7 +40,8 @@ const Column: React.FC<ColumnProps> = ({
   const [hlF, setHlF] = useState('all');
   const [speakerFilter, setSpeakerFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
+  const [agentFilter, setAgentFilter] = useState('');
+  const [showFilters, setShowFilters] = useState(true);
   const [transcriptMenuOpen, setTranscriptMenuOpen] = useState(false);
   const transcriptMenuRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -131,6 +132,11 @@ const Column: React.FC<ColumnProps> = ({
 
   // Unique speakers for filter dropdown + context menu
   const speakers = Array.from(new Set(cards.map(c => c.speaker).filter(Boolean) as string[]));
+  // Unique agent names for filter dropdown
+  const agentNames = useMemo(() =>
+    Array.from(new Set(cards.map(c => c.sourceAgentName).filter(Boolean) as string[])).sort(),
+    [cards],
+  );
   // All known speakers (from speakerColors + cards)
   const allKnownSpeakers = useMemo(() => {
     const s = new Set(Object.keys(speakerColors));
@@ -253,6 +259,9 @@ const Column: React.FC<ColumnProps> = ({
   }
   if (sourceFilter) {
     filtered = filtered.filter((c) => c.source === sourceFilter);
+  }
+  if (agentFilter) {
+    filtered = filtered.filter((c) => c.sourceAgentName === agentFilter);
   }
   // Hide processed raw transcript cards — they've been merged into clean cards
   if (column.type === 'transcript') {
@@ -437,15 +446,13 @@ const Column: React.FC<ColumnProps> = ({
                 {'\u007B\u007D'}
               </button>
             )}
-            {cards.length > 3 && (
-              <button
-                onClick={() => setShowFilters(o => !o)}
-                className={`cursor-pointer border-none bg-transparent text-[11px] ${showFilters || speakerFilter || sourceFilter ? 'text-indigo-400' : 'text-wall-subtle'} hover:text-indigo-300`}
-                title="Filter cards"
-              >
-                {'\uD83D\uDD0D'}
-              </button>
-            )}
+            <button
+              onClick={() => setShowFilters(o => !o)}
+              className={`cursor-pointer border-none bg-transparent text-[11px] ${showFilters || speakerFilter || sourceFilter || agentFilter ? 'text-indigo-400' : 'text-wall-subtle'} hover:text-indigo-300`}
+              title={showFilters ? 'Hide filters & search' : 'Show filters & search'}
+            >
+              {'\uD83D\uDD0D'}
+            </button>
             <button
               onClick={() => toggleColumnCollapsed(column.id)}
               className="cursor-pointer border-none bg-transparent text-[11px] text-wall-subtle"
@@ -455,36 +462,50 @@ const Column: React.FC<ColumnProps> = ({
           </div>
         </div>
 
-        {/* ── Column filters ── */}
+        {/* ── Search + filters (toggled together) ── */}
         {showFilters && (
-          <div className="flex flex-wrap gap-1 mt-1 px-0.5">
-            {speakers.length > 0 && (
+          <>
+            <div className="flex flex-wrap gap-1 mt-1 px-0.5">
+              {speakers.length > 0 && (
+                <select
+                  value={speakerFilter}
+                  onChange={(e) => setSpeakerFilter(e.target.value)}
+                  className="rounded-md border border-wall-muted bg-wall-border px-1.5 py-0.5 text-[9px] text-wall-text outline-none"
+                >
+                  <option value="">All speakers</option>
+                  {speakers.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              )}
               <select
-                value={speakerFilter}
-                onChange={(e) => setSpeakerFilter(e.target.value)}
+                value={sourceFilter}
+                onChange={(e) => setSourceFilter(e.target.value)}
                 className="rounded-md border border-wall-muted bg-wall-border px-1.5 py-0.5 text-[9px] text-wall-text outline-none"
               >
-                <option value="">All speakers</option>
-                {speakers.map(s => <option key={s} value={s}>{s}</option>)}
+                <option value="">All sources</option>
+                <option value="user">User</option>
+                <option value="agent">Agent</option>
+                {(column.type === 'transcript' || column.type === 'highlights') && (
+                  <option value="transcription">Transcript</option>
+                )}
               </select>
-            )}
-            <select
-              value={sourceFilter}
-              onChange={(e) => setSourceFilter(e.target.value)}
-              className="rounded-md border border-wall-muted bg-wall-border px-1.5 py-0.5 text-[9px] text-wall-text outline-none"
-            >
-              <option value="">All sources</option>
-              <option value="user">User</option>
-              <option value="agent">Agent</option>
-              <option value="transcription">Transcript</option>
-            </select>
-            {(speakerFilter || sourceFilter) && (
-              <button
-                onClick={() => { setSpeakerFilter(''); setSourceFilter(''); }}
-                className="cursor-pointer border-none bg-transparent text-[9px] text-indigo-400 hover:text-indigo-300"
-              >Clear</button>
-            )}
-          </div>
+              {agentNames.length > 0 && (
+                <select
+                  value={agentFilter}
+                  onChange={(e) => setAgentFilter(e.target.value)}
+                  className="rounded-md border border-wall-muted bg-wall-border px-1.5 py-0.5 text-[9px] text-wall-text outline-none"
+                >
+                  <option value="">All agents</option>
+                  {agentNames.map(a => <option key={a} value={a}>{a}</option>)}
+                </select>
+              )}
+              {(speakerFilter || sourceFilter || agentFilter) && (
+                <button
+                  onClick={() => { setSpeakerFilter(''); setSourceFilter(''); setAgentFilter(''); }}
+                  className="cursor-pointer border-none bg-transparent text-[9px] text-indigo-400 hover:text-indigo-300"
+                >Clear</button>
+              )}
+            </div>
+          </>
         )}
 
         {/* ── Transcript record controls ── */}
@@ -596,41 +617,41 @@ const Column: React.FC<ColumnProps> = ({
           </div>
         )}
 
-        {/* ── Search bar (when >5 cards) ── */}
-        {cards.length > 5 && (
-          <input
-            placeholder="Search..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="mt-[3px] w-full rounded-md border border-wall-muted bg-wall-border px-[7px] py-[3px] text-[11px] text-wall-text outline-none"
-            style={{ boxSizing: 'border-box' }}
-          />
-        )}
-
-        {/* ── Highlights filter tabs ── */}
-        {column.type === 'highlights' && (
-          <div className="mt-1 flex gap-[3px]">
-            {(['all', 'user', 'ai'] as const).map((f) => (
-              <button
-                key={f}
-                onClick={() => setHlF(f)}
-                className="cursor-pointer rounded-lg border-none px-[7px] py-0.5 text-[9px] font-medium"
-                style={{
-                  background:
-                    hlF === f
-                      ? f === 'user'
-                        ? '#f59e0b'
-                        : f === 'ai'
-                          ? '#3b82f6'
-                          : '#6366f1'
-                      : 'var(--wall-border-hex)',
-                  color: hlF === f ? '#fff' : 'var(--wall-text-dim-hex)',
-                }}
-              >
-                {f === 'all' ? 'All' : f === 'user' ? '\u2B50 User' : '\uD83E\uDD16 AI'}
-              </button>
-            ))}
-          </div>
+        {/* ── Search bar + highlights tabs (inside filter toggle) ── */}
+        {showFilters && (
+          <>
+            <input
+              placeholder="Search..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="mt-[3px] w-full rounded-md border border-wall-muted bg-wall-border px-[7px] py-[3px] text-[11px] text-wall-text outline-none"
+              style={{ boxSizing: 'border-box' }}
+            />
+            {column.type === 'highlights' && (
+              <div className="mt-1 flex gap-[3px]">
+                {(['all', 'user', 'ai'] as const).map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setHlF(f)}
+                    className="cursor-pointer rounded-lg border-none px-[7px] py-0.5 text-[9px] font-medium"
+                    style={{
+                      background:
+                        hlF === f
+                          ? f === 'user'
+                            ? '#f59e0b'
+                            : f === 'ai'
+                              ? '#3b82f6'
+                              : '#6366f1'
+                          : 'var(--wall-border-hex)',
+                      color: hlF === f ? '#fff' : 'var(--wall-text-dim-hex)',
+                    }}
+                  >
+                    {f === 'all' ? 'All' : f === 'user' ? '\u2B50 User' : '\uD83E\uDD16 AI'}
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
 

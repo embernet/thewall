@@ -316,9 +316,8 @@ export default function TopBar({
       </button>
 
       {/* ── Search ── */}
-      <button onClick={onOpenSearch} className={`${TB} flex items-center gap-1`} title="Search all cards (Cmd+K)">
+      <button onClick={onOpenSearch} className={TB} title="Search all cards (Cmd+K)">
         <IconSearch />
-        <kbd className="rounded border border-wall-muted bg-wall-border/80 px-1 text-[8px] text-wall-subtle">{'\u2318'}K</kbd>
       </button>
 
       {/* ── Cost Dashboard ── */}
