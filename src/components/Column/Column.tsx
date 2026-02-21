@@ -13,6 +13,7 @@ import TranscriptInput from './TranscriptInput';
 import { askClaude } from '@/utils/llm';
 import { speakText, stopSpeaking } from '@/utils/tts';
 import TtsTransport from '@/components/TtsTransport';
+import TranscriptSpeaker from './TranscriptSpeaker';
 
 interface ColumnProps {
   column: ColumnType;
@@ -76,6 +77,8 @@ const Column: React.FC<ColumnProps> = ({
   const [editingSummary, setEditingSummary] = useState(false);
   const [summaryDraft, setSummaryDraft] = useState('');
   const [ttsActive, setTtsActive] = useState(false);
+  const [transcriptSpeakerOpen, setTranscriptSpeakerOpen] = useState(false);
+  const [speakingCardId, setSpeakingCardId] = useState<string | null>(null);
 
   // Change tracking: compute a content hash from visible cards
   const computeContentHash = (cardList: CardType[]): string => {
@@ -572,6 +575,24 @@ const Column: React.FC<ColumnProps> = ({
                   </div>
                 )}
               </div>
+              {/* Speak transcript button */}
+              {cards.length > 0 && (
+                <button
+                  onClick={() => {
+                    if (transcriptSpeakerOpen) {
+                      stopSpeaking();
+                      setTranscriptSpeakerOpen(false);
+                      setSpeakingCardId(null);
+                    } else {
+                      setTranscriptSpeakerOpen(true);
+                    }
+                  }}
+                  title={transcriptSpeakerOpen ? 'Stop speaking transcript' : 'Speak transcript'}
+                  className="flex h-[26px] w-[26px] cursor-pointer items-center justify-center rounded-md border border-wall-muted bg-wall-border text-wall-text-muted hover:text-wall-text"
+                >
+                  <SvgIcon name={transcriptSpeakerOpen ? 'speak-stop' : 'speak'} size={12} />
+                </button>
+              )}
               {audio?.recording && (
                 <button
                   onClick={onPauseRecord}
@@ -785,6 +806,17 @@ const Column: React.FC<ColumnProps> = ({
         </div>
       )}
 
+      {/* ── Transcript Speaker panel ── */}
+      {column.type === 'transcript' && transcriptSpeakerOpen && (
+        <TranscriptSpeaker
+          cards={[...filtered].sort((a, b) => (a.sortOrder || '').localeCompare(b.sortOrder || ''))}
+          speakerColors={speakerColors}
+          scrollRef={scrollRef}
+          onClose={() => { setTranscriptSpeakerOpen(false); setSpeakingCardId(null); }}
+          onCardChange={setSpeakingCardId}
+        />
+      )}
+
       {/* ── Card list ── */}
       <div
         ref={scrollRef}
@@ -825,6 +857,7 @@ const Column: React.FC<ColumnProps> = ({
                 linkingFrom={linkingFrom}
                 onStartLink={onStartLink}
                 onCompleteLink={onCompleteLink}
+                speakingHighlight={speakingCardId === card.id}
               />
             </div>
           ))}

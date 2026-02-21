@@ -50,6 +50,7 @@ interface CardProps {
   linkingFrom?: string | null;
   onStartLink?: (cardId: string) => void;
   onCompleteLink?: (cardId: string) => void;
+  speakingHighlight?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -72,6 +73,7 @@ export default function Card({
   linkingFrom,
   onStartLink,
   onCompleteLink,
+  speakingHighlight,
 }: CardProps) {
   const [editing, setEditing] = useState(false);
   const [txt, setTxt] = useState(card.content);
@@ -302,7 +304,7 @@ export default function Card({
         ];
         showMenu(e, items);
       }}
-      className={`bg-wall-surface rounded-lg px-2.5 py-2 mb-1.5 transition-all duration-150 ${card.pinned ? 'ring-1 ring-amber-600/40' : ''} ${isLinkSource ? 'ring-2 ring-purple-500' : ''} ${isLinkTarget ? 'cursor-crosshair hover:ring-1 hover:ring-purple-400' : ''} `}
+      className={`bg-wall-surface rounded-lg px-2.5 py-2 mb-1.5 transition-all duration-150 ${card.pinned ? 'ring-1 ring-amber-600/40' : ''} ${isLinkSource ? 'ring-2 ring-purple-500' : ''} ${isLinkTarget ? 'cursor-crosshair hover:ring-1 hover:ring-purple-400' : ''} ${speakingHighlight ? 'ring-2 ring-amber-400/70' : ''} `}
       style={{
         border: `1px solid ${highlighted ? borderColor : isLinkSource ? '#a855f7' : 'var(--wall-border-hex)'}`,
         borderLeft: isRawTranscript

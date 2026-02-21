@@ -190,6 +190,125 @@ export function stopSpeaking(): void {
   }
 }
 
+// ── Preloading ───────────────────────────────────────────────────────────────
+//
+// preloadTts() fetches audio from the TTS API in the background and returns a
+// handle that can later be played instantly via playPreloaded().  This lets the
+// TranscriptSpeaker start fetching the *next* card's audio while the current
+// card is still playing, eliminating the dead-air gap between cards.
+
+export interface PreloadedAudio {
+  audio: HTMLAudioElement;
+  objectUrl: string;
+  /** Set to true if the preload was cancelled before it completed. */
+  cancelled: boolean;
+}
+
+/**
+ * Fetch TTS audio in the background without playing it.
+ * Returns a handle that can be passed to playPreloaded().
+ * Call handle.cancelled = true to discard it (the object URL will be revoked).
+ */
+export async function preloadTts(
+  text: string,
+  voice?: TtsVoice,
+): Promise<PreloadedAudio | null> {
+  if (!text.trim()) return null;
+
+  const truncated = text.length > 4096 ? text.slice(0, 4093) + '...' : text;
+  const resolvedVoice = voice ?? getPreferredVoice();
+
+  const result = await window.electronAPI.ttsSpeak(truncated, resolvedVoice);
+
+  if (result.error || !result.audioBase64) {
+    console.warn('[tts] Preload API error:', result.error || 'no audio data');
+    return null;
+  }
+
+  // Decode base64 → blob → object URL → HTMLAudioElement
+  const binaryStr = atob(result.audioBase64);
+  const bytes = new Uint8Array(binaryStr.length);
+  for (let i = 0; i < binaryStr.length; i++) {
+    bytes[i] = binaryStr.charCodeAt(i);
+  }
+  const blob = new Blob([bytes], { type: result.mimeType || 'audio/mpeg' });
+  const objectUrl = URL.createObjectURL(blob);
+  const audio = new Audio(objectUrl);
+
+  // Force the browser to buffer the audio data
+  audio.preload = 'auto';
+  audio.load();
+
+  const handle: PreloadedAudio = { audio, objectUrl, cancelled: false };
+  return handle;
+}
+
+/**
+ * Discard a preloaded audio handle, revoking its object URL.
+ */
+export function discardPreloaded(handle: PreloadedAudio | null): void {
+  if (!handle) return;
+  handle.cancelled = true;
+  handle.audio.pause();
+  handle.audio.src = '';
+  URL.revokeObjectURL(handle.objectUrl);
+}
+
+/**
+ * Install a preloaded audio handle as the active TTS playback and start it.
+ * Returns a promise that resolves when playback completes (like speakText).
+ * The onLoaded callback fires immediately since the audio is already buffered.
+ */
+export function playPreloaded(
+  handle: PreloadedAudio,
+  onLoaded?: () => void,
+): Promise<void> {
+  // Stop any existing playback and claim a new generation
+  stopSpeaking();
+  const myGeneration = speakGeneration;
+
+  if (handle.cancelled) return Promise.resolve();
+
+  currentObjectUrl = handle.objectUrl;
+  const audio = handle.audio;
+  currentAudio = audio;
+
+  notifyChange(); // notify: new audio installed
+
+  return new Promise<void>((resolve, reject) => {
+    // Wire up change notifications for UI updates
+    audio.ontimeupdate = notifyChange;
+    audio.onplay = notifyChange;
+    audio.onpause = notifyChange;
+    audio.onseeked = notifyChange;
+    audio.onloadedmetadata = () => {
+      notifyChange();
+      onLoaded?.();
+    };
+    // If metadata is already loaded (preload finished), fire immediately
+    if (audio.readyState >= 1) {
+      onLoaded?.();
+    }
+
+    audio.onended = () => {
+      if (speakGeneration === myGeneration) stopSpeaking();
+      notifyChange();
+      resolve();
+    };
+    audio.onerror = () => {
+      if (speakGeneration === myGeneration) stopSpeaking();
+      notifyChange();
+      reject(new Error('Audio playback failed'));
+    };
+
+    audio.play().catch((e) => {
+      if (speakGeneration === myGeneration) stopSpeaking();
+      notifyChange();
+      reject(e);
+    });
+  });
+}
+
 // ── Change listeners ────────────────────────────────────────────────────────
 
 type TtsChangeListener = () => void;
