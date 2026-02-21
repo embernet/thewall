@@ -537,6 +537,12 @@ export interface ElectronAPI {
   /** Proxy OpenAI TTS API calls through the main process (bypasses CORS). */
   ttsSpeak: (text: string, voice?: string) => Promise<{ audioBase64?: string; mimeType?: string; error?: string }>;
 
+  /** List available TTS voices (validates API key and returns voice catalogue). */
+  ttsListVoices: () => Promise<{
+    voices: Array<{ id: string; name: string; description: string }>;
+    error: string | null;
+  }>;
+
   /** List available Google Imagen models through main process (bypasses CORS). */
   listImagenModels: (apiKey: string) => Promise<{
     models: Array<{ name: string; displayName?: string; supportedGenerationMethods?: string[] }>;

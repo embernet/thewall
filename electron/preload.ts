@@ -99,6 +99,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Text-to-Speech proxy (bypasses CORS)
   ttsSpeak: (text: string, voice?: string) =>
     ipcRenderer.invoke('tts:speak', text, voice) as Promise<{ audioBase64?: string; mimeType?: string; error?: string }>,
+  ttsListVoices: () =>
+    ipcRenderer.invoke('tts:listVoices') as Promise<{
+      voices: Array<{ id: string; name: string; description: string }>;
+      error: string | null;
+    }>,
 
   // Image generation proxy (bypasses CORS for Google Imagen API)
   listImagenModels: (apiKey: string) =>

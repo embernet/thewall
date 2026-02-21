@@ -21,16 +21,33 @@ let cachedModelId = 'tts-1';
 let cachedKey = '';
 
 /** TTS voice options (OpenAI voices). */
-export type TtsVoice = 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
+export type TtsVoice = 'alloy' | 'ash' | 'coral' | 'echo' | 'fable' | 'onyx' | 'nova' | 'sage' | 'shimmer';
 
 export const TTS_VOICES: readonly { id: TtsVoice; label: string }[] = [
   { id: 'alloy', label: 'Alloy' },
+  { id: 'ash', label: 'Ash' },
+  { id: 'coral', label: 'Coral' },
   { id: 'echo', label: 'Echo' },
   { id: 'fable', label: 'Fable' },
   { id: 'onyx', label: 'Onyx' },
   { id: 'nova', label: 'Nova' },
+  { id: 'sage', label: 'Sage' },
   { id: 'shimmer', label: 'Shimmer' },
 ] as const;
+
+const VOICE_STORAGE_KEY = 'wall:tts-voice';
+
+/** Get the user's preferred TTS voice (from localStorage). */
+export function getPreferredVoice(): TtsVoice {
+  const stored = localStorage.getItem(VOICE_STORAGE_KEY);
+  if (stored && TTS_VOICES.some(v => v.id === stored)) return stored as TtsVoice;
+  return 'alloy';
+}
+
+/** Save the user's preferred TTS voice to localStorage. */
+export function setPreferredVoice(voice: TtsVoice): void {
+  localStorage.setItem(VOICE_STORAGE_KEY, voice);
+}
 
 export function setTtsConfig(provider: ApiProvider, modelId: string, key: string): void {
   cachedProvider = provider;
@@ -211,9 +228,12 @@ export async function speakText(
   // Truncate very long text (TTS API has a 4096 char limit)
   const truncated = text.length > 4096 ? text.slice(0, 4093) + '...' : text;
 
+  // Use saved preference when no explicit voice is passed
+  const resolvedVoice = voice ?? getPreferredVoice();
+
   notifyChange(); // notify: loading started
 
-  const result = await window.electronAPI.ttsSpeak(truncated, voice);
+  const result = await window.electronAPI.ttsSpeak(truncated, resolvedVoice);
 
   // ── Stale-response guard ──────────────────────────────────────────────
   // If stopSpeaking() (or another speakText()) was called while we were

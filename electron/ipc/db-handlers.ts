@@ -742,6 +742,76 @@ export function registerDbHandlers() {
     }
   });
 
+  // ── TTS: List Available Voices ──
+  // OpenAI TTS voices are a known static set, but we validate the API key works
+  // by making a tiny speech request, and return the voice catalogue.
+
+  ipcMain.handle('tts:listVoices', async () => {
+    // Read TTS config from DB, fall back to transcription key
+    let row = db().prepare('SELECT * FROM api_keys WHERE slot = ?').get('tts') as any;
+    if (!row) {
+      row = db().prepare('SELECT * FROM api_keys WHERE slot = ?').get('transcription') as any;
+    }
+    if (!row) return { error: 'No TTS or Transcription API key configured', voices: [] };
+
+    let apiKey = '';
+    if (row.encrypted_key) {
+      try {
+        if (safeStorage.isEncryptionAvailable()) {
+          apiKey = safeStorage.decryptString(row.encrypted_key);
+        } else {
+          apiKey = row.encrypted_key.toString('utf-8');
+        }
+      } catch {
+        return { error: 'Failed to decrypt TTS API key', voices: [] };
+      }
+    }
+    if (!apiKey) return { error: 'TTS API key is empty', voices: [] };
+
+    // OpenAI voices are a fixed set — return them if the key looks valid.
+    // We do a minimal API call to confirm the key works.
+    try {
+      const r = await fetch('https://api.openai.com/v1/audio/speech', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'tts-1',
+          input: 'test',
+          voice: 'alloy',
+          response_format: 'mp3',
+        }),
+      });
+      if (!r.ok) {
+        const err = await r.text().catch(() => r.statusText);
+        return { error: `OpenAI TTS API error ${r.status}: ${err}`, voices: [] };
+      }
+      // Consume the response body so the connection is released
+      await r.arrayBuffer();
+
+      // Return the known voice catalogue
+      return {
+        error: null,
+        voices: [
+          { id: 'alloy', name: 'Alloy', description: 'Neutral and balanced' },
+          { id: 'ash', name: 'Ash', description: 'Warm and clear' },
+          { id: 'coral', name: 'Coral', description: 'Warm and engaging' },
+          { id: 'echo', name: 'Echo', description: 'Smooth and resonant' },
+          { id: 'fable', name: 'Fable', description: 'Warm and British-accented' },
+          { id: 'onyx', name: 'Onyx', description: 'Deep and authoritative' },
+          { id: 'nova', name: 'Nova', description: 'Friendly and upbeat' },
+          { id: 'sage', name: 'Sage', description: 'Gentle and composed' },
+          { id: 'shimmer', name: 'Shimmer', description: 'Bright and expressive' },
+        ],
+      };
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return { error: msg, voices: [] };
+    }
+  });
+
   // ── Image Generation Proxy ──
   // Proxies Imagen 3 API calls through the main process to avoid CORS issues
   // in the renderer. Google's Generative AI API does not set CORS headers.

@@ -6,7 +6,8 @@ import { setChatConfig, validateApiKey } from '@/utils/llm';
 import { setEmbeddingConfig } from '@/utils/embedding-service';
 import { setTranscriptionConfig } from '@/utils/transcription';
 import { setImageGenConfig } from '@/utils/image-generation';
-import { setTtsConfig } from '@/utils/tts';
+import { setTtsConfig, getPreferredVoice, setPreferredVoice, speakText, stopSpeaking, isSpeaking } from '@/utils/tts';
+import type { TtsVoice } from '@/utils/tts';
 import { bus } from '@/events/bus';
 import {
   loadSummaryPrompts,
@@ -79,6 +80,13 @@ export default function SettingsPanel({ open, onClose, onOpenAgentConfig }: Sett
 
   // "Use same key as Transcription" toggle for TTS
   const [ttsUseSameKey, setTtsUseSameKey] = useState(false);
+
+  // TTS voice selection
+  const [ttsVoices, setTtsVoices] = useState<Array<{ id: string; name: string; description: string }>>([]);
+  const [ttsVoice, setTtsVoice] = useState<TtsVoice>(getPreferredVoice());
+  const [ttsVoicesLoading, setTtsVoicesLoading] = useState(false);
+  const [ttsVoicesError, setTtsVoicesError] = useState<string | null>(null);
+  const [ttsTesting, setTtsTesting] = useState(false);
 
   // Fetched models per provider (live from API)
   const [fetchedModels, setFetchedModels] = useState<Record<string, ModelDef[]>>({});
@@ -168,6 +176,34 @@ export default function SettingsPanel({ open, onClose, onOpenAgentConfig }: Sett
   useEffect(() => {
     if (open) setSummaryPrompts(loadSummaryPrompts());
   }, [open]);
+
+  // Fetch TTS voices when panel opens and TTS key is available
+  const fetchTtsVoices = useCallback(async () => {
+    setTtsVoicesLoading(true);
+    setTtsVoicesError(null);
+    try {
+      const result = await window.electronAPI.ttsListVoices();
+      if (result.error) {
+        setTtsVoicesError(result.error);
+        setTtsVoices([]);
+      } else {
+        setTtsVoices(result.voices);
+      }
+    } catch (e) {
+      setTtsVoicesError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setTtsVoicesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const ttsState = slotStates.tts;
+    if (ttsState.hasExistingKey || ttsUseSameKey) {
+      fetchTtsVoices();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, slotStates.tts.hasExistingKey, ttsUseSameKey]);
 
   // Update a single slot field
   const updateSlot = useCallback((slot: ApiSlot, patch: Partial<SlotState>) => {
@@ -401,7 +437,7 @@ export default function SettingsPanel({ open, onClose, onOpenAgentConfig }: Sett
                   onSave={() => saveSlot(slotDef.slot)}
                 />
                 {/* "Use same key as Transcription" toggle for TTS slot */}
-                {slotDef.slot === 'tts' && (
+                {slotDef.slot === 'tts' && (<>
                   <label className="mt-1.5 flex items-center gap-2 text-[10px] text-wall-text-dim cursor-pointer select-none">
                     <input
                       type="checkbox"
@@ -435,7 +471,72 @@ export default function SettingsPanel({ open, onClose, onOpenAgentConfig }: Sett
                     />
                     Use same OpenAI API key as Voice Transcription
                   </label>
-                )}
+
+                  {/* Voice selection dropdown + test button */}
+                  <div className="mt-2.5 rounded-lg border border-wall-border bg-wall-bg p-3">
+                    <label className="mb-1 block text-[10px] font-medium text-wall-text-dim">Default Voice</label>
+                    {ttsVoicesLoading ? (
+                      <div className="text-[10px] text-wall-subtle py-1">Loading voices...</div>
+                    ) : ttsVoicesError ? (
+                      <div className="text-[10px] text-wall-subtle py-1">
+                        Save an API key above to configure voice selection.
+                      </div>
+                    ) : ttsVoices.length > 0 ? (
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={ttsVoice}
+                          onChange={(e) => {
+                            const v = e.target.value as TtsVoice;
+                            setTtsVoice(v);
+                            setPreferredVoice(v);
+                          }}
+                          className="flex-1 cursor-pointer rounded-md border border-wall-muted bg-wall-border px-2 py-1 text-xs text-wall-text outline-none"
+                        >
+                          {ttsVoices.map((v) => (
+                            <option key={v.id} value={v.id}>
+                              {v.name} {'\u2014'} {v.description}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={async () => {
+                            if (ttsTesting) {
+                              stopSpeaking();
+                              setTtsTesting(false);
+                              return;
+                            }
+                            setTtsTesting(true);
+                            const voiceObj = ttsVoices.find(v => v.id === ttsVoice);
+                            const voiceName = voiceObj?.name ?? ttsVoice;
+                            try {
+                              await speakText(
+                                `Hi, this is the ${voiceName} voice.`,
+                                ttsVoice,
+                              );
+                            } catch (e) {
+                              console.warn('[tts] Test failed:', e);
+                            } finally {
+                              setTtsTesting(false);
+                            }
+                          }}
+                          className={
+                            'cursor-pointer rounded-md border-none px-3 py-1 text-[10px] font-semibold text-white ' +
+                            (ttsTesting
+                              ? 'bg-red-600 hover:bg-red-500'
+                              : 'bg-indigo-600 hover:bg-indigo-500')
+                          }
+                          title={ttsTesting ? 'Stop test' : 'Test voice'}
+                        >
+                          {ttsTesting ? '\u25A0 Stop' : '\u25B6 Test'}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="text-[10px] text-wall-subtle py-1">
+                        Save an API key above to see available voices.
+                      </div>
+                    )}
+                  </div>
+                </>)}
               </div>
             ))}
           </div>
