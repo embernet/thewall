@@ -126,6 +126,21 @@ export const SLOT_PROVIDERS: readonly SlotDef[] = [
       },
     ],
   },
+  {
+    slot: 'search',
+    label: 'Web Search',
+    description: 'Powers Google Search and Patent Search tools (free tier: 100 queries/day)',
+    providers: [
+      {
+        id: 'google',
+        label: 'Google Custom Search',
+        models: [
+          { id: 'free', label: 'Free tier (100 queries/day)', inputCost: 0, outputCost: 0 },
+          { id: 'paid', label: 'Paid ($5 per 1K queries after free tier)', inputCost: 0.005, outputCost: 0 },
+        ],
+      },
+    ],
+  },
 ] as const;
 
 // ---------------------------------------------------------------------------

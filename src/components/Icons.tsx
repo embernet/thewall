@@ -352,6 +352,15 @@ export function IconStar(props: IconProps) {
   );
 }
 
+/** Paperclip — Artefacts column */
+export function IconArtefact(props: IconProps) {
+  return (
+    <svg {...defaults} {...props}>
+      <path d="M6.5 13.5V5a2.5 2.5 0 015 0v7a1.5 1.5 0 01-3 0V5.5a.5.5 0 011 0V12" />
+    </svg>
+  );
+}
+
 /** Clipboard check — Summary column */
 export function IconSummary(props: IconProps) {
   return (
@@ -1171,6 +1180,7 @@ const ICON_MAP: Record<string, (props: IconProps) => JSX.Element> = {
   inquiry: IconInquiry,
   agent_queue: IconBolt,
   highlights: IconStar,
+  artefacts: IconArtefact,
   summary: IconSummary,
   trash: IconTrash,
 

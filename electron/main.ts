@@ -1,9 +1,10 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { initDatabase, getDatabase } from './ipc/database';
 import { registerDbHandlers } from './ipc/db-handlers';
 import { registerFileHandlers } from './ipc/file-handlers';
+import { registerToolHandlers } from './ipc/tool-handlers';
 
 // ESM polyfill for __dirname (not available in ES modules)
 const __filename = fileURLToPath(import.meta.url);
@@ -39,6 +40,23 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
 
+  // Prevent the Electron window from navigating away when clicking external links.
+  // Open them in the system default browser instead.
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    // Allow dev server reloads and file:// loads
+    if (url.startsWith('http://localhost') || url.startsWith('file://')) return;
+    event.preventDefault();
+    shell.openExternal(url);
+  });
+
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('http://localhost') || url.startsWith('file://')) {
+      return { action: 'allow' };
+    }
+    shell.openExternal(url);
+    return { action: 'deny' };
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -49,11 +67,18 @@ app.whenReady().then(() => {
   initDatabase(userDataPath);
   registerDbHandlers();
   registerFileHandlers();
+  registerToolHandlers();
 
   ipcMain.handle('app:quit', () => {
     const db = getDatabase();
     if (db) db.close();
     app.quit();
+  });
+
+  ipcMain.handle('shell:openExternal', (_event, url: string) => {
+    if (typeof url === 'string' && (url.startsWith('https://') || url.startsWith('http://'))) {
+      return shell.openExternal(url);
+    }
   });
 
   createWindow();

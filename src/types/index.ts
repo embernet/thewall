@@ -26,6 +26,7 @@ export type ColumnType =
   | 'inquiry'
   | 'agent_queue'
   | 'highlights'
+  | 'artefacts'
   | 'summary'
   | 'trash';
 
@@ -394,7 +395,7 @@ export interface SourceBadge {
 // ----------------------------------------------------------------------------
 
 /** Functional slot — each capability has its own provider/model/key. */
-export type ApiSlot = 'chat' | 'embeddings' | 'image_gen' | 'transcription';
+export type ApiSlot = 'chat' | 'embeddings' | 'image_gen' | 'transcription' | 'search';
 
 /** Supported API providers. */
 export type ApiProvider = 'anthropic' | 'openai' | 'voyage' | 'google' | 'local' | 'wispr';
@@ -544,8 +545,41 @@ export interface ElectronAPI {
    *  modelId overrides the saved setting for per-generation model selection. */
   generateImage: (prompt: string, inputBase64?: string, modelId?: string) => Promise<{ imageData?: string; mimeType?: string; error?: string }>;
 
+  /** Tool proxies — CORS-bypassed external API calls for agent tools. */
+  tools: {
+    webSearch: (query: string, numResults?: number) => Promise<{
+      results: Array<{ title: string; url: string; snippet: string }>;
+      error: string | null;
+    }>;
+    searchPatents: (query: string, numResults?: number) => Promise<{
+      results: Array<{ title: string; url: string; snippet: string }>;
+      error: string | null;
+    }>;
+    searchArxiv: (query: string, numResults?: number) => Promise<{
+      results: Array<{ title: string; url: string; authors: string; published: string; summary: string }>;
+      error: string | null;
+    }>;
+    searchAcademic: (query: string, numResults?: number, yearFrom?: number) => Promise<{
+      results: Array<{ title: string; authors: string; year: number; abstract: string; url: string; citationCount: number; venue: string }>;
+      error: string | null;
+    }>;
+    wikipediaLookup: (query: string) => Promise<{
+      result: { title: string; extract: string; url: string } | null;
+      error: string | null;
+    }>;
+    fetchUrl: (url: string) => Promise<{
+      result: { title: string; content: string; url: string } | null;
+      error: string | null;
+    }>;
+    fetchPdf: (url: string) => Promise<{
+      result: { title: string; content: string; pageCount: number } | null;
+      error: string | null;
+    }>;
+  };
+
   shell: {
     openPath: (filePath: string) => Promise<string>;
+    openExternal: (url: string) => Promise<void>;
   };
 }
 
@@ -626,6 +660,7 @@ export const COL_TYPES: readonly ColumnMeta[] = [
   { type: 'inquiry',     title: 'Inquiry',        icon: 'inquiry',       color: '#06b6d4' },
   { type: 'agent_queue', title: 'Agent Queue',    icon: 'agent_queue',   color: '#eab308' },
   { type: 'highlights',  title: 'Highlights',     icon: 'highlights',    color: '#fbbf24' },
+  { type: 'artefacts',   title: 'Artefacts',      icon: 'artefacts',     color: '#8b5cf6' },
   { type: 'summary',     title: 'Summary',        icon: 'summary',       color: '#f59e0b' },
   { type: 'trash',       title: 'Trash',          icon: 'trash',         color: '#6b7280' },
 ] as const;

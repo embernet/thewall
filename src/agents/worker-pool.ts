@@ -408,11 +408,67 @@ export class WorkerPool {
 
   /**
    * Create Card objects from agent result and add them to the store.
+   * Also creates artefact cards for tool results and links them bidirectionally.
    * Returns the number of cards created.
    */
   private createCards(result: AgentResult, task: QueuedTask): number {
     const store = useSessionStore.getState();
     let count = 0;
+
+    // --- Phase A: Create artefact cards (tool results) ---
+    const artefactCardIds: string[] = [];
+
+    if (result.artefacts && result.artefacts.length > 0) {
+      const artefactsCol = store.columns.find((c) => c.type === 'artefacts');
+      if (artefactsCol) {
+        for (const artefact of result.artefacts) {
+          const existing = store.cards.filter((c) => c.columnId === artefactsCol.id);
+          const sortOrder = existing.length > 0
+            ? String.fromCharCode(existing[existing.length - 1].sortOrder.charCodeAt(0) + 1)
+            : 'n';
+
+          // Build card content as markdown — NO clickable links (those navigate Electron away)
+          const contentParts: string[] = [];
+          contentParts.push(`**${artefact.toolName}**`);
+          if (artefact.query) contentParts.push(`> Query: ${artefact.query}`);
+          contentParts.push('');
+          contentParts.push(artefact.content);
+
+          // Store URL in aiTags so the Card component can render a safe "View Source" button
+          const tags: string[] = [`tool:${artefact.toolId}`];
+          if (artefact.url) tags.push(`url:${artefact.url}`);
+
+          const card: Card = {
+            id: uuid(),
+            columnId: artefactsCol.id,
+            sessionId: task.context.sessionId,
+            content: contentParts.join('\n'),
+            source: 'agent',
+            sourceAgentName: task.agent.name,
+            sourceCardIds: [],
+            aiTags: tags,
+            userTags: [],
+            highlightedBy: 'none',
+            isDeleted: false,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            sortOrder,
+          };
+
+          store.addCard(card);
+          artefactCardIds.push(card.id);
+          count++;
+        }
+
+        // Auto-show artefacts column if hidden
+        if (!artefactsCol.visible) {
+          store.updateColumn(artefactsCol.id, { visible: true });
+        }
+      }
+    }
+
+    // --- Phase B: Create normal output cards ---
+    const outputCardIds: string[] = [];
 
     for (const cardDef of result.cards) {
       const col = store.columns.find((c) => c.type === cardDef.columnType);
@@ -451,7 +507,18 @@ export class WorkerPool {
       };
 
       store.addCard(card);
+      outputCardIds.push(card.id);
       count++;
+    }
+
+    // --- Phase C: Bidirectional linking between output cards and artefact cards ---
+    if (artefactCardIds.length > 0 && outputCardIds.length > 0) {
+      for (const outputId of outputCardIds) {
+        for (const artefactId of artefactCardIds) {
+          store.linkCards(outputId, artefactId);
+          store.linkCards(artefactId, outputId);
+        }
+      }
     }
 
     return count;

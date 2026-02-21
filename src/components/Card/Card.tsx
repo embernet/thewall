@@ -16,6 +16,7 @@ import { useSessionStore } from '@/store/session';
 import ContextMenu, { useContextMenu } from '@/components/ContextMenu/ContextMenu';
 import type { MenuItem } from '@/components/ContextMenu/ContextMenu';
 import { SvgIcon } from '@/components/Icons';
+import { safeMarkdownComponents } from '@/utils/safe-markdown';
 
 // ---------------------------------------------------------------------------
 // Highlight border color lookup (dynamic -- must remain inline styles)
@@ -602,9 +603,29 @@ export default function Card({
         </div>
       ) : (
         <div className="card-markdown text-xs text-wall-text leading-normal break-words">
-          <ReactMarkdown>{card.content}</ReactMarkdown>
+          <ReactMarkdown components={safeMarkdownComponents}>{card.content}</ReactMarkdown>
         </div>
       )}
+
+      {/* ── Artefact "View Source" button ─────────────────────────── */}
+      {card.aiTags?.some(t => t.startsWith('url:')) && (() => {
+        const urlTag = card.aiTags.find(t => t.startsWith('url:'));
+        const url = urlTag ? urlTag.slice(4) : '';
+        return url ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              window.electronAPI?.shell.openExternal(url);
+            }}
+            className="mt-1.5 text-[10px] text-white border-none rounded px-2.5 py-1 cursor-pointer flex items-center gap-1 font-medium"
+            style={{ background: '#8b5cf6' }}
+            title={url}
+          >
+            <SvgIcon name="globe" size={12} />
+            View Source ↗
+          </button>
+        ) : null;
+      })()}
 
       {/* ── Source links (non-transcript) ──────────────────────────── */}
       {hasNonTranscriptLinks && (
@@ -651,6 +672,20 @@ export default function Card({
         >
           {badge.label}
         </span>
+        {card.aiTags?.some(t => t.startsWith('tool:')) && (() => {
+          const toolTag = card.aiTags.find(t => t.startsWith('tool:'));
+          const toolName = toolTag
+            ? toolTag.slice(5).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+            : '';
+          return (
+            <span
+              className="text-[8px] text-white px-1.5 py-px rounded-[7px] font-semibold tracking-wide"
+              style={{ background: '#8b5cf6' }}
+            >
+              🔧 {toolName}
+            </span>
+          );
+        })()}
         {card.timestamp !== undefined && card.timestamp !== null && (
           <span className="text-[9px] text-wall-subtle">
             {'\u23F1' + fmtTime(card.timestamp)}

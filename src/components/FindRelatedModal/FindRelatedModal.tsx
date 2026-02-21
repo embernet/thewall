@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { safeMarkdownComponents } from '@/utils/safe-markdown';
 import type { Card } from '@/types';
 import { SOURCE_BADGES, COL_TYPES } from '@/types';
 import { useSessionStore } from '@/store/session';
@@ -406,7 +407,7 @@ export default function FindRelatedView({ open, initialCard, onClose, onNavigate
                 <div className="text-[9px] uppercase tracking-wider text-indigo-400 font-semibold mb-1">Focus Card</div>
                 <div className="bg-wall-border/60 rounded-lg px-3 py-2 border border-indigo-500/20">
                   <div className="card-markdown text-xs text-wall-text leading-normal break-words line-clamp-4">
-                    <ReactMarkdown>{focusCard.content}</ReactMarkdown>
+                    <ReactMarkdown components={safeMarkdownComponents}>{focusCard.content}</ReactMarkdown>
                   </div>
                   <div className="mt-1.5 flex items-center gap-1.5">
                     <span
@@ -596,7 +597,7 @@ function CardRow({
       )}
       <div className="flex-1 min-w-0">
         <div className="card-markdown text-[11px] text-wall-text leading-snug break-words line-clamp-2">
-          <ReactMarkdown>{card.content}</ReactMarkdown>
+          <ReactMarkdown components={safeMarkdownComponents}>{card.content}</ReactMarkdown>
         </div>
         <div className="mt-0.5 flex items-center gap-1.5">
           <span

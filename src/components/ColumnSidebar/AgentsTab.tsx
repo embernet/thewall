@@ -50,6 +50,7 @@ const AgentDetailPanel: React.FC<{
     maxTokens: number;
     dependsOn: string[];
     priority: number;
+    hasTools: boolean;
   };
 }> = ({ agent }) => {
   const triggerLabel = agent.triggersOnTranscript
@@ -78,6 +79,9 @@ const AgentDetailPanel: React.FC<{
         <DetailRow label="Max tokens" value={String(agent.maxTokens)} />
         {agent.dependsOn.length > 0 && (
           <DetailRow label="Depends on" value={agent.dependsOn.join(', ')} />
+        )}
+        {agent.hasTools && (
+          <DetailRow label="Tools" value="\uD83D\uDD27 Tool-enabled" />
         )}
       </div>
     </div>
@@ -219,6 +223,15 @@ const AgentsTab: React.FC<AgentsTabProps> = ({
                         {agent.name}
                       </span>
                       <AgentTypeBadge agentType={agent.agentType} />
+                      {agent.hasTools && (
+                        <span
+                          className="shrink-0 text-[9px]"
+                          title="Tool-enabled agent"
+                          style={{ color: '#f59e0b' }}
+                        >
+                          {'\uD83D\uDD27'}
+                        </span>
+                      )}
                       <span
                         className="rounded-full px-1 text-[8px]"
                         style={{

@@ -1,9 +1,10 @@
-import { BaseAgent, AgentContext } from '../base';
+import { ToolEnabledAgent } from '../tool-enabled-base';
+import type { AgentContext } from '../base';
 
-class ClaimVerifierAgent extends BaseAgent {
+class ClaimVerifierAgent extends ToolEnabledAgent {
   readonly id = 'claim-verifier';
   readonly name = 'Claim Verifier';
-  readonly description = 'Fact-check and verify claims from the meeting';
+  readonly description = 'Fact-check and verify claims using external sources';
   readonly targetColumn = 'claims';
   readonly priority = 5;
   readonly maxTokens = 800;
@@ -12,6 +13,15 @@ class ClaimVerifierAgent extends BaseAgent {
 
   readonly triggersOnTranscript = false;
   readonly dependsOn = ['claims'];
+
+  readonly tools = [
+    'session_search',
+    'web_search',
+    'academic_search',
+    'wikipedia_lookup',
+    'text_summarizer',
+  ];
+  readonly maxToolCalls = 3;
 
   shouldActivate(ctx: AgentContext): boolean {
     if (ctx.previousOutput) return true;
@@ -22,7 +32,7 @@ class ClaimVerifierAgent extends BaseAgent {
   }
 
   systemPrompt(_ctx: AgentContext): string {
-    return 'Fact-check and verify claims from the meeting. For each claim, assess its accuracy and provide supporting or contradicting evidence. Output 1-3 items, each on its own line starting with \u2022.';
+    return 'Fact-check and verify claims from the meeting using the tool results as evidence. For each claim, assess its accuracy and cite supporting or contradicting evidence with sources. Output 1-3 items, each on its own line starting with \u2022.';
   }
 
   userPrompt(ctx: AgentContext): string {

@@ -48,6 +48,7 @@ const AgentColumnMatrix: React.FC<AgentColumnMatrixProps> = ({
       defaultColumn: a.targetColumn,
       isCustom: false,
       enabled: configs[a.id]?.enabled !== false,
+      hasTools: a.hasTools,
     }));
     const customs = customAgents.map(a => ({
       id: a.id,
@@ -55,6 +56,7 @@ const AgentColumnMatrix: React.FC<AgentColumnMatrixProps> = ({
       defaultColumn: a.targetColumn,
       isCustom: true,
       enabled: a.enabled,
+      hasTools: (a.toolIds?.length ?? 0) > 0,
     }));
     return [...builtIns, ...customs];
   }, [configs, customAgents]);
@@ -173,6 +175,9 @@ const AgentColumnMatrix: React.FC<AgentColumnMatrixProps> = ({
                         <span className="text-[8px] text-amber-400 font-semibold">usr</span>
                       )}
                       {agent.name}
+                      {agent.hasTools && (
+                        <span className="text-[9px] shrink-0" title="Tool-enabled" style={{ color: '#f59e0b' }}>{'\uD83D\uDD27'}</span>
+                      )}
                     </span>
                   </td>
                   {columns.map(col => {

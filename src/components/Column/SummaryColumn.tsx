@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { safeMarkdownComponents } from '@/utils/safe-markdown';
 import type { Column as ColumnType, Card as CardType } from '@/types';
 import { COL_TYPES } from '@/types';
 import { useSessionStore } from '@/store/session';
@@ -347,7 +348,7 @@ const SummaryColumn: React.FC<SummaryColumnProps> = ({
             </div>
             {summaryOpen && (
               <div className="card-markdown text-[11px] leading-relaxed summary-text" style={{ scrollbarWidth: 'thin', scrollbarColor: 'var(--summary-scrollbar) transparent' }}>
-                <ReactMarkdown>{overallSummary}</ReactMarkdown>
+                <ReactMarkdown components={safeMarkdownComponents}>{overallSummary}</ReactMarkdown>
               </div>
             )}
           </div>

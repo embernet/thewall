@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { safeMarkdownComponents } from '@/utils/safe-markdown';
 import type { Column as ColumnType, Card as CardType, AudioState } from '@/types';
 import { COL_TYPES, SPEAKER_COLORS } from '@/types';
 import { SvgIcon } from '@/components/Icons';
@@ -753,7 +754,7 @@ const Column: React.FC<ColumnProps> = ({
             </div>
           ) : summaryOpen ? (
             <div className="card-markdown text-[11px] leading-relaxed summary-text overflow-y-auto min-h-0" style={{ scrollbarWidth: 'thin', scrollbarColor: 'var(--summary-scrollbar) transparent' }}>
-              <ReactMarkdown>{summary}</ReactMarkdown>
+              <ReactMarkdown components={safeMarkdownComponents}>{summary}</ReactMarkdown>
             </div>
           ) : null}
         </div>

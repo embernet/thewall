@@ -11,7 +11,7 @@ import { SvgIcon } from '@/components/Icons';
 
 const MODES: SessionMode[] = ['silent', 'active', 'sidekick'];
 
-const COLUMN_OPTIONS = COL_TYPES.filter(c => c.type !== 'trash' && c.type !== 'summary');
+const COLUMN_OPTIONS = COL_TYPES.filter(c => c.type !== 'trash' && c.type !== 'summary' && c.type !== 'artefacts');
 
 const AGENT_OPTIONS = builtInAgents
   .filter(a => a.id !== 'image-generator')

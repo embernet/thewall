@@ -105,9 +105,49 @@ contextBridge.exposeInMainWorld('electronAPI', {
   generateImage: (prompt: string, inputBase64?: string, modelId?: string) =>
     ipcRenderer.invoke('generateImage', prompt, inputBase64, modelId) as Promise<{ imageData?: string; mimeType?: string; error?: string }>,
 
+  // Tool proxies (CORS-bypassed external API calls for agent tools)
+  tools: {
+    webSearch: (query: string, numResults?: number) =>
+      ipcRenderer.invoke('tool:webSearch', query, numResults) as Promise<{
+        results: Array<{ title: string; url: string; snippet: string }>;
+        error: string | null;
+      }>,
+    searchPatents: (query: string, numResults?: number) =>
+      ipcRenderer.invoke('tool:searchPatents', query, numResults) as Promise<{
+        results: Array<{ title: string; url: string; snippet: string }>;
+        error: string | null;
+      }>,
+    searchArxiv: (query: string, numResults?: number) =>
+      ipcRenderer.invoke('tool:searchArxiv', query, numResults) as Promise<{
+        results: Array<{ title: string; url: string; authors: string; published: string; summary: string }>;
+        error: string | null;
+      }>,
+    searchAcademic: (query: string, numResults?: number, yearFrom?: number) =>
+      ipcRenderer.invoke('tool:searchAcademic', query, numResults, yearFrom) as Promise<{
+        results: Array<{ title: string; authors: string; year: number; abstract: string; url: string; citationCount: number; venue: string }>;
+        error: string | null;
+      }>,
+    wikipediaLookup: (query: string) =>
+      ipcRenderer.invoke('tool:wikipediaLookup', query) as Promise<{
+        result: { title: string; extract: string; url: string } | null;
+        error: string | null;
+      }>,
+    fetchUrl: (url: string) =>
+      ipcRenderer.invoke('tool:fetchUrl', url) as Promise<{
+        result: { title: string; content: string; url: string } | null;
+        error: string | null;
+      }>,
+    fetchPdf: (url: string) =>
+      ipcRenderer.invoke('tool:fetchPdf', url) as Promise<{
+        result: { title: string; content: string; pageCount: number } | null;
+        error: string | null;
+      }>,
+  },
+
   // Shell utilities
   shell: {
     openPath: (filePath: string) => ipcRenderer.invoke('file:openPath', filePath),
+    openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url),
   },
 
   // App lifecycle

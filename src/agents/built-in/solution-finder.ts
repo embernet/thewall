@@ -1,9 +1,10 @@
-import { BaseAgent, AgentContext } from '../base';
+import { ToolEnabledAgent } from '../tool-enabled-base';
+import type { AgentContext } from '../base';
 
-class SolutionFinderAgent extends BaseAgent {
+class SolutionFinderAgent extends ToolEnabledAgent {
   readonly id = 'solution-finder';
   readonly name = 'Solution Finder';
-  readonly description = 'Propose practical solutions to problems and gaps identified';
+  readonly description = 'Propose practical solutions to problems and gaps, informed by external research';
   readonly targetColumn = 'ideas';
   readonly priority = 4;
   readonly maxTokens = 800;
@@ -12,6 +13,12 @@ class SolutionFinderAgent extends BaseAgent {
 
   readonly triggersOnTranscript = false;
   readonly dependsOn = ['gaps'];
+
+  readonly tools = [
+    'session_search',
+    'web_search',
+  ];
+  readonly maxToolCalls = 2;
 
   shouldActivate(ctx: AgentContext): boolean {
     if (ctx.previousOutput) return true;
@@ -23,7 +30,7 @@ class SolutionFinderAgent extends BaseAgent {
   }
 
   systemPrompt(_ctx: AgentContext): string {
-    return 'Propose practical solutions to problems and gaps identified in the discussion. Be specific and actionable. Output 1-3 items, each on a new line starting with \u2022.';
+    return 'Propose practical solutions to problems and gaps identified in the discussion. Use tool results to find existing solutions or best practices. Be specific and actionable. Output 1-3 items, each on a new line starting with \u2022.';
   }
 
   userPrompt(ctx: AgentContext): string {

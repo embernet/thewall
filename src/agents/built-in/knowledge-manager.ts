@@ -1,17 +1,24 @@
-import { BaseAgent, AgentContext, AgentResult } from '../base';
+import { ToolEnabledAgent } from '../tool-enabled-base';
+import type { AgentContext, AgentResult } from '../base';
 import { addEntitiesAndRelations } from '@/graph/graph-service';
 import type { ExtractedEntity, ExtractedRelation } from '@/graph/graph-service';
 import type { KGNodeType } from '@/types';
 
-class KnowledgeManagerAgent extends BaseAgent {
+class KnowledgeManagerAgent extends ToolEnabledAgent {
   readonly id = 'knowledge-manager';
   readonly name = 'Knowledge Manager';
-  readonly description = 'Extract entities, relationships, and connections for the knowledge graph';
+  readonly description = 'Extract entities, relationships, and connections for the knowledge graph, enriched with external context';
   readonly targetColumn = 'observations';
   readonly priority = 6;
   readonly maxTokens = 800;
   readonly inputSummary = 'Transcript fragment (~4 sec) + similar existing items. Populates knowledge graph via code.';
-  readonly behaviorType: 'prompt-plus-code' = 'prompt-plus-code';
+
+  readonly tools = [
+    'session_search',
+    'wikipedia_lookup',
+    'extract_structured_data',
+  ];
+  readonly maxToolCalls = 2;
 
   systemPrompt(_ctx: AgentContext): string {
     return `Extract entities and their relationships from the text. For each entity, classify it as one of: concept, entity, topic, claim.

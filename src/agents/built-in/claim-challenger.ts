@@ -1,9 +1,10 @@
-import { BaseAgent, AgentContext } from '../base';
+import { ToolEnabledAgent } from '../tool-enabled-base';
+import type { AgentContext } from '../base';
 
-class ClaimChallengerAgent extends BaseAgent {
+class ClaimChallengerAgent extends ToolEnabledAgent {
   readonly id = 'claim-challenger';
   readonly name = 'Claim Challenger';
-  readonly description = 'Generate counter-arguments and alternative perspectives for claims';
+  readonly description = 'Generate counter-arguments and alternative perspectives for claims, backed by external evidence';
   readonly targetColumn = 'claims';
   readonly priority = 4;
   readonly maxTokens = 800;
@@ -12,6 +13,13 @@ class ClaimChallengerAgent extends BaseAgent {
 
   readonly triggersOnTranscript = false;
   readonly dependsOn = ['claims'];
+
+  readonly tools = [
+    'session_search',
+    'web_search',
+    'academic_search',
+  ];
+  readonly maxToolCalls = 2;
 
   shouldActivate(ctx: AgentContext): boolean {
     if (ctx.previousOutput) return true;
@@ -22,7 +30,7 @@ class ClaimChallengerAgent extends BaseAgent {
   }
 
   systemPrompt(_ctx: AgentContext): string {
-    return 'Generate counter-arguments and alternative perspectives for claims. Challenge assumptions. Output 1-2 items, each on its own line starting with \u2022.';
+    return 'Generate counter-arguments and alternative perspectives for claims. Use tool results to find contradicting evidence or alternative viewpoints. Challenge assumptions with cited sources where possible. Output 1-2 items, each on its own line starting with \u2022.';
   }
 
   userPrompt(ctx: AgentContext): string {

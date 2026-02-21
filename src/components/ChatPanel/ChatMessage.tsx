@@ -4,6 +4,7 @@
 
 import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { safeMarkdownComponents } from '@/utils/safe-markdown';
 import type { ChatMessage as ChatMessageType, ImageAttachment } from '@/types';
 import ImagePromptCard from './ImagePromptCard';
 
@@ -282,7 +283,7 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
               <span className="whitespace-pre-wrap break-words">{message.content}</span>
             ) : (
               <div className="card-markdown">
-                <ReactMarkdown>{message.content}</ReactMarkdown>
+                <ReactMarkdown components={safeMarkdownComponents}>{message.content}</ReactMarkdown>
               </div>
             )}
           </div>

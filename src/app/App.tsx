@@ -502,7 +502,7 @@ export default function App() {
       sortOrder: c.type === 'summary' ? 'a' : String.fromCharCode(98 + i * 2),
       visible: templateVisibleSet
         ? templateVisibleSet.has(c.type)
-        : c.type !== 'trash' && c.type !== 'summary',
+        : c.type !== 'trash' && c.type !== 'summary' && c.type !== 'artefacts',
       collapsed: false,
     }));
 
@@ -576,6 +576,15 @@ export default function App() {
       };
       await window.electronAPI.db.createColumn(summaryCol);
       cols.push(summaryCol);
+    }
+    // Backfill artefacts column for existing sessions
+    if (!cols.some(c => c.type === 'artefacts')) {
+      const artefactsCol: ColumnType = {
+        id: uid(), sessionId: id, type: 'artefacts', title: 'Artefacts',
+        sortOrder: 'zz', visible: false, collapsed: false,
+      };
+      await window.electronAPI.db.createColumn(artefactsCol);
+      cols.push(artefactsCol);
     }
     const cardRows = await window.electronAPI.db.getCards(id);
     const colors = await window.electronAPI.db.getSpeakerColors(id);

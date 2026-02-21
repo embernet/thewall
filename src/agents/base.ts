@@ -49,6 +49,20 @@ export interface AgentContext {
 // Agent Result -- what an agent produces
 // ----------------------------------------------------------------------------
 
+/** Metadata about a single tool result, used to create artefact cards. */
+export interface ArtefactData {
+  toolId: string;
+  toolName: string;
+  /** The query or params used to invoke the tool. */
+  query: string;
+  /** Primary URL from the tool result (if applicable). */
+  url?: string;
+  /** Excerpt/summary of the tool result for the card body. */
+  content: string;
+  /** Full raw tool result data. */
+  rawResult: string;
+}
+
 export interface AgentResult {
   cards: {
     content: string;
@@ -57,6 +71,8 @@ export interface AgentResult {
   }[];
   /** Raw LLM output before parsing. */
   raw: string;
+  /** Tool result artefacts to store as cards in the Artefacts column. */
+  artefacts?: ArtefactData[];
 }
 
 // ----------------------------------------------------------------------------
@@ -93,6 +109,9 @@ export abstract class BaseAgent {
 
   /** Agent category for UI grouping: 1st-pass fires on transcript, 2nd-pass on dependencies, utility is manual. */
   readonly agentType: '1st-pass' | '2nd-pass' | 'utility' = '1st-pass';
+
+  /** Whether this agent has tool support (overridden by ToolEnabledAgent). */
+  get hasTools(): boolean { return false; }
 
   // --------------------------------------------------------------------------
   // Abstract methods -- subclasses must implement

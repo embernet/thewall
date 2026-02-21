@@ -15,6 +15,7 @@
     "postinstall": "electron-rebuild -f -w better-sqlite3"
   },
   "dependencies": {
+    "@mozilla/readability": "^0.6.0",
     "@tanstack/react-virtual": "^3.13.18",
     "better-sqlite3": "^11.7.0",
     "csv-parse": "^6.1.0",
@@ -23,6 +24,7 @@
     "fractional-indexing": "^3.2.0",
     "graphology": "^0.26.0",
     "graphology-types": "^0.24.8",
+    "jsdom": "^28.1.0",
     "mitt": "^3.0.1",
     "pdf-parse": "^2.4.5",
     "react": "^18.3.1",
@@ -35,6 +37,7 @@
   "devDependencies": {
     "@electron/rebuild": "^4.0.3",
     "@types/better-sqlite3": "^7.6.12",
+    "@types/jsdom": "^27.0.0",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@types/uuid": "^10.0.0",

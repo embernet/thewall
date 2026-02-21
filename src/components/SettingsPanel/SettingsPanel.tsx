@@ -70,6 +70,7 @@ export default function SettingsPanel({ open, onClose, onOpenAgentConfig }: Sett
     embeddings: mkSlotState(SLOT_PROVIDERS[1]),
     image_gen: mkSlotState(SLOT_PROVIDERS[2]),
     transcription: mkSlotState(SLOT_PROVIDERS[3]),
+    search: mkSlotState(SLOT_PROVIDERS[4]),
   });
 
   // Fetched models per provider (live from API)
@@ -121,6 +122,7 @@ export default function SettingsPanel({ open, onClose, onOpenAgentConfig }: Sett
           embeddings: mkSlotState(SLOT_PROVIDERS[1], configs.find(c => c.slot === 'embeddings')),
           image_gen: mkSlotState(SLOT_PROVIDERS[2], configs.find(c => c.slot === 'image_gen')),
           transcription: mkSlotState(SLOT_PROVIDERS[3], configs.find(c => c.slot === 'transcription')),
+          search: mkSlotState(SLOT_PROVIDERS[4], configs.find(c => c.slot === 'search')),
         };
         setSlotStates(next);
 
@@ -251,8 +253,7 @@ export default function SettingsPanel({ open, onClose, onOpenAgentConfig }: Sett
           ...prev,
           transcription: { ...prev.transcription, saving: false, dirty: false, hasExistingKey: hasKey, status: 'saved' },
         }));
-      } else {
-        // image_gen
+      } else if (slot === 'image_gen') {
         const decrypted = await db.getDecryptedKey('image_gen');
         setImageGenConfig(decrypted, state.modelId);
         setSlotStates(prev => ({
@@ -261,6 +262,12 @@ export default function SettingsPanel({ open, onClose, onOpenAgentConfig }: Sett
         }));
         // Fetch live Imagen models now that we have a valid key
         if (decrypted) fetchModelsForProvider(state.provider as ApiProvider);
+      } else {
+        // search — just save, no in-memory cache to update
+        setSlotStates(prev => ({
+          ...prev,
+          search: { ...prev.search, saving: false, dirty: false, hasExistingKey: hasKey, status: 'saved' },
+        }));
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -604,22 +611,45 @@ function SlotSection({ slotDef, state, fetchedModels, onProviderChange, onModelC
         </select>
       </div>
 
-      {/* Model */}
-      <div className="mb-2">
-        <label className="mb-0.5 block text-[10px] font-medium text-wall-text-dim">Model</label>
-        <select
-          value={state.modelId}
-          onChange={(e) => onModelChange(e.target.value)}
-          className="w-full cursor-pointer rounded-md border border-wall-muted bg-wall-border px-2 py-1 text-xs text-wall-text outline-none"
-        >
-          {models.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.label}
-              {m.inputCost > 0 ? ` ($${(m.inputCost * 1_000_000).toFixed(2)}/$${(m.outputCost * 1_000_000).toFixed(2)} per 1M tok)` : ''}
-            </option>
-          ))}
-        </select>
-      </div>
+      {/* Model — or Search Engine ID for search slot */}
+      {slotDef.slot === 'search' ? (
+        <div className="mb-2">
+          <label className="mb-0.5 block text-[10px] font-medium text-wall-text-dim">
+            Search Engine ID (CX)
+          </label>
+          <input
+            type="text"
+            value={state.modelId}
+            onChange={(e) => onModelChange(e.target.value)}
+            placeholder="e.g. 017576662512468239146:omuauf_gy1o"
+            className="w-full rounded-md border border-wall-muted bg-wall-border px-2 py-1 font-mono text-xs text-wall-text outline-none"
+            style={{ boxSizing: 'border-box' }}
+          />
+          <div className="mt-0.5 text-[9px] text-wall-subtle">
+            Create at{' '}
+            <span className="text-indigo-400 cursor-pointer" onClick={() => window.electronAPI.shell.openPath('https://programmablesearchengine.google.com/')}>
+              programmablesearchengine.google.com
+            </span>
+            {' '}&mdash; free tier: 100 queries/day
+          </div>
+        </div>
+      ) : (
+        <div className="mb-2">
+          <label className="mb-0.5 block text-[10px] font-medium text-wall-text-dim">Model</label>
+          <select
+            value={state.modelId}
+            onChange={(e) => onModelChange(e.target.value)}
+            className="w-full cursor-pointer rounded-md border border-wall-muted bg-wall-border px-2 py-1 text-xs text-wall-text outline-none"
+          >
+            {models.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.label}
+                {m.inputCost > 0 ? ` ($${(m.inputCost * 1_000_000).toFixed(2)}/$${(m.outputCost * 1_000_000).toFixed(2)} per 1M tok)` : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* API Key */}
       {needsKey && (

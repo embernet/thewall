@@ -125,6 +125,11 @@ const AgentList: React.FC<AgentListProps> = ({ selectedId, onSelect, configs, cu
               <div className="flex-1 min-w-0">
                 <div className="text-[10px] font-semibold truncate">{agent.name}</div>
               </div>
+              {agent.hasTools && (
+                <span className="shrink-0 text-[9px]" title="Tool-enabled agent" style={{ color: '#f59e0b' }}>
+                  {'\uD83D\uDD27'}
+                </span>
+              )}
               <span className={`text-[8px] font-semibold shrink-0 ${
                 isSecondPass ? 'text-purple-400' : 'text-cyan-400'
               }`}>
