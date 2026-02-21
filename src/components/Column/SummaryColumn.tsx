@@ -8,6 +8,8 @@ import { askClaude } from '@/utils/llm';
 import { loadSummaryPrompts } from '@/utils/summary-prompts';
 import type { SummaryPrompt } from '@/utils/summary-prompts';
 import { SvgIcon } from '@/components/Icons';
+import { speakText, stopSpeaking } from '@/utils/tts';
+import TtsTransport from '@/components/TtsTransport';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -71,6 +73,7 @@ const SummaryColumn: React.FC<SummaryColumnProps> = ({
   );
   const [summarizing, setSummarizing] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(true);
+  const [ttsActive, setTtsActive] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Load prompts on mount and seed customPrompt if using a preset
@@ -318,6 +321,25 @@ const SummaryColumn: React.FC<SummaryColumnProps> = ({
                   {'\uD83D\uDCCB'}
                 </button>
                 <button
+                  onClick={async () => {
+                    if (ttsActive) {
+                      stopSpeaking();
+                      setTtsActive(false);
+                      return;
+                    }
+                    setTtsActive(true);
+                    try {
+                      await speakText(overallSummary);
+                    } catch (e) {
+                      console.warn('[tts] Summary speak failed:', e);
+                    }
+                  }}
+                  className="cursor-pointer border-none bg-transparent text-[9px] summary-action"
+                  title={ttsActive ? 'Stop Speaking' : 'Speak'}
+                >
+                  <SvgIcon name={ttsActive ? 'speak-stop' : 'speak'} size={11} />
+                </button>
+                <button
                   onClick={handleSummariseAll}
                   disabled={summarizing}
                   className="cursor-pointer border-none bg-transparent text-[9px] summary-action"
@@ -346,6 +368,9 @@ const SummaryColumn: React.FC<SummaryColumnProps> = ({
                 </button>
               </div>
             </div>
+            {ttsActive && (
+              <TtsTransport onClose={() => setTtsActive(false)} />
+            )}
             {summaryOpen && (
               <div className="card-markdown text-[11px] leading-relaxed summary-text" style={{ scrollbarWidth: 'thin', scrollbarColor: 'var(--summary-scrollbar) transparent' }}>
                 <ReactMarkdown components={safeMarkdownComponents}>{overallSummary}</ReactMarkdown>

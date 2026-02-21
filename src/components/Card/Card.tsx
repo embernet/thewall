@@ -17,6 +17,8 @@ import ContextMenu, { useContextMenu } from '@/components/ContextMenu/ContextMen
 import type { MenuItem } from '@/components/ContextMenu/ContextMenu';
 import { SvgIcon } from '@/components/Icons';
 import { safeMarkdownComponents, safeRemarkPlugins } from '@/utils/safe-markdown';
+import { speakText, stopSpeaking } from '@/utils/tts';
+import TtsTransport from '@/components/TtsTransport';
 
 // ---------------------------------------------------------------------------
 // Highlight border color lookup (dynamic -- must remain inline styles)
@@ -79,6 +81,7 @@ export default function Card({
   const [splitting, setSplitting] = useState(false);
   const [splitHover, setSplitHover] = useState<number | null>(null);
   const [speakerDropOpen, setSpeakerDropOpen] = useState(false);
+  const [ttsActive, setTtsActive] = useState(false);
   const hamburgerRef = useRef<HTMLDivElement>(null);
   const rawSourcesRef = useRef<HTMLDivElement>(null);
   const speakerDropRef = useRef<HTMLDivElement>(null);
@@ -180,12 +183,32 @@ export default function Card({
   // Speaker color (dynamic per-session, must use inline style)
   const spkColor = speakerColors?.[card.speaker ?? ''] || '#64748b';
 
+  const handleSpeak = async () => {
+    if (ttsActive) {
+      // Clicking speak again while transport is open → reset/stop
+      stopSpeaking();
+      setTtsActive(false);
+      return;
+    }
+    setTtsActive(true);
+    try {
+      await speakText(card.content);
+    } catch (e) {
+      console.warn('[tts] Speak failed:', e);
+    }
+  };
+
   // ── Action buttons for the toolbar (icon-only, always present) ──────────
   const toolbarActions = [
     {
       icon: 'copy',
       tooltip: 'Copy',
       fn: () => navigator.clipboard?.writeText(card.content),
+    },
+    {
+      icon: ttsActive ? 'speak-stop' : 'speak',
+      tooltip: ttsActive ? 'Stop Speaking' : 'Speak',
+      fn: handleSpeak,
     },
     {
       icon: 'edit',
@@ -351,6 +374,11 @@ export default function Card({
             </button>
           )}
         </div>
+      )}
+
+      {/* ── TTS Transport controls ────────────────────────────────── */}
+      {ttsActive && (
+        <TtsTransport onClose={() => setTtsActive(false)} />
       )}
 
       {/* ── Pinned indicator ──────────────────────────────────────────── */}

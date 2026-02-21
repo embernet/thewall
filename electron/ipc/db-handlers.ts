@@ -685,6 +685,63 @@ export function registerDbHandlers() {
     }
   });
 
+  // ── Text-to-Speech Proxy ──
+  // Proxies OpenAI TTS API calls through the main process to avoid CORS.
+  // Returns base64-encoded audio (mp3) that the renderer can play via AudioContext.
+
+  ipcMain.handle('tts:speak', async (_e, text: string, voice?: string) => {
+    // Read TTS config from DB, fall back to transcription key if tts slot not configured
+    let row = db().prepare('SELECT * FROM api_keys WHERE slot = ?').get('tts') as any;
+    if (!row) {
+      // No dedicated TTS key — try transcription slot (both use OpenAI)
+      row = db().prepare('SELECT * FROM api_keys WHERE slot = ?').get('transcription') as any;
+    }
+    if (!row) return { error: 'No TTS or Transcription API key configured' };
+
+    let apiKey = '';
+    if (row.encrypted_key) {
+      try {
+        if (safeStorage.isEncryptionAvailable()) {
+          apiKey = safeStorage.decryptString(row.encrypted_key);
+        } else {
+          apiKey = row.encrypted_key.toString('utf-8');
+        }
+      } catch {
+        return { error: 'Failed to decrypt TTS API key' };
+      }
+    }
+    if (!apiKey) return { error: 'TTS API key is empty' };
+
+    const modelId = (row.slot === 'tts' ? row.model_id : null) || 'tts-1';
+    const ttsVoice = voice || 'alloy';
+
+    try {
+      const r = await fetch('https://api.openai.com/v1/audio/speech', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: modelId,
+          input: text,
+          voice: ttsVoice,
+          response_format: 'mp3',
+        }),
+      });
+      if (!r.ok) {
+        const err = await r.text().catch(() => r.statusText);
+        return { error: `OpenAI TTS API error ${r.status}: ${err}` };
+      }
+      const arrayBuf = await r.arrayBuffer();
+      const base64 = Buffer.from(arrayBuf).toString('base64');
+      return { audioBase64: base64, mimeType: 'audio/mpeg' };
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return { error: msg };
+    }
+  });
+
   // ── Image Generation Proxy ──
   // Proxies Imagen 3 API calls through the main process to avoid CORS issues
   // in the renderer. Google's Generative AI API does not set CORS headers.

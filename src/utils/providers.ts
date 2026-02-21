@@ -127,6 +127,21 @@ export const SLOT_PROVIDERS: readonly SlotDef[] = [
     ],
   },
   {
+    slot: 'tts',
+    label: 'Text to Speech',
+    description: 'Read card and summary content aloud via OpenAI TTS',
+    providers: [
+      {
+        id: 'openai',
+        label: 'OpenAI',
+        models: [
+          { id: 'tts-1', label: 'TTS-1 (fast)', inputCost: 15.0 / 1_000_000, outputCost: 0 },
+          { id: 'tts-1-hd', label: 'TTS-1 HD (quality)', inputCost: 30.0 / 1_000_000, outputCost: 0 },
+        ],
+      },
+    ],
+  },
+  {
     slot: 'search',
     label: 'Web Search',
     description: 'Powers Google Search and Patent Search tools (free tier: 100 queries/day)',

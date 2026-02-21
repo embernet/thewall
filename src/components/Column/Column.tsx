@@ -11,6 +11,8 @@ import Card from '@/components/Card/Card';
 import AudioVisualizer from './AudioVisualizer';
 import TranscriptInput from './TranscriptInput';
 import { askClaude } from '@/utils/llm';
+import { speakText, stopSpeaking } from '@/utils/tts';
+import TtsTransport from '@/components/TtsTransport';
 
 interface ColumnProps {
   column: ColumnType;
@@ -73,6 +75,7 @@ const Column: React.FC<ColumnProps> = ({
   const [summarizing, setSummarizing] = useState(false);
   const [editingSummary, setEditingSummary] = useState(false);
   const [summaryDraft, setSummaryDraft] = useState('');
+  const [ttsActive, setTtsActive] = useState(false);
 
   // Change tracking: compute a content hash from visible cards
   const computeContentHash = (cardList: CardType[]): string => {
@@ -673,6 +676,25 @@ const Column: React.FC<ColumnProps> = ({
                 {'\uD83D\uDCCB'}
               </button>
               <button
+                onClick={async () => {
+                  if (ttsActive) {
+                    stopSpeaking();
+                    setTtsActive(false);
+                  } else {
+                    setTtsActive(true);
+                    try {
+                      await speakText(summary);
+                    } catch (e) {
+                      console.warn('[tts] Column summary speak failed:', e);
+                    }
+                  }
+                }}
+                className="cursor-pointer border-none bg-transparent summary-action flex items-center"
+                title={ttsActive ? 'Stop speaking' : 'Speak'}
+              >
+                <SvgIcon name={ttsActive ? 'speak-stop' : 'speak'} size={12} />
+              </button>
+              <button
                 onClick={() => {
                   setSummaryDraft(summary);
                   setEditingSummary(true);
@@ -712,6 +734,9 @@ const Column: React.FC<ColumnProps> = ({
               </button>
             </div>
           </div>
+          {ttsActive && (
+            <TtsTransport onClose={() => setTtsActive(false)} />
+          )}
           {summaryOpen && editingSummary ? (
             <div className="overflow-y-auto min-h-0">
               <textarea

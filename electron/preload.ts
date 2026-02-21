@@ -96,6 +96,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   transcribe: (audioBase64: string) =>
     ipcRenderer.invoke('transcribe', audioBase64) as Promise<{ text?: string; error?: string }>,
 
+  // Text-to-Speech proxy (bypasses CORS)
+  ttsSpeak: (text: string, voice?: string) =>
+    ipcRenderer.invoke('tts:speak', text, voice) as Promise<{ audioBase64?: string; mimeType?: string; error?: string }>,
+
   // Image generation proxy (bypasses CORS for Google Imagen API)
   listImagenModels: (apiKey: string) =>
     ipcRenderer.invoke('listImagenModels', apiKey) as Promise<{

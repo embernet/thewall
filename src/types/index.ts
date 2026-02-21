@@ -395,7 +395,7 @@ export interface SourceBadge {
 // ----------------------------------------------------------------------------
 
 /** Functional slot — each capability has its own provider/model/key. */
-export type ApiSlot = 'chat' | 'embeddings' | 'image_gen' | 'transcription' | 'search';
+export type ApiSlot = 'chat' | 'embeddings' | 'image_gen' | 'transcription' | 'tts' | 'search';
 
 /** Supported API providers. */
 export type ApiProvider = 'anthropic' | 'openai' | 'voyage' | 'google' | 'local' | 'wispr';
@@ -533,6 +533,9 @@ export interface ElectronAPI {
 
   /** Proxy transcription API calls through the main process (bypasses CORS). */
   transcribe: (audioBase64: string) => Promise<{ text?: string; error?: string }>;
+
+  /** Proxy OpenAI TTS API calls through the main process (bypasses CORS). */
+  ttsSpeak: (text: string, voice?: string) => Promise<{ audioBase64?: string; mimeType?: string; error?: string }>;
 
   /** List available Google Imagen models through main process (bypasses CORS). */
   listImagenModels: (apiKey: string) => Promise<{

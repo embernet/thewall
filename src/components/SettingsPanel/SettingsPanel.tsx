@@ -6,6 +6,7 @@ import { setChatConfig, validateApiKey } from '@/utils/llm';
 import { setEmbeddingConfig } from '@/utils/embedding-service';
 import { setTranscriptionConfig } from '@/utils/transcription';
 import { setImageGenConfig } from '@/utils/image-generation';
+import { setTtsConfig } from '@/utils/tts';
 import { bus } from '@/events/bus';
 import {
   loadSummaryPrompts,
@@ -65,13 +66,19 @@ export default function SettingsPanel({ open, onClose, onOpenAgentConfig }: Sett
   const [tab, setTab] = useState<SettingsTab>('columns');
 
   // API Key slot states
+  const ttsSlotDef = SLOT_PROVIDERS.find(s => s.slot === 'tts')!;
+  const searchSlotDef = SLOT_PROVIDERS.find(s => s.slot === 'search')!;
   const [slotStates, setSlotStates] = useState<Record<ApiSlot, SlotState>>({
     chat: mkSlotState(SLOT_PROVIDERS[0]),
     embeddings: mkSlotState(SLOT_PROVIDERS[1]),
     image_gen: mkSlotState(SLOT_PROVIDERS[2]),
     transcription: mkSlotState(SLOT_PROVIDERS[3]),
-    search: mkSlotState(SLOT_PROVIDERS[4]),
+    tts: mkSlotState(ttsSlotDef),
+    search: mkSlotState(searchSlotDef),
   });
+
+  // "Use same key as Transcription" toggle for TTS
+  const [ttsUseSameKey, setTtsUseSameKey] = useState(false);
 
   // Fetched models per provider (live from API)
   const [fetchedModels, setFetchedModels] = useState<Record<string, ModelDef[]>>({});
@@ -122,7 +129,8 @@ export default function SettingsPanel({ open, onClose, onOpenAgentConfig }: Sett
           embeddings: mkSlotState(SLOT_PROVIDERS[1], configs.find(c => c.slot === 'embeddings')),
           image_gen: mkSlotState(SLOT_PROVIDERS[2], configs.find(c => c.slot === 'image_gen')),
           transcription: mkSlotState(SLOT_PROVIDERS[3], configs.find(c => c.slot === 'transcription')),
-          search: mkSlotState(SLOT_PROVIDERS[4], configs.find(c => c.slot === 'search')),
+          tts: mkSlotState(ttsSlotDef, configs.find(c => c.slot === 'tts')),
+          search: mkSlotState(searchSlotDef, configs.find(c => c.slot === 'search')),
         };
         setSlotStates(next);
 
@@ -134,6 +142,21 @@ export default function SettingsPanel({ open, onClose, onOpenAgentConfig }: Sett
         const imageGenConfig = configs.find(c => c.slot === 'image_gen');
         if (imageGenConfig?.hasKey) {
           fetchModelsForProvider(imageGenConfig.provider as ApiProvider);
+        }
+
+        // Auto-detect "use same key" for TTS: if both slots have keys, compare them
+        const ttsConfig = configs.find(c => c.slot === 'tts');
+        const transcriptionConfig = configs.find(c => c.slot === 'transcription');
+        if (ttsConfig?.hasKey && transcriptionConfig?.hasKey) {
+          try {
+            const [ttsKey, transcriptionKey] = await Promise.all([
+              window.electronAPI?.db?.getDecryptedKey('tts'),
+              window.electronAPI?.db?.getDecryptedKey('transcription'),
+            ]);
+            setTtsUseSameKey(!!(ttsKey && transcriptionKey && ttsKey === transcriptionKey));
+          } catch { setTtsUseSameKey(false); }
+        } else {
+          setTtsUseSameKey(false);
         }
       } catch (e) {
         console.warn('Failed to load API key configs:', e);
@@ -262,6 +285,15 @@ export default function SettingsPanel({ open, onClose, onOpenAgentConfig }: Sett
         }));
         // Fetch live Imagen models now that we have a valid key
         if (decrypted) fetchModelsForProvider(state.provider as ApiProvider);
+      } else if (slot === 'tts') {
+        const decrypted = providerNeedsKey(state.provider)
+          ? await db.getDecryptedKey('tts')
+          : '';
+        setTtsConfig(state.provider, state.modelId, decrypted);
+        setSlotStates(prev => ({
+          ...prev,
+          tts: { ...prev.tts, saving: false, dirty: false, hasExistingKey: hasKey, status: 'saved' },
+        }));
       } else {
         // search — just save, no in-memory cache to update
         setSlotStates(prev => ({
@@ -358,16 +390,53 @@ export default function SettingsPanel({ open, onClose, onOpenAgentConfig }: Sett
             </div>
 
             {SLOT_PROVIDERS.map((slotDef) => (
-              <SlotSection
-                key={slotDef.slot}
-                slotDef={slotDef}
-                state={slotStates[slotDef.slot]}
-                fetchedModels={fetchedModels[slotStates[slotDef.slot].provider]}
-                onProviderChange={(p) => onProviderChange(slotDef.slot, p)}
-                onModelChange={(m) => onModelChange(slotDef.slot, m)}
-                onKeyChange={(k) => updateSlot(slotDef.slot, { key: k })}
-                onSave={() => saveSlot(slotDef.slot)}
-              />
+              <div key={slotDef.slot}>
+                <SlotSection
+                  slotDef={slotDef}
+                  state={slotStates[slotDef.slot]}
+                  fetchedModels={fetchedModels[slotStates[slotDef.slot].provider]}
+                  onProviderChange={(p) => onProviderChange(slotDef.slot, p)}
+                  onModelChange={(m) => onModelChange(slotDef.slot, m)}
+                  onKeyChange={(k) => updateSlot(slotDef.slot, { key: k })}
+                  onSave={() => saveSlot(slotDef.slot)}
+                />
+                {/* "Use same key as Transcription" toggle for TTS slot */}
+                {slotDef.slot === 'tts' && (
+                  <label className="mt-1.5 flex items-center gap-2 text-[10px] text-wall-text-dim cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={ttsUseSameKey}
+                      onChange={async (e) => {
+                        const checked = e.target.checked;
+                        if (checked) {
+                          // Copy key from transcription slot (if it's OpenAI)
+                          try {
+                            const transcriptionKey = await window.electronAPI?.db?.getDecryptedKey('transcription');
+                            if (!transcriptionKey) {
+                              console.warn('No transcription key available to copy');
+                              return; // Don't tick the box if there's nothing to copy
+                            }
+                            const ttsState = slotStates.tts;
+                            await window.electronAPI.db.setApiKeyConfig('tts', ttsState.provider, ttsState.modelId, transcriptionKey);
+                            setTtsConfig(ttsState.provider, ttsState.modelId, transcriptionKey);
+                            setSlotStates(prev => ({
+                              ...prev,
+                              tts: { ...prev.tts, hasExistingKey: true, status: 'saved', dirty: false },
+                            }));
+                            setTtsUseSameKey(true);
+                          } catch (err) {
+                            console.warn('Failed to copy transcription key to TTS:', err);
+                          }
+                        } else {
+                          setTtsUseSameKey(false);
+                        }
+                      }}
+                      className="accent-indigo-500"
+                    />
+                    Use same OpenAI API key as Voice Transcription
+                  </label>
+                )}
+              </div>
             ))}
           </div>
         )}

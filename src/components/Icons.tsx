@@ -1122,6 +1122,77 @@ export function IconPower(props: IconProps) {
   );
 }
 
+/** Skip to start — transport control */
+export function IconSkipStart(props: IconProps) {
+  return (
+    <svg {...defaults} {...props}>
+      <rect x="2" y="3.5" width="2" height="9" rx="0.5" fill="currentColor" stroke="none" />
+      <path d="M13 3.5L6 8l7 4.5z" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+/** Skip to end — transport control */
+export function IconSkipEnd(props: IconProps) {
+  return (
+    <svg {...defaults} {...props}>
+      <rect x="12" y="3.5" width="2" height="9" rx="0.5" fill="currentColor" stroke="none" />
+      <path d="M3 3.5L10 8l-7 4.5z" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+/** Rewind — transport control (double left arrows) */
+export function IconRewind(props: IconProps) {
+  return (
+    <svg {...defaults} {...props}>
+      <path d="M8 8L15 3.5v9z" fill="currentColor" stroke="none" />
+      <path d="M1 8L8 3.5v9z" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+/** Fast forward — transport control (double right arrows) */
+export function IconFastForward(props: IconProps) {
+  return (
+    <svg {...defaults} {...props}>
+      <path d="M8 8L1 3.5v9z" fill="currentColor" stroke="none" />
+      <path d="M15 8L8 3.5v9z" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+/** Stop square — transport control */
+export function IconStop(props: IconProps) {
+  return (
+    <svg {...defaults} {...props}>
+      <rect x="3" y="3" width="10" height="10" rx="1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+/** Volume / speak — TTS playback */
+export function IconSpeak(props: IconProps) {
+  return (
+    <svg {...defaults} {...props}>
+      <path d="M2 6v4h3l4 3V3L5 6z" />
+      <path d="M11 5.5a3.5 3.5 0 010 5" />
+      <path d="M13 3.5a6.5 6.5 0 010 9" />
+    </svg>
+  );
+}
+
+/** Volume stop — TTS stop playback */
+export function IconSpeakStop(props: IconProps) {
+  return (
+    <svg {...defaults} {...props}>
+      <path d="M2 6v4h3l4 3V3L5 6z" />
+      <line x1="11" y1="5.5" x2="15" y2="10.5" />
+      <line x1="15" y1="5.5" x2="11" y2="10.5" />
+    </svg>
+  );
+}
+
 /** Database backup — Export All */
 export function IconBackup(props: IconProps) {
   return (
@@ -1198,6 +1269,13 @@ const ICON_MAP: Record<string, (props: IconProps) => JSX.Element> = {
   power: IconPower,
   'find-related': IconSearch,
   delete: IconTrash,
+  speak: IconSpeak,
+  'speak-stop': IconSpeakStop,
+  'skip-start': IconSkipStart,
+  'skip-end': IconSkipEnd,
+  rewind: IconRewind,
+  'fast-forward': IconFastForward,
+  stop: IconStop,
 
   // Help sections
   'getting-started': IconRocket,
