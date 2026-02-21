@@ -16,7 +16,7 @@ import { useSessionStore } from '@/store/session';
 import ContextMenu, { useContextMenu } from '@/components/ContextMenu/ContextMenu';
 import type { MenuItem } from '@/components/ContextMenu/ContextMenu';
 import { SvgIcon } from '@/components/Icons';
-import { safeMarkdownComponents } from '@/utils/safe-markdown';
+import { safeMarkdownComponents, safeRemarkPlugins } from '@/utils/safe-markdown';
 
 // ---------------------------------------------------------------------------
 // Highlight border color lookup (dynamic -- must remain inline styles)
@@ -603,7 +603,7 @@ export default function Card({
         </div>
       ) : (
         <div className="card-markdown text-xs text-wall-text leading-normal break-words">
-          <ReactMarkdown components={safeMarkdownComponents}>{card.content}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={safeRemarkPlugins} components={safeMarkdownComponents}>{card.content}</ReactMarkdown>
         </div>
       )}
 

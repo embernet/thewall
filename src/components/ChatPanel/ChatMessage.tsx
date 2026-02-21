@@ -4,7 +4,7 @@
 
 import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { safeMarkdownComponents } from '@/utils/safe-markdown';
+import { safeMarkdownComponents, safeRemarkPlugins, Linkify } from '@/utils/safe-markdown';
 import type { ChatMessage as ChatMessageType, ImageAttachment } from '@/types';
 import ImagePromptCard from './ImagePromptCard';
 
@@ -280,10 +280,10 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
             style={message.collapsed ? { maxHeight: '4.5em', WebkitLineClamp: 3, display: '-webkit-box', WebkitBoxOrient: 'vertical', overflow: 'hidden' } : undefined}
           >
             {isUser ? (
-              <span className="whitespace-pre-wrap break-words">{message.content}</span>
+              <span className="whitespace-pre-wrap break-words"><Linkify text={message.content} /></span>
             ) : (
               <div className="card-markdown">
-                <ReactMarkdown components={safeMarkdownComponents}>{message.content}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={safeRemarkPlugins} components={safeMarkdownComponents}>{message.content}</ReactMarkdown>
               </div>
             )}
           </div>
