@@ -397,4 +397,22 @@ const migrations: Migration[] = [
       -- SQLite doesn't support DROP COLUMN easily; ignore
     `,
   },
+  {
+    name: '012_session_folders',
+    up: `
+      CREATE TABLE session_folders (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
+      ALTER TABLE sessions ADD COLUMN is_favorited INTEGER DEFAULT 0;
+      ALTER TABLE sessions ADD COLUMN folder_id TEXT REFERENCES session_folders(id) ON DELETE SET NULL;
+    `,
+    down: `
+      DROP TABLE IF EXISTS session_folders;
+      -- SQLite doesn't support DROP COLUMN easily; ignore added columns
+    `,
+  },
 ];

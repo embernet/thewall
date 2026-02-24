@@ -8,7 +8,7 @@ import { fmtTime } from '@/utils/ids';
 import {
   IconMenu, IconPause, IconPlay, IconBell, IconSearch, IconDollar, IconBot,
   IconClipboard, IconGraph, IconSave, IconExport, IconSun, IconMoon,
-  IconHelp, IconGear, IconInfo, IconClose, IconPower,
+  IconHelp, IconGear, IconInfo, IconClose, IconPower, IconTrash,
 } from '@/components/Icons';
 
 // ---------------------------------------------------------------------------
@@ -140,6 +140,12 @@ export default function TopBar({
     { label: 'Settings', icon: <IconGear width={14} height={14} />, action: () => { onOpenSettings(); setMenuOpen(false); } },
     { divider: true },
     { label: 'Close Session', icon: <IconClose width={14} height={14} />, action: () => { goToLauncher(); setMenuOpen(false); } },
+    { label: 'Delete Session', icon: <IconTrash className="text-red-400" width={14} height={14} />, action: () => {
+      if (session && confirm('Delete this session? This cannot be undone.')) {
+        setMenuOpen(false);
+        window.electronAPI?.db.deleteSession(session.id).then(() => goToLauncher());
+      }
+    } },
     { label: 'Quit', icon: <IconPower className="text-red-400" width={14} height={14} />, action: () => { (window as any).electronAPI?.quit(); } },
   ];
 
@@ -200,7 +206,7 @@ export default function TopBar({
       ) : (
         <span
           onClick={() => setEditTitle(true)}
-          className="max-w-[180px] cursor-pointer truncate text-xs font-medium text-wall-text hover:text-indigo-300"
+          className="no-drag max-w-[180px] cursor-pointer truncate text-xs font-medium text-wall-text hover:text-indigo-300"
         >
           {session.title}
         </span>

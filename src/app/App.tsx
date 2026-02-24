@@ -182,13 +182,7 @@ export default function App() {
   const loadSessions = useCallback(async () => {
     if (window.electronAPI) {
       const rows = await window.electronAPI.db.getSessions();
-      setSessions(rows.map((r: any) => ({
-        id: r.id,
-        title: r.title,
-        mode: r.mode,
-        updatedAt: r.updated_at || r.updatedAt,
-        cardCount: r.card_count ?? r.cardCount ?? 0,
-      })));
+      setSessions(rows);
     }
   }, []);
 

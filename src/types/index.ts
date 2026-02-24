@@ -256,6 +256,16 @@ export interface SessionIndexEntry {
   mode: SessionMode;
   updatedAt: string;
   cardCount: number;
+  isFavorited: boolean;
+  folderId: string | null;
+}
+
+/** A logical folder for grouping sessions in the launcher. */
+export interface SessionFolder {
+  id: string;
+  name: string;
+  sortOrder: number;
+  createdAt: string;
 }
 
 // ----------------------------------------------------------------------------
@@ -524,6 +534,14 @@ export interface ElectronDbApi {
   createChatMessage: (msg: ChatMessage & { sessionId: string }) => Promise<ChatMessage>;
   updateChatMessage: (id: string, updates: Partial<Pick<ChatMessage, 'content' | 'hiddenFromLlm' | 'collapsed' | 'isDeleted'>>) => Promise<void>;
   clearChatMessages: (sessionId: string) => Promise<void>;
+
+  // Session Folders & Favorites
+  toggleSessionFavorite: (id: string, isFavorited: boolean) => Promise<void>;
+  setSessionFolder: (sessionId: string, folderId: string | null) => Promise<void>;
+  getSessionFolders: () => Promise<SessionFolder[]>;
+  createSessionFolder: (folder: SessionFolder) => Promise<SessionFolder>;
+  updateSessionFolder: (id: string, updates: Partial<SessionFolder>) => Promise<void>;
+  deleteSessionFolder: (id: string) => Promise<void>;
 }
 
 export type EmbeddingProvider = 'openai' | 'local';

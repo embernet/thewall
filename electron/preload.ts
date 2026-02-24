@@ -90,6 +90,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     createChatMessage: (msg: any) => ipcRenderer.invoke('db:createChatMessage', msg),
     updateChatMessage: (id: string, updates: any) => ipcRenderer.invoke('db:updateChatMessage', id, updates),
     clearChatMessages: (sessionId: string) => ipcRenderer.invoke('db:clearChatMessages', sessionId),
+
+    // Session Folders & Favorites
+    toggleSessionFavorite: (id: string, isFavorited: boolean) =>
+      ipcRenderer.invoke('db:toggleSessionFavorite', id, isFavorited),
+    setSessionFolder: (sessionId: string, folderId: string | null) =>
+      ipcRenderer.invoke('db:setSessionFolder', sessionId, folderId),
+    getSessionFolders: () => ipcRenderer.invoke('db:getSessionFolders'),
+    createSessionFolder: (folder: any) => ipcRenderer.invoke('db:createSessionFolder', folder),
+    updateSessionFolder: (id: string, updates: any) =>
+      ipcRenderer.invoke('db:updateSessionFolder', id, updates),
+    deleteSessionFolder: (id: string) => ipcRenderer.invoke('db:deleteSessionFolder', id),
   },
 
   // Transcription proxy (bypasses CORS)

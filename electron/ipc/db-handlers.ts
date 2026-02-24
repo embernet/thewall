@@ -20,7 +20,15 @@ export function registerDbHandlers() {
          LIMIT 50`
       )
       .all();
-    return rows;
+    return rows.map((r: any) => ({
+      id: r.id,
+      title: r.title,
+      mode: r.mode,
+      updatedAt: r.updated_at,
+      cardCount: r.card_count ?? 0,
+      isFavorited: !!(r.is_favorited),
+      folderId: r.folder_id ?? null,
+    }));
   });
 
   ipcMain.handle('db:getSession', (_e, id: string) => {
@@ -72,7 +80,59 @@ export function registerDbHandlers() {
   });
 
   ipcMain.handle('db:deleteSession', (_e, id: string) => {
-    db().prepare('DELETE FROM sessions WHERE id = ?').run(id);
+    const d = db();
+    // api_usage.session_id FK lacks ON DELETE CASCADE — clean up manually
+    d.prepare('DELETE FROM api_usage WHERE session_id = ?').run(id);
+    d.prepare('DELETE FROM sessions WHERE id = ?').run(id);
+  });
+
+  // ── Session Favorites & Folders ──
+
+  ipcMain.handle('db:toggleSessionFavorite', (_e, id: string, isFavorited: boolean) => {
+    db().prepare('UPDATE sessions SET is_favorited = ?, updated_at = ? WHERE id = ?')
+      .run(isFavorited ? 1 : 0, new Date().toISOString(), id);
+  });
+
+  ipcMain.handle('db:setSessionFolder', (_e, sessionId: string, folderId: string | null) => {
+    db().prepare('UPDATE sessions SET folder_id = ?, updated_at = ? WHERE id = ?')
+      .run(folderId, new Date().toISOString(), sessionId);
+  });
+
+  ipcMain.handle('db:getSessionFolders', () => {
+    return db()
+      .prepare('SELECT * FROM session_folders ORDER BY sort_order ASC, created_at ASC')
+      .all()
+      .map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        sortOrder: r.sort_order,
+        createdAt: r.created_at,
+      }));
+  });
+
+  ipcMain.handle('db:createSessionFolder', (_e, folder: any) => {
+    db()
+      .prepare('INSERT INTO session_folders (id, name, sort_order, created_at) VALUES (?, ?, ?, ?)')
+      .run(folder.id, folder.name, folder.sortOrder ?? 0, folder.createdAt || new Date().toISOString());
+    return folder;
+  });
+
+  ipcMain.handle('db:updateSessionFolder', (_e, id: string, updates: any) => {
+    const fields: string[] = [];
+    const values: any[] = [];
+    if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name); }
+    if (updates.sortOrder !== undefined) { fields.push('sort_order = ?'); values.push(updates.sortOrder); }
+    if (fields.length === 0) return;
+    values.push(id);
+    db().prepare(`UPDATE session_folders SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+  });
+
+  ipcMain.handle('db:deleteSessionFolder', (_e, id: string) => {
+    const d = db();
+    // Clear folder_id on sessions that referenced this folder (ON DELETE SET NULL handles it,
+    // but be explicit in case FK enforcement is off)
+    d.prepare('UPDATE sessions SET folder_id = NULL WHERE folder_id = ?').run(id);
+    d.prepare('DELETE FROM session_folders WHERE id = ?').run(id);
   });
 
   // ── Columns ──
@@ -1278,6 +1338,8 @@ function mapSessionFromDb(row: any) {
     templateId: row.template_id ?? null,
     systemPrompt: row.system_prompt ?? '',
     enabledAgentIds: safeJsonParse(row.enabled_agent_ids, null),
+    isFavorited: !!(row.is_favorited),
+    folderId: row.folder_id ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     cardCount: row.card_count,
