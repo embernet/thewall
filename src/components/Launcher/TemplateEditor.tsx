@@ -35,6 +35,8 @@ export default function TemplateEditor({ initial, onSave, onCancel, onDelete }: 
   const [selectedAgents, setSelectedAgents] = useState<Set<string>>(
     new Set(initial?.enabledAgentIds ?? []),
   );
+  const [summaryPrompt, setSummaryPrompt] = useState(initial?.summaryPrompt ?? '');
+  const [summaryPromptLabel, setSummaryPromptLabel] = useState(initial?.summaryPromptLabel ?? '');
   const [selectedColumns, setSelectedColumns] = useState<Set<ColumnType>>(
     new Set(initial?.visibleColumnTypes ?? COLUMN_OPTIONS.map(c => c.type)),
   );
@@ -67,6 +69,8 @@ export default function TemplateEditor({ initial, onSave, onCancel, onDelete }: 
       defaultMode: mode,
       systemPrompt: systemPrompt.trim(),
       goalPlaceholder: goalPlaceholder.trim(),
+      summaryPrompt: summaryPrompt.trim() || undefined,
+      summaryPromptLabel: summaryPromptLabel.trim() || undefined,
       isBuiltIn: false,
       createdAt: initial?.createdAt ?? new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -141,6 +145,24 @@ export default function TemplateEditor({ initial, onSave, onCancel, onDelete }: 
         onChange={e => setGoalPlaceholder(e.target.value)}
         placeholder="Goal placeholder (e.g. 'What are we brainstorming?')"
         className="mb-2 w-full rounded-md border border-wall-muted bg-wall-border px-2 py-[5px] text-[11px] text-wall-text outline-none focus:border-indigo-500"
+      />
+
+      {/* Summary Prompt (optional) */}
+      <label className="mb-1 block text-[10px] text-wall-text-muted">
+        Default Summary Prompt <span className="text-wall-subtle">(optional)</span>
+      </label>
+      <input
+        value={summaryPromptLabel}
+        onChange={e => setSummaryPromptLabel(e.target.value)}
+        placeholder="Summary prompt label (e.g. 'Collaboration Meeting')"
+        className="mb-1 w-full rounded-md border border-wall-muted bg-wall-border px-2 py-[5px] text-[11px] text-wall-text outline-none focus:border-indigo-500"
+      />
+      <textarea
+        value={summaryPrompt}
+        onChange={e => setSummaryPrompt(e.target.value)}
+        placeholder="Custom summary prompt for this template (leave blank to use default)..."
+        rows={3}
+        className="mb-2 box-border w-full resize-y rounded-md border border-wall-muted bg-wall-border px-2 py-[5px] font-sans text-[11px] text-wall-text outline-none focus:border-indigo-500"
       />
 
       {/* Columns */}

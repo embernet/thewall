@@ -498,6 +498,15 @@ export default function App() {
         ? templateVisibleSet.has(c.type)
         : c.type !== 'trash' && c.type !== 'summary' && c.type !== 'artefacts',
       collapsed: false,
+      // Seed summary column config with template prompt if provided
+      ...(c.type === 'summary' && template?.summaryPrompt ? {
+        config: {
+          summaryPromptId: 'template',
+          customSummaryPrompt: template.summaryPrompt,
+          templateSummaryPrompt: template.summaryPrompt,
+          templateSummaryPromptLabel: template.summaryPromptLabel || template.name,
+        },
+      } : {}),
     }));
 
     return {

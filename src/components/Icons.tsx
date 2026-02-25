@@ -1321,6 +1321,7 @@ const ICON_MAP: Record<string, (props: IconProps) => JSX.Element> = {
   interview: IconMic,
   strategy: IconTarget,
   target: IconTarget,
+  collaboration: IconHandshake,
 
   // Agent icons (keyed by agent id)
   'concept-extractor': IconKey,

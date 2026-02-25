@@ -60,6 +60,10 @@ const SummaryColumn: React.FC<SummaryColumnProps> = ({
   const storeUpdateColumn = useSessionStore(s => s.updateColumn);
   const meta = COL_TYPES.find(c => c.type === 'summary') || COL_TYPES[0];
 
+  // Template-provided summary prompt (set by mkSession when template has summaryPrompt)
+  const templateSummaryPrompt = (column.config?.templateSummaryPrompt as string) ?? '';
+  const templateSummaryPromptLabel = (column.config?.templateSummaryPromptLabel as string) ?? '';
+
   // Summary prompts
   const [prompts, setPrompts] = useState<SummaryPrompt[]>([]);
   const [selectedPromptId, setSelectedPromptId] = useState<string>(
@@ -80,8 +84,10 @@ const SummaryColumn: React.FC<SummaryColumnProps> = ({
   useEffect(() => {
     const loaded = loadSummaryPrompts();
     setPrompts(loaded);
-    // If a preset is selected and no custom text saved, seed from the preset
-    if (selectedPromptId !== 'custom' && !customPrompt) {
+    // If using a template prompt, seed from the template
+    if (selectedPromptId === 'template' && templateSummaryPrompt && !customPrompt) {
+      setCustomPrompt(templateSummaryPrompt);
+    } else if (selectedPromptId !== 'custom' && selectedPromptId !== 'template' && !customPrompt) {
       const preset = loaded.find(p => p.id === selectedPromptId);
       if (preset) setCustomPrompt(preset.prompt);
     }
@@ -92,8 +98,10 @@ const SummaryColumn: React.FC<SummaryColumnProps> = ({
     if (column.visible) {
       const loaded = loadSummaryPrompts();
       setPrompts(loaded);
-      // Re-seed if still on a preset and user hasn't gone custom
-      if (selectedPromptId !== 'custom') {
+      // Re-seed if still on a preset/template and user hasn't gone custom
+      if (selectedPromptId === 'template' && templateSummaryPrompt && customPrompt === '') {
+        setCustomPrompt(templateSummaryPrompt);
+      } else if (selectedPromptId !== 'custom' && selectedPromptId !== 'template') {
         const preset = loaded.find(p => p.id === selectedPromptId);
         if (preset && customPrompt === '') setCustomPrompt(preset.prompt);
       }
@@ -101,17 +109,27 @@ const SummaryColumn: React.FC<SummaryColumnProps> = ({
   }, [column.visible]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isCustom = selectedPromptId === 'custom';
+  const isTemplate = selectedPromptId === 'template';
   const selectedPrompt = prompts.find(p => p.id === selectedPromptId);
 
-  // The displayed prompt text: for presets show their text, for custom show the user's text
+  // The displayed prompt text: template → template text, presets → their text, custom → user text
   const displayedPromptText = isCustom
     ? customPrompt
-    : (selectedPrompt?.prompt ?? '');
+    : isTemplate
+      ? customPrompt || templateSummaryPrompt
+      : (selectedPrompt?.prompt ?? '');
 
   // Persist prompt selection — when switching to a preset, also seed customPrompt with its text
   const handlePromptChange = (id: string) => {
     setSelectedPromptId(id);
-    if (id !== 'custom') {
+    if (id === 'template' && templateSummaryPrompt) {
+      setCustomPrompt(templateSummaryPrompt);
+      storeUpdateColumn(column.id, {
+        config: { ...column.config, summaryPromptId: id, customSummaryPrompt: templateSummaryPrompt },
+      });
+      return;
+    }
+    if (id !== 'custom' && id !== 'template') {
       const preset = prompts.find(p => p.id === id);
       if (preset) {
         setCustomPrompt(preset.prompt);
@@ -267,6 +285,11 @@ const SummaryColumn: React.FC<SummaryColumnProps> = ({
             onChange={(e) => handlePromptChange(e.target.value)}
             className="w-full cursor-pointer rounded-md border border-wall-muted bg-wall-border px-2 py-1 text-[11px] text-wall-text outline-none"
           >
+            {templateSummaryPrompt && (
+              <option value="template">
+                {templateSummaryPromptLabel || 'Template Default'}
+              </option>
+            )}
             {prompts.map(p => (
               <option key={p.id} value={p.id}>{p.label}</option>
             ))}
@@ -287,9 +310,14 @@ const SummaryColumn: React.FC<SummaryColumnProps> = ({
               ...(isCustom ? { borderColor: 'var(--summary-textarea-border)', backgroundColor: 'var(--summary-textarea-bg)' } : {}),
             }}
           />
-          {isCustom && selectedPromptId === 'custom' && (
+          {isCustom && (
             <div className="text-[9px]" style={{ color: 'var(--summary-hint)' }}>
               Custom prompt — select a style above to reset
+            </div>
+          )}
+          {isTemplate && (
+            <div className="text-[9px]" style={{ color: 'var(--summary-hint)' }}>
+              Prompt from template — select a different style above to change
             </div>
           )}
 

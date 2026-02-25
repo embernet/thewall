@@ -84,6 +84,11 @@ export interface SessionTemplate {
   systemPrompt: string;
   /** Placeholder text for the goal input. */
   goalPlaceholder: string;
+  /** Optional default summary prompt for the Summary column.
+   *  When provided, it appears as the default selection in the summary style dropdown. */
+  summaryPrompt?: string;
+  /** Label shown in the summary style dropdown for the template prompt. */
+  summaryPromptLabel?: string;
   /** Whether this is a built-in template (not user-editable). */
   isBuiltIn: boolean;
   createdAt?: string;
