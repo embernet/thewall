@@ -54,6 +54,31 @@ const MIN_SEGMENT_MS = 2_000;
 /** How often we poll the analyser for RMS levels (ms). */
 const VAD_POLL_MS = 50;
 
+// ── Whisper hallucination filter ────────────────────────────────────────────
+// Whisper hallucinates these phrases when fed silence / near-silence audio.
+// We strip them to avoid polluting the transcript.
+const WHISPER_HALLUCINATIONS = new Set([
+  'thank you',
+  'thank you.',
+  'thanks.',
+  'thanks for watching.',
+  'thank you for watching.',
+  'thank you very much.',
+  'thank you so much.',
+  'thank you for watching. come again.',
+  'thanks for watching!',
+  'thank you for watching!',
+  'bye.',
+  'bye bye.',
+  'goodbye.',
+  'you',
+  'the end.',
+  'i\'m sorry.',
+  'subtitles by the amara.org community',
+  'subtitles made by the amara.org community',
+  'subs by www.teletext.ch',
+]);
+
 // ── Session state ───────────────────────────────────────────────────────────
 
 interface TranscriptionSession {
@@ -154,6 +179,31 @@ function createRecorder(s: TranscriptionSession): MediaRecorder {
   return mr;
 }
 
+// ── Discard: stop recorder → throw away audio → restart ─────────────────────
+// Used when the hard cap fires but no speech was detected (pure silence).
+
+async function discardAndRestart(): Promise<void> {
+  if (!session || session.flushing || session.stopped) return;
+
+  const mr = session.mediaRecorder;
+  if (!mr || mr.state === 'inactive') return;
+
+  session.flushing = true;
+
+  await new Promise<void>((resolve) => {
+    mr.onstop = () => {
+      session!.chunks = [];
+      resolve();
+    };
+    mr.stop();
+  });
+
+  if (session && !session.stopped && !session.paused) {
+    createRecorder(session);
+  }
+  if (session) session.flushing = false;
+}
+
 // ── Flush: stop recorder → send to API → restart ───────────────────────────
 
 async function flushAndRestart(): Promise<void> {
@@ -195,8 +245,14 @@ async function flushAndRestart(): Promise<void> {
       console.warn('[transcription] IPC proxy returned error:', result.error);
       bus.emit('transcript:error', { error: result.error });
     } else if (result.text) {
-      console.debug(`[transcription] Got text: "${result.text.slice(0, 80)}${result.text.length > 80 ? '…' : ''}"`);
-      bus.emit('transcript:segment', { text: result.text });
+      // Filter known Whisper hallucination phrases (silence artifacts)
+      const normalised = result.text.trim().toLowerCase();
+      if (WHISPER_HALLUCINATIONS.has(normalised)) {
+        console.debug(`[transcription] Filtered hallucination: "${result.text}"`);
+      } else {
+        console.debug(`[transcription] Got text: "${result.text.slice(0, 80)}${result.text.length > 80 ? '…' : ''}"`);
+        bus.emit('transcript:segment', { text: result.text });
+      }
     }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -222,10 +278,19 @@ function vadTick(): void {
     session.hasSpeech = true;
   }
 
-  // Hard cap — flush regardless to keep latency bounded
+  // Hard cap — flush to keep latency bounded, but only if we detected speech.
+  // If no speech was detected the audio is silence/noise; sending it to Whisper
+  // produces hallucinated text ("Thank you", "Thank you for watching", etc.).
   if (elapsed >= MAX_SEGMENT_MS) {
-    console.debug(`[transcription] VAD: hard cap ${MAX_SEGMENT_MS}ms reached, flushing`);
-    flushAndRestart();
+    if (session.hasSpeech) {
+      console.debug(`[transcription] VAD: hard cap ${MAX_SEGMENT_MS}ms reached, flushing`);
+      flushAndRestart();
+    } else {
+      // Reset the segment timer so we don't spin on the cap every tick.
+      // Discard the silent audio by stopping and restarting the recorder.
+      console.debug(`[transcription] VAD: hard cap reached but no speech detected, discarding silent segment`);
+      discardAndRestart();
+    }
     return;
   }
 
