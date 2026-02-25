@@ -6,6 +6,7 @@ import { v4 as uid } from 'uuid';
 import { exportSessionToFile, readFileAsJSON, downloadJSON } from '@/utils/export';
 import { personaRegistry } from '@/personas/base';
 import { builtInPersonas } from '@/personas/built-in';
+import { askClaude } from '@/utils/llm';
 import { BUILT_IN_TEMPLATES } from '@/templates/built-in';
 import { builtInAgents } from '@/agents/built-in';
 import TemplateEditor from './TemplateEditor';
@@ -254,6 +255,9 @@ export default function Launcher({
   const [simCtx, setSimCtx] = useState(DEFAULT_SIM_CTX);
   const [simParts, setSimParts] = useState<SimParticipant[]>(DEFAULT_SIM_PARTS);
   const [simTurns, setSimTurns] = useState(DEFAULT_SIM_TURNS);
+  const [simStep, setSimStep] = useState<'describe' | 'edit'>('describe');
+  const [simDescription, setSimDescription] = useState('');
+  const [simGenerating, setSimGenerating] = useState(false);
 
   // ── Folders & Favorites state ──
   const [folders, setFolders] = useState<SessionFolder[]>([]);
@@ -347,6 +351,43 @@ export default function Launcher({
     setRenameSessionTitle('');
     onRefresh();
   }, [renameSessionTitle, onRefresh]);
+
+  // ── Generate sim from description ──
+  const handleGenerateSim = useCallback(async () => {
+    const desc = simDescription.trim();
+    if (!desc) return;
+    setSimGenerating(true);
+    try {
+      const sys = 'You are a meeting simulation planner. Given a meeting description, generate a structured meeting setup. Respond with ONLY valid JSON (no markdown, no code fences) in this exact format: {"context": "a clear meeting goal and context", "participants": [{"name": "FirstName", "role": "Title — brief style note", "personaPrompt": "Describe their personality, expertise, perspective, and conversation style in 1-2 sentences."}], "turns": N}. Choose 3-6 participants with realistic first names. Choose an appropriate number of turns (10-30) based on meeting complexity.';
+      const result = await askClaude(sys, desc);
+      if (!result) return;
+      // Strip markdown code fences if present
+      const cleaned = result.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
+      const parsed = JSON.parse(cleaned) as {
+        context: string;
+        participants: { name: string; role: string; personaPrompt: string }[];
+        turns: number;
+      };
+      setSimCtx(parsed.context || desc);
+      setSimParts(
+        parsed.participants.map(p => ({
+          name: p.name,
+          role: p.role,
+          personaId: null,
+          personaPrompt: p.personaPrompt || '',
+        })),
+      );
+      setSimTurns(Math.max(5, Math.min(40, parsed.turns || 20)));
+      setSimStep('edit');
+    } catch (e) {
+      console.error('Failed to generate sim setup:', e);
+      // Fallback: use description as context, keep defaults
+      setSimCtx(desc);
+      setSimStep('edit');
+    } finally {
+      setSimGenerating(false);
+    }
+  }, [simDescription]);
 
   // ── Drag & drop ──
   const handleDragStart = useCallback((e: React.DragEvent, sessionId: string) => {
@@ -913,106 +954,173 @@ export default function Launcher({
           {/* ─── Simulate Meeting Tab ─── */}
           {tab === 'sim' && (
             <div>
-              <label className="mb-1 block text-xs text-wall-text-muted">Meeting Context</label>
-              <textarea
-                value={simCtx}
-                onChange={(e) => setSimCtx(e.target.value)}
-                rows={3}
-                className="mb-2.5 box-border w-full resize-y rounded-lg border border-wall-muted bg-wall-border px-3 py-[9px] font-sans text-xs text-wall-text outline-none focus:border-indigo-500"
-              />
-
-              <div className="mb-1.5 flex items-center justify-between">
-                <label className="text-xs text-wall-text-muted">Participants</label>
-                <button
-                  onClick={() => setSimParts([...simParts, { name: '', role: '', personaId: null, personaPrompt: '' }])}
-                  className="cursor-pointer rounded border border-wall-muted bg-wall-border px-[7px] py-0.5 text-[10px] text-indigo-500 hover:bg-wall-muted"
-                >
-                  + Add
-                </button>
-              </div>
-
-              {simParts.map((p, i) => (
-                <div key={i} className="mb-2 rounded-lg border border-wall-muted/50 bg-wall-border/30 px-2 py-1.5">
-                  <div className="flex items-center gap-1.5">
-                    <div
-                      className="h-2 w-2 shrink-0 rounded-full"
-                      style={{ background: SPEAKER_COLORS[i % SPEAKER_COLORS.length] }}
-                    />
-                    <input
-                      value={p.name}
-                      onChange={(e) => {
-                        const n = [...simParts];
-                        n[i] = { ...n[i], name: e.target.value };
-                        setSimParts(n);
-                      }}
-                      placeholder="Name"
-                      className="w-[90px] rounded-md border border-wall-muted bg-wall-border px-[7px] py-[5px] text-[11px] text-wall-text outline-none focus:border-indigo-500"
-                    />
-                    <input
-                      value={p.role}
-                      onChange={(e) => {
-                        const n = [...simParts];
-                        n[i] = { ...n[i], role: e.target.value };
-                        setSimParts(n);
-                      }}
-                      placeholder="Role"
-                      className="flex-1 rounded-md border border-wall-muted bg-wall-border px-[7px] py-[5px] text-[11px] text-wall-text outline-none focus:border-indigo-500"
-                    />
-                    {simParts.length > 2 && (
-                      <button
-                        onClick={() => setSimParts(simParts.filter((_, j) => j !== i))}
-                        className="cursor-pointer border-none bg-transparent text-wall-subtle hover:text-red-400"
-                      >
-                        <IconClose width={12} height={12} />
-                      </button>
+              {simStep === 'describe' ? (
+                /* ── Step 1: Describe the meeting ── */
+                <>
+                  <label className="mb-1 block text-xs text-wall-text-muted">
+                    Describe the meeting you want to simulate
+                  </label>
+                  <textarea
+                    value={simDescription}
+                    onChange={(e) => setSimDescription(e.target.value)}
+                    placeholder="e.g. A tense board meeting where the CEO wants to pivot the company to AI but the CFO is worried about burn rate and the VP of Engineering thinks the current product just needs better marketing..."
+                    rows={5}
+                    className="mb-2.5 box-border w-full resize-y rounded-lg border border-wall-muted bg-wall-border px-3 py-[9px] font-sans text-xs text-wall-text outline-none placeholder:text-wall-text-dim focus:border-indigo-500"
+                  />
+                  <p className="mb-3 text-[10px] leading-relaxed text-wall-text-dim">
+                    AI will generate a meeting goal, participants, and their roles from your description.
+                    You can edit everything before starting.
+                  </p>
+                  <button
+                    onClick={handleGenerateSim}
+                    disabled={!simDescription.trim() || simGenerating}
+                    className="w-full cursor-pointer rounded-lg border-none py-[11px] text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-wall-muted"
+                    style={{
+                      ...(simDescription.trim() && !simGenerating
+                        ? { background: 'linear-gradient(135deg, #ec4899, #6366f1)' }
+                        : {}),
+                    }}
+                  >
+                    {simGenerating ? (
+                      <span className="inline-flex items-center gap-2">
+                        <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                        Generating meeting setup...
+                      </span>
+                    ) : (
+                      <>
+                        <IconMasks width={14} height={14} className="inline-block" /> Generate Meeting Setup {'\u2192'}
+                      </>
                     )}
-                  </div>
-                  {/* Persona picker */}
-                  <div className="mt-1 ml-[18px]">
-                    <label className="block text-[8px] font-semibold text-wall-subtle mb-0.5 uppercase tracking-wider">Persona</label>
-                    <PersonaPicker
-                      participant={p}
-                      index={i}
-                      onChange={(updated) => {
-                        const n = [...simParts];
-                        n[i] = updated;
-                        setSimParts(n);
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
+                  </button>
 
-              <label className="mb-1 mt-2.5 block text-xs text-wall-text-muted">
-                Turns: {simTurns}
-              </label>
-              <input
-                type="range"
-                min={5}
-                max={40}
-                value={simTurns}
-                onChange={(e) => setSimTurns(+e.target.value)}
-                className="mb-3 w-full accent-indigo-500"
-              />
+                  {/* Skip to manual setup */}
+                  <button
+                    onClick={() => {
+                      setSimCtx(DEFAULT_SIM_CTX);
+                      setSimParts(DEFAULT_SIM_PARTS);
+                      setSimTurns(DEFAULT_SIM_TURNS);
+                      setSimStep('edit');
+                    }}
+                    className="mt-2 w-full cursor-pointer rounded-lg border border-wall-muted bg-transparent py-[7px] text-[11px] text-wall-text-muted hover:border-indigo-500/50 hover:text-wall-text"
+                  >
+                    Or set up manually...
+                  </button>
+                </>
+              ) : (
+                /* ── Step 2: Edit generated setup ── */
+                <>
+                  <div className="mb-2.5 flex items-center justify-between">
+                    <button
+                      onClick={() => setSimStep('describe')}
+                      className="cursor-pointer rounded-md border border-wall-muted bg-wall-border px-2 py-1 text-[10px] text-wall-text-muted hover:text-wall-text"
+                    >
+                      {'\u2190'} Back
+                    </button>
+                    <span className="text-[10px] text-wall-subtle">Review &amp; edit before starting</span>
+                  </div>
 
-              <button
-                onClick={() =>
-                  onSimulate({
-                    context: simCtx,
-                    participants: simParts.filter((p) => p.name),
-                    turns: simTurns,
-                  })
-                }
-                disabled={!simCtx.trim() || simParts.filter((p) => p.name).length < 2}
-                className="w-full cursor-pointer rounded-lg border-none py-[11px] text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-wall-muted"
-                style={{
-                  ...( simCtx.trim()
-                    ? { background: 'linear-gradient(135deg, #ec4899, #6366f1)' }
-                    : {}),
-                }}
-              >
-                <IconMasks width={14} height={14} className="inline-block" /> Start Simulated Meeting {'\u2192'}
-              </button>
+                  <label className="mb-1 block text-xs text-wall-text-muted">Meeting Context</label>
+                  <textarea
+                    value={simCtx}
+                    onChange={(e) => setSimCtx(e.target.value)}
+                    rows={3}
+                    className="mb-2.5 box-border w-full resize-y rounded-lg border border-wall-muted bg-wall-border px-3 py-[9px] font-sans text-xs text-wall-text outline-none focus:border-indigo-500"
+                  />
+
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <label className="text-xs text-wall-text-muted">Participants</label>
+                    <button
+                      onClick={() => setSimParts([...simParts, { name: '', role: '', personaId: null, personaPrompt: '' }])}
+                      className="cursor-pointer rounded border border-wall-muted bg-wall-border px-[7px] py-0.5 text-[10px] text-indigo-500 hover:bg-wall-muted"
+                    >
+                      + Add
+                    </button>
+                  </div>
+
+                  {simParts.map((p, i) => (
+                    <div key={i} className="mb-2 rounded-lg border border-wall-muted/50 bg-wall-border/30 px-2 py-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <div
+                          className="h-2 w-2 shrink-0 rounded-full"
+                          style={{ background: SPEAKER_COLORS[i % SPEAKER_COLORS.length] }}
+                        />
+                        <input
+                          value={p.name}
+                          onChange={(e) => {
+                            const n = [...simParts];
+                            n[i] = { ...n[i], name: e.target.value };
+                            setSimParts(n);
+                          }}
+                          placeholder="Name"
+                          className="w-[90px] rounded-md border border-wall-muted bg-wall-border px-[7px] py-[5px] text-[11px] text-wall-text outline-none focus:border-indigo-500"
+                        />
+                        <input
+                          value={p.role}
+                          onChange={(e) => {
+                            const n = [...simParts];
+                            n[i] = { ...n[i], role: e.target.value };
+                            setSimParts(n);
+                          }}
+                          placeholder="Role"
+                          className="flex-1 rounded-md border border-wall-muted bg-wall-border px-[7px] py-[5px] text-[11px] text-wall-text outline-none focus:border-indigo-500"
+                        />
+                        {simParts.length > 2 && (
+                          <button
+                            onClick={() => setSimParts(simParts.filter((_, j) => j !== i))}
+                            className="cursor-pointer border-none bg-transparent text-wall-subtle hover:text-red-400"
+                          >
+                            <IconClose width={12} height={12} />
+                          </button>
+                        )}
+                      </div>
+                      {/* Persona picker */}
+                      <div className="mt-1 ml-[18px]">
+                        <label className="block text-[8px] font-semibold text-wall-subtle mb-0.5 uppercase tracking-wider">Persona</label>
+                        <PersonaPicker
+                          participant={p}
+                          index={i}
+                          onChange={(updated) => {
+                            const n = [...simParts];
+                            n[i] = updated;
+                            setSimParts(n);
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+
+                  <label className="mb-1 mt-2.5 block text-xs text-wall-text-muted">
+                    Turns: {simTurns}
+                  </label>
+                  <input
+                    type="range"
+                    min={5}
+                    max={40}
+                    value={simTurns}
+                    onChange={(e) => setSimTurns(+e.target.value)}
+                    className="mb-3 w-full accent-indigo-500"
+                  />
+
+                  <button
+                    onClick={() =>
+                      onSimulate({
+                        context: simCtx,
+                        participants: simParts.filter((p) => p.name),
+                        turns: simTurns,
+                      })
+                    }
+                    disabled={!simCtx.trim() || simParts.filter((p) => p.name).length < 2}
+                    className="w-full cursor-pointer rounded-lg border-none py-[11px] text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-wall-muted"
+                    style={{
+                      ...(simCtx.trim()
+                        ? { background: 'linear-gradient(135deg, #ec4899, #6366f1)' }
+                        : {}),
+                    }}
+                  >
+                    <IconMasks width={14} height={14} className="inline-block" /> Start Simulated Meeting {'\u2192'}
+                  </button>
+                </>
+              )}
             </div>
           )}
         </div>
