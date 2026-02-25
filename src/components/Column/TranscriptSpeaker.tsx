@@ -13,6 +13,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { Card as CardType } from '@/types';
 import { SvgIcon } from '@/components/Icons';
+import { bus } from '@/events/bus';
 import {
   speakText,
   stopSpeaking,
@@ -164,13 +165,10 @@ export default function TranscriptSpeaker({
     };
   }, []);
 
-  // Highlight the active card and scroll to it
+  // Highlight the active card and scroll to it (via virtualizer)
   useEffect(() => {
     if (currentCardIndex < 0 || currentCardIndex >= cards.length) return;
-    const cardEl = document.getElementById(`card-${cards[currentCardIndex].id}`);
-    if (cardEl) {
-      cardEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
+    bus.emit('column:scrollToCard', { cardId: cards[currentCardIndex].id });
   }, [currentCardIndex, cards]);
 
   // Sync TTS state

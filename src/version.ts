@@ -4,4 +4,4 @@
  *
  * To bump the version: update BOTH package.json and this constant.
  */
-export const APP_VERSION = '0.2.0';
+export const APP_VERSION = '0.3.0';

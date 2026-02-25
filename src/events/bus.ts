@@ -26,6 +26,7 @@ export type AppEvents = {
   'transcript:pipeline:started': { batchId: string; rawCardCount: number };
   'transcript:pipeline:completed': { batchId: string; cleanCardCount: number };
   'speakerColors:updated': { colors: Record<string, string> };
+  'column:scrollToCard': { cardId: string };
 };
 
 // ---------------------------------------------------------------------------

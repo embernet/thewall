@@ -52,18 +52,20 @@ const ContextColumn: React.FC<ContextColumnProps> = ({
       if (col && !col.visible) useSessionStore.getState().toggleColumnVisibility(column.id);
       if (col && col.collapsed) useSessionStore.getState().toggleColumnCollapsed(column.id);
 
-      // Scroll to the document card
+      // Scroll to the document card via virtualizer
       setTimeout(() => {
-        const el = document.getElementById('card-' + docCardId);
-        if (el) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          el.style.outline = '2px solid #a855f7';
-          el.style.outlineOffset = '2px';
-          setTimeout(() => {
-            el.style.outline = 'none';
-            el.style.outlineOffset = '0';
-          }, 2000);
-        }
+        bus.emit('column:scrollToCard', { cardId: docCardId });
+        setTimeout(() => {
+          const el = document.getElementById('card-' + docCardId);
+          if (el) {
+            el.style.outline = '2px solid #a855f7';
+            el.style.outlineOffset = '2px';
+            setTimeout(() => {
+              el.style.outline = 'none';
+              el.style.outlineOffset = '0';
+            }, 2000);
+          }
+        }, 300);
       }, 100);
     };
     bus.on('document:viewChunks', handler);

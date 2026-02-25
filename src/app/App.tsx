@@ -696,13 +696,15 @@ export default function App() {
         // Create the chunk column, then scroll after it renders
         bus.emit('document:viewChunks', { docCardId: parentDocId, highlightChunkId: cardId });
         setTimeout(() => {
-          const el = document.getElementById('card-' + cardId);
-          if (el) {
-            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            el.style.outline = '2px solid #a855f7';
-            el.style.outlineOffset = '2px';
-            setTimeout(() => { el.style.outline = 'none'; el.style.outlineOffset = '0'; }, 2000);
-          }
+          bus.emit('column:scrollToCard', { cardId });
+          setTimeout(() => {
+            const el = document.getElementById('card-' + cardId);
+            if (el) {
+              el.style.outline = '2px solid #a855f7';
+              el.style.outlineOffset = '2px';
+              setTimeout(() => { el.style.outline = 'none'; el.style.outlineOffset = '0'; }, 2000);
+            }
+          }, 300);
         }, 300);
         return;
       }
@@ -716,15 +718,17 @@ export default function App() {
       if (col && col.collapsed) toggleColumnCollapsed(col.id);
     }
 
+    // Ask the virtualizer to scroll to the card (it may not be in the DOM yet)
+    bus.emit('column:scrollToCard', { cardId });
+    // After the virtualizer scrolls, highlight the card in the DOM
     setTimeout(() => {
       const el = document.getElementById('card-' + cardId);
       if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         el.style.outline = '2px solid #a855f7';
         el.style.outlineOffset = '2px';
         setTimeout(() => { el.style.outline = 'none'; el.style.outlineOffset = '0'; }, 2000);
       }
-    }, 100);
+    }, 300);
   }, [cards, columns, toggleColumnVisibility, toggleColumnCollapsed, setColumnVisible]);
 
   // ── Card linking ──

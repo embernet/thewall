@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import type { Card as CardType, ColumnType } from '@/types';
 import { SOURCE_BADGES } from '@/types';
@@ -56,7 +56,7 @@ interface CardProps {
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
-export default function Card({
+function CardInner({
   card,
   colType,
   speakerColors,
@@ -734,6 +734,30 @@ export default function Card({
     </div>
   );
 }
+
+const Card = memo(CardInner, (prev, next) => {
+  // Re-render only when meaningful props change
+  if (prev.card !== next.card) return false;
+  if (prev.colType !== next.colType) return false;
+  if (prev.speakerColors !== next.speakerColors) return false;
+  if (prev.knownSpeakers !== next.knownSpeakers) return false;
+  if (prev.linkingFrom !== next.linkingFrom) return false;
+  if (prev.speakingHighlight !== next.speakingHighlight) return false;
+  // Callback identity: these must be stable (useCallback) from parent
+  if (prev.onDelete !== next.onDelete) return false;
+  if (prev.onHighlight !== next.onHighlight) return false;
+  if (prev.onPin !== next.onPin) return false;
+  if (prev.onEdit !== next.onEdit) return false;
+  if (prev.onSpeakerChange !== next.onSpeakerChange) return false;
+  if (prev.onAddSpeaker !== next.onAddSpeaker) return false;
+  if (prev.onSplit !== next.onSplit) return false;
+  if (prev.onNavigate !== next.onNavigate) return false;
+  if (prev.onStartLink !== next.onStartLink) return false;
+  if (prev.onCompleteLink !== next.onCompleteLink) return false;
+  return true;
+});
+
+export default Card;
 
 // ---------------------------------------------------------------------------
 // Raw Sources Dropdown — shown on clean transcript cards

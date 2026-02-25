@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { safeMarkdownComponents } from '@/utils/safe-markdown';
 import type { Column as ColumnType, Card as CardType, AudioState } from '@/types';
@@ -14,6 +14,8 @@ import { askClaude } from '@/utils/llm';
 import { speakText, stopSpeaking } from '@/utils/tts';
 import TtsTransport from '@/components/TtsTransport';
 import TranscriptSpeaker from './TranscriptSpeaker';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { bus } from '@/events/bus';
 
 interface ColumnProps {
   column: ColumnType;
@@ -130,16 +132,22 @@ const Column: React.FC<ColumnProps> = ({
     if (suppressScrollRef.current) {
       suppressScrollRef.current = false;
     } else if (cards.length > prevLen.current) {
-      scrollRef.current?.scrollTo({
-        top: scrollRef.current.scrollHeight,
-        behavior: 'smooth',
+      // Use requestAnimationFrame to ensure the virtualizer has measured the new item
+      requestAnimationFrame(() => {
+        scrollRef.current?.scrollTo({
+          top: scrollRef.current.scrollHeight,
+          behavior: 'smooth',
+        });
       });
     }
     prevLen.current = cards.length;
   }, [cards.length]);
 
   // Unique speakers for filter dropdown + context menu
-  const speakers = Array.from(new Set(cards.map(c => c.speaker).filter(Boolean) as string[]));
+  const speakers = useMemo(() =>
+    Array.from(new Set(cards.map(c => c.speaker).filter(Boolean) as string[])),
+    [cards],
+  );
   // Unique agent names for filter dropdown
   const agentNames = useMemo(() =>
     Array.from(new Set(cards.map(c => c.sourceAgentName).filter(Boolean) as string[])).sort(),
@@ -152,16 +160,23 @@ const Column: React.FC<ColumnProps> = ({
     return [...s];
   }, [speakerColors, cards]);
 
-  const handleAddSpeaker = (cardId: string, name: string) => {
+  const handleAddSpeaker = useCallback((cardId: string, name: string) => {
     // Assign a color and persist the speaker in speakerColors
     const idx = Object.keys(speakerColors).length;
     const color = SPEAKER_COLORS[idx % SPEAKER_COLORS.length];
     setSpeakerColors({ ...speakerColors, [name]: color });
     // Set the speaker on the card
     updateCard(cardId, { speaker: name });
-  };
+  }, [speakerColors, setSpeakerColors, updateCard]);
 
-  const handleSplit = (cardId: string, splitIndex: number) => {
+  // Stable callbacks for Card props (avoid re-creating on every render)
+  const handleCardDelete = useCallback((id: string) => deleteCard(id), [deleteCard]);
+  const handleCardHighlight = useCallback((id: string) => toggleHighlight(id), [toggleHighlight]);
+  const handleCardPin = useCallback((id: string) => togglePin(id), [togglePin]);
+  const handleCardEdit = useCallback((id: string, c: string) => updateCard(id, { content: c }), [updateCard]);
+  const handleCardSpeakerChange = useCallback((id: string, s: string | undefined) => updateCard(id, { speaker: s }), [updateCard]);
+
+  const handleSplit = useCallback((cardId: string, splitIndex: number) => {
     const card = cards.find((c) => c.id === cardId);
     if (!card) return;
     // Suppress the auto-scroll-to-bottom that normally fires when a card is added
@@ -214,7 +229,7 @@ const Column: React.FC<ColumnProps> = ({
       updatedAt: now(),
       sortOrder: newSortOrder,
     });
-  };
+  }, [cards, updateCard, addCard]);
 
   // Close transcript hamburger on outside click
   useEffect(() => {
@@ -253,38 +268,72 @@ const Column: React.FC<ColumnProps> = ({
     setTranscriptMenuOpen(false);
   };
 
-  let filtered = cards;
-  if (search) {
-    const q = search.toLowerCase();
-    filtered = filtered.filter(
-      (c) =>
-        c.content.toLowerCase().includes(q) ||
-        c.speaker?.toLowerCase().includes(q),
-    );
-  }
-  if (speakerFilter) {
-    filtered = filtered.filter((c) => c.speaker === speakerFilter);
-  }
-  if (sourceFilter) {
-    filtered = filtered.filter((c) => c.source === sourceFilter);
-  }
-  if (agentFilter) {
-    filtered = filtered.filter((c) => c.sourceAgentName === agentFilter);
-  }
-  // Hide processed raw transcript cards — they've been merged into clean cards
-  if (column.type === 'transcript') {
-    filtered = filtered.filter((c) => !c.userTags.includes('transcript:processed'));
-  }
-  if (column.type === 'highlights') {
-    if (hlF === 'user')
-      filtered = filtered.filter(
-        (c) => c.highlightedBy === 'user' || c.highlightedBy === 'both',
+  const filtered = useMemo(() => {
+    let result = cards;
+    if (search) {
+      const q = search.toLowerCase();
+      result = result.filter(
+        (c) =>
+          c.content.toLowerCase().includes(q) ||
+          c.speaker?.toLowerCase().includes(q),
       );
-    else if (hlF === 'ai')
-      filtered = filtered.filter(
-        (c) => c.highlightedBy === 'ai' || c.highlightedBy === 'both',
-      );
-  }
+    }
+    if (speakerFilter) {
+      result = result.filter((c) => c.speaker === speakerFilter);
+    }
+    if (sourceFilter) {
+      result = result.filter((c) => c.source === sourceFilter);
+    }
+    if (agentFilter) {
+      result = result.filter((c) => c.sourceAgentName === agentFilter);
+    }
+    // Hide processed raw transcript cards — they've been merged into clean cards
+    if (column.type === 'transcript') {
+      result = result.filter((c) => !c.userTags.includes('transcript:processed'));
+    }
+    if (column.type === 'highlights') {
+      if (hlF === 'user')
+        result = result.filter(
+          (c) => c.highlightedBy === 'user' || c.highlightedBy === 'both',
+        );
+      else if (hlF === 'ai')
+        result = result.filter(
+          (c) => c.highlightedBy === 'ai' || c.highlightedBy === 'both',
+        );
+    }
+    return result;
+  }, [cards, search, speakerFilter, sourceFilter, agentFilter, column.type, hlF]);
+
+  // Pre-sort filtered cards (memoized to avoid re-sorting on every render)
+  const sortedCards = useMemo(() =>
+    [...filtered].sort((a, b) => {
+      // Pinned cards float to top
+      if (a.pinned && !b.pinned) return -1;
+      if (!a.pinned && b.pinned) return 1;
+      return (a.sortOrder || '').localeCompare(b.sortOrder || '');
+    }),
+    [filtered],
+  );
+
+  // ── Virtual scrolling ──
+  const virtualizer = useVirtualizer({
+    count: sortedCards.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 80, // estimated card height in px
+    overscan: 5, // render 5 extra cards above/below viewport
+  });
+
+  // Listen for scroll-to-card requests from App.tsx navigateToCard
+  useEffect(() => {
+    const handler = ({ cardId }: { cardId: string }) => {
+      const idx = sortedCards.findIndex((c) => c.id === cardId);
+      if (idx >= 0) {
+        virtualizer.scrollToIndex(idx, { align: 'center', behavior: 'smooth' });
+      }
+    };
+    bus.on('column:scrollToCard', handler);
+    return () => { bus.off('column:scrollToCard', handler); };
+  }, [sortedCards, virtualizer]);
 
   const handleAddCard = () => {
     if (!input.trim()) return;
@@ -809,7 +858,7 @@ const Column: React.FC<ColumnProps> = ({
       {/* ── Transcript Speaker panel ── */}
       {column.type === 'transcript' && transcriptSpeakerOpen && (
         <TranscriptSpeaker
-          cards={[...filtered].sort((a, b) => (a.sortOrder || '').localeCompare(b.sortOrder || ''))}
+          cards={sortedCards}
           speakerColors={speakerColors}
           scrollRef={scrollRef}
           onClose={() => { setTranscriptSpeakerOpen(false); setSpeakingCardId(null); }}
@@ -817,7 +866,7 @@ const Column: React.FC<ColumnProps> = ({
         />
       )}
 
-      {/* ── Card list ── */}
+      {/* ── Card list (virtualized) ── */}
       <div
         ref={scrollRef}
         className="flex-1 overflow-auto px-2 py-1.5"
@@ -826,42 +875,59 @@ const Column: React.FC<ColumnProps> = ({
           scrollbarColor: 'var(--scrollbar-thumb) transparent',
         }}
       >
-        {filtered
-          .sort((a, b) => {
-            // Pinned cards float to top
-            if (a.pinned && !b.pinned) return -1;
-            if (!a.pinned && b.pinned) return 1;
-            return (a.sortOrder || '').localeCompare(b.sortOrder || '');
-          })
-          .map((card) => (
-            <div
-              key={card.id}
-              draggable
-              onDragStart={(e) =>
-                e.dataTransfer.setData('text/plain', card.id)
-              }
-            >
-              <Card
-                card={card}
-                colType={column.type}
-                speakerColors={speakerColors}
-                knownSpeakers={allKnownSpeakers}
-                onNavigate={onNavigate}
-                onDelete={(id) => deleteCard(id)}
-                onHighlight={(id) => toggleHighlight(id)}
-                onPin={(id) => togglePin(id)}
-                onEdit={(id, c) => updateCard(id, { content: c })}
-                onSpeakerChange={(id, s) => updateCard(id, { speaker: s })}
-                onAddSpeaker={handleAddSpeaker}
-                onSplit={column.type === 'transcript' ? handleSplit : undefined}
-                linkingFrom={linkingFrom}
-                onStartLink={onStartLink}
-                onCompleteLink={onCompleteLink}
-                speakingHighlight={speakingCardId === card.id}
-              />
-            </div>
-          ))}
-        {filtered.length === 0 && (
+        {sortedCards.length > 0 ? (
+          <div
+            style={{
+              height: virtualizer.getTotalSize(),
+              width: '100%',
+              position: 'relative',
+            }}
+          >
+            {virtualizer.getVirtualItems().map((virtualRow) => {
+              const card = sortedCards[virtualRow.index];
+              return (
+                <div
+                  key={card.id}
+                  data-index={virtualRow.index}
+                  ref={virtualizer.measureElement}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    transform: `translateY(${virtualRow.start}px)`,
+                  }}
+                >
+                  <div
+                    draggable
+                    onDragStart={(e) =>
+                      e.dataTransfer.setData('text/plain', card.id)
+                    }
+                  >
+                    <Card
+                      card={card}
+                      colType={column.type}
+                      speakerColors={speakerColors}
+                      knownSpeakers={allKnownSpeakers}
+                      onNavigate={onNavigate}
+                      onDelete={handleCardDelete}
+                      onHighlight={handleCardHighlight}
+                      onPin={handleCardPin}
+                      onEdit={handleCardEdit}
+                      onSpeakerChange={handleCardSpeakerChange}
+                      onAddSpeaker={handleAddSpeaker}
+                      onSplit={column.type === 'transcript' ? handleSplit : undefined}
+                      linkingFrom={linkingFrom}
+                      onStartLink={onStartLink}
+                      onCompleteLink={onCompleteLink}
+                      speakingHighlight={speakingCardId === card.id}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
           <div className="text-center text-[11px] text-wall-muted" style={{ padding: 16 }}>
             {column.type === 'transcript'
               ? 'Type transcript segments below.\nTag speakers and press Enter.\nAgents will auto-analyse your input.'
