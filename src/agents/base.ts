@@ -143,7 +143,7 @@ export abstract class BaseAgent {
     return raw
       .split('\n')
       .map(l => l.replace(/^[•\-*\d.)\]]+\s*/, '').trim())
-      .filter(l => l.length > 5)
+      .filter(l => l.length > 5 && l.toUpperCase() !== 'NOTHING')
       .map(content => ({ content, columnType: this.targetColumn }));
   }
 

@@ -70,14 +70,36 @@ const WHISPER_HALLUCINATIONS = new Set([
   'thank you for watching!',
   'bye.',
   'bye bye.',
+  'bye-bye.',
   'goodbye.',
   'you',
   'the end.',
   'i\'m sorry.',
+  'see you next time.',
+  'see you later.',
+  'see you on saturday.',
+  'see you soon.',
   'subtitles by the amara.org community',
   'subtitles made by the amara.org community',
   'subs by www.teletext.ch',
 ]);
+
+// Patterns that catch Whisper hallucination variants the exact set misses.
+const WHISPER_HALLUCINATION_PATTERNS = [
+  /^(bye[\s.!-]*)+$/,                                     // "Bye. Bye. Bye." etc.
+  /^see you\b/,                                            // "See you on Saturday", "See you next week"
+  /\b(subscribe|like and subscribe|hit the bell)\b/,       // YouTube sign-off hallucinations
+  /\bplease (like|subscribe|comment)\b/,                   // "Please like, comment and subscribe"
+  /^thank(s| you)\b.*\b(watching|listening|viewing)\b/,    // "Thank you for watching" variants
+  /\bwww\.\S+\.(com|org|net|ch)\b/,                       // URLs in subtitles attribution
+  /^(subtitles|captions) (by|made by|provided by)\b/,     // Subtitle attribution variants
+];
+
+function isWhisperHallucination(text: string): boolean {
+  const normalised = text.trim().toLowerCase();
+  if (WHISPER_HALLUCINATIONS.has(normalised)) return true;
+  return WHISPER_HALLUCINATION_PATTERNS.some(p => p.test(normalised));
+}
 
 // ── Session state ───────────────────────────────────────────────────────────
 
@@ -246,8 +268,7 @@ async function flushAndRestart(): Promise<void> {
       bus.emit('transcript:error', { error: result.error });
     } else if (result.text) {
       // Filter known Whisper hallucination phrases (silence artifacts)
-      const normalised = result.text.trim().toLowerCase();
-      if (WHISPER_HALLUCINATIONS.has(normalised)) {
+      if (isWhisperHallucination(result.text)) {
         console.debug(`[transcription] Filtered hallucination: "${result.text}"`);
       } else {
         console.debug(`[transcription] Got text: "${result.text.slice(0, 80)}${result.text.length > 80 ? '…' : ''}"`);
