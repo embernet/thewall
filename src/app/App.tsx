@@ -670,7 +670,7 @@ export default function App() {
         id: uid(), columnId: tcol.id, sessionId: s.session.id, content: text,
         source: 'transcription', speaker,
         timestamp: Date.now() - timerStart.current!,
-        sourceCardIds: [], aiTags: [], userTags: [], highlightedBy: 'none', isDeleted: false,
+        sourceCardIds: [], aiTags: [], userTags: ['transcript:clean'], highlightedBy: 'none', isDeleted: false,
         createdAt: now(), updatedAt: now(), sortOrder: last ? mid(last.sortOrder) : 'n',
       });
       // Orchestrator auto-triggers via card:created events from addCard

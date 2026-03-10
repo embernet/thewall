@@ -48,7 +48,7 @@ const TranscriptInput: React.FC<TranscriptInputProps> = ({
       timestamp: undefined,
       sourceCardIds: [],
       aiTags: [],
-      userTags: [],
+      userTags: ['transcript:clean'],
       highlightedBy: 'none',
       isDeleted: false,
       createdAt: now(),
