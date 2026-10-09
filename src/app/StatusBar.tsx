@@ -121,6 +121,11 @@ export default function StatusBar({ simRunning, embeddingProvider, apiKeyStatus 
               {m.label}
             </option>
           ))}
+          {!models.some(m => m.id === selectedModel) && selectedModel && (
+            <option key={selectedModel} value={selectedModel}>
+              {selectedModel} (custom)
+            </option>
+          )}
         </select>
       </div>
 

@@ -29,8 +29,8 @@ export interface LLMProvider {
 // ---------------------------------------------------------------------------
 
 let cachedKey = '';
-let cachedProvider: ApiProvider = 'anthropic';
-let cachedModelId = 'claude-sonnet-4-20250514';
+let cachedProvider: ApiProvider = 'openai';
+let cachedModelId = 'gpt-5.6';
 
 // ---------------------------------------------------------------------------
 // Public getters

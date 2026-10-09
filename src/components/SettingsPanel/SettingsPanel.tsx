@@ -754,6 +754,15 @@ function SlotSection({ slotDef, state, fetchedModels, onProviderChange, onModelC
   const needsKey = providerNeedsKey(state.provider);
   const dot = STATUS_DOT[state.status];
 
+  const isKnownModel = models.some(m => m.id === state.modelId);
+  const [isCustom, setIsCustom] = useState(!isKnownModel && Boolean(state.modelId));
+
+  useEffect(() => {
+    if (!models.some(m => m.id === state.modelId) && Boolean(state.modelId)) {
+      setIsCustom(true);
+    }
+  }, [state.modelId, models]);
+
   return (
     <div className="rounded-lg border border-wall-border bg-wall-bg p-3">
       {/* Header */}
@@ -805,19 +814,57 @@ function SlotSection({ slotDef, state, fetchedModels, onProviderChange, onModelC
         </div>
       ) : (
         <div className="mb-2">
-          <label className="mb-0.5 block text-[10px] font-medium text-wall-text-dim">Model</label>
-          <select
-            value={state.modelId}
-            onChange={(e) => onModelChange(e.target.value)}
-            className="w-full cursor-pointer rounded-md border border-wall-muted bg-wall-border px-2 py-1 text-xs text-wall-text outline-none"
-          >
-            {models.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.label}
-                {m.inputCost > 0 ? ` ($${(m.inputCost * 1_000_000).toFixed(2)}/$${(m.outputCost * 1_000_000).toFixed(2)} per 1M tok)` : ''}
-              </option>
-            ))}
-          </select>
+          <div className="mb-0.5 flex items-center justify-between">
+            <label className="text-[10px] font-medium text-wall-text-dim">Model</label>
+            <button
+              type="button"
+              onClick={() => {
+                if (isCustom) {
+                  setIsCustom(false);
+                  if (!models.some(m => m.id === state.modelId) && models[0]) {
+                    onModelChange(models[0].id);
+                  }
+                } else {
+                  setIsCustom(true);
+                }
+              }}
+              className="text-[9px] text-indigo-400 hover:text-indigo-300 transition-colors cursor-pointer"
+            >
+              {isCustom ? 'Choose from list' : 'Type custom model'}
+            </button>
+          </div>
+
+          {isCustom ? (
+            <input
+              type="text"
+              value={state.modelId}
+              onChange={(e) => onModelChange(e.target.value)}
+              placeholder="e.g. gpt-4.5-preview, text-embedding-3-large, gpt-image-2..."
+              className="w-full rounded-md border border-indigo-500/60 bg-wall-border px-2 py-1 font-mono text-xs text-wall-text outline-none focus:border-indigo-400"
+              style={{ boxSizing: 'border-box' }}
+            />
+          ) : (
+            <select
+              value={models.some(m => m.id === state.modelId) ? state.modelId : '__custom__'}
+              onChange={(e) => {
+                if (e.target.value === '__custom__') {
+                  setIsCustom(true);
+                } else {
+                  setIsCustom(false);
+                  onModelChange(e.target.value);
+                }
+              }}
+              className="w-full cursor-pointer rounded-md border border-wall-muted bg-wall-border px-2 py-1 text-xs text-wall-text outline-none"
+            >
+              {models.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label}
+                  {m.inputCost > 0 ? ` ($${(m.inputCost * 1_000_000).toFixed(2)}/$${(m.outputCost * 1_000_000).toFixed(2)} per 1M tok)` : ''}
+                </option>
+              ))}
+              <option value="__custom__">Custom model...</option>
+            </select>
+          )}
         </div>
       )}
 

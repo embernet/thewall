@@ -613,6 +613,17 @@ export interface ElectronAPI {
     openPath: (filePath: string) => Promise<string>;
     openExternal: (url: string) => Promise<void>;
   };
+
+  /** Export HTML content as a styled PDF document */
+  exportPDF?: (
+    html: string,
+    defaultFileName: string,
+  ) => Promise<{
+    success: boolean;
+    filePath?: string;
+    canceled?: boolean;
+    error?: string;
+  }>;
 }
 
 export type ApiKeyStatus = 'unchecked' | 'checking' | 'valid' | 'invalid';

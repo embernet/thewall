@@ -32,6 +32,10 @@ interface ImagePromptCardProps {
 
 // Human-readable descriptions shown below the picker when a model is selected
 const MODEL_DESCRIPTIONS: Record<string, string> = {
+  'gpt-image-2':
+    'GPT Image 2 — OpenAI next-generation image generation model.',
+  'dall-e-3':
+    'DALL-E 3 — OpenAI high-detail image generation model.',
   'imagen-3.0-generate-001':
     'Imagen 3 — dedicated text-to-image pipeline. High fidelity, strong prompt adherence.',
   'imagen-3.0-fast-generate-001':
@@ -63,6 +67,7 @@ const ImagePromptCard: React.FC<ImagePromptCardProps> = ({
   const defaultModelId =
     availableModels.find((m) => m.id === savedModel)?.id ?? availableModels[0]?.id ?? savedModel;
   const [selectedModelId, setSelectedModelId] = useState(defaultModelId);
+  const [isCustomModel, setIsCustomModel] = useState(!availableModels.some(m => m.id === defaultModelId) && Boolean(defaultModelId));
 
   // On mount, fetch live models from Google (same flow as Settings panel)
   useEffect(() => {
@@ -85,6 +90,7 @@ const ImagePromptCard: React.FC<ImagePromptCardProps> = ({
   }, []);
 
   const isGemini = /gemini/i.test(selectedModelId);
+  const isOpenAIImage = /^(gpt-image|dall-e)/i.test(selectedModelId);
 
   const handleGenerate = () => {
     if (!finalPrompt.trim() || loading) return;
@@ -145,27 +151,56 @@ const ImagePromptCard: React.FC<ImagePromptCardProps> = ({
 
       {/* Model picker */}
       <div className="mb-2">
-        <div className="mb-1 text-[9px] font-semibold uppercase tracking-widest text-wall-subtle">
-          Model
+        <div className="mb-1 flex items-center justify-between">
+          <span className="text-[9px] font-semibold uppercase tracking-widest text-wall-subtle">
+            Model
+          </span>
+          <button
+            type="button"
+            onClick={() => setIsCustomModel(prev => !prev)}
+            className="text-[9px] text-indigo-400 hover:text-indigo-300 transition-colors cursor-pointer"
+          >
+            {isCustomModel ? 'Choose from list' : 'Type custom model'}
+          </button>
         </div>
-        <select
-          value={selectedModelId}
-          onChange={e => setSelectedModelId(e.target.value)}
-          disabled={loading}
-          className="w-full cursor-pointer rounded border border-wall-muted bg-wall-border px-2 py-1 text-[10px] text-wall-text outline-none disabled:opacity-50"
-        >
-          {availableModels.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.label}
-            </option>
-          ))}
-        </select>
+        {isCustomModel ? (
+          <input
+            type="text"
+            value={selectedModelId}
+            onChange={e => setSelectedModelId(e.target.value)}
+            disabled={loading}
+            placeholder="e.g. gpt-image-2, dall-e-3, imagen-3.0-generate-001"
+            className="w-full rounded border border-indigo-500/60 bg-wall-border px-2 py-1 font-mono text-[10px] text-wall-text outline-none focus:border-indigo-400 disabled:opacity-50"
+          />
+        ) : (
+          <select
+            value={availableModels.some(m => m.id === selectedModelId) ? selectedModelId : '__custom__'}
+            onChange={e => {
+              if (e.target.value === '__custom__') {
+                setIsCustomModel(true);
+              } else {
+                setSelectedModelId(e.target.value);
+              }
+            }}
+            disabled={loading}
+            className="w-full cursor-pointer rounded border border-wall-muted bg-wall-border px-2 py-1 text-[10px] text-wall-text outline-none disabled:opacity-50"
+          >
+            {availableModels.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.label}
+              </option>
+            ))}
+            <option value="__custom__">Custom model...</option>
+          </select>
+        )}
         {/* Contextual description */}
         <p className="mt-1 text-[9px] leading-snug text-wall-muted">
           {MODEL_DESCRIPTIONS[selectedModelId] ?? (
             isGemini
               ? 'Gemini model — uses generate_content with IMAGE response modality.'
-              : 'Imagen model — uses dedicated predict pipeline.'
+              : isOpenAIImage
+              ? 'OpenAI image model — uses /v1/images/generations endpoint.'
+              : 'Dedicated image generation model.'
           )}
         </p>
       </div>

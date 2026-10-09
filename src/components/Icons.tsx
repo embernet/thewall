@@ -599,6 +599,19 @@ export function IconMarkdown(props: IconProps) {
   );
 }
 
+/** PDF Document */
+export function IconPdf(props: IconProps) {
+  return (
+    <svg {...defaults} {...props}>
+      <path d="M9 1H4a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V6L9 1z" />
+      <path d="M9 1v5h5" />
+      <path d="M4.5 11.5v-3h1.2a1 1 0 010 2H4.5" />
+      <path d="M8 8.5v3" />
+      <path d="M8 8.5h1a1.5 1.5 0 010 3H8" />
+    </svg>
+  );
+}
+
 /** Chart bars — CSV */
 export function IconChart(props: IconProps) {
   return (
@@ -1301,6 +1314,8 @@ const ICON_MAP: Record<string, (props: IconProps) => JSX.Element> = {
   json: IconJson,
   package: IconPackage,
   markdown: IconMarkdown,
+  'summary-md': IconDocument,
+  pdf: IconPdf,
   csv: IconChart,
   chart: IconChart,
   html: IconGlobe,

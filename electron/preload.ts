@@ -170,6 +170,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url),
   },
 
+  // PDF Export
+  exportPDF: (html: string, defaultFileName: string) =>
+    ipcRenderer.invoke('export:pdf', { html, defaultFileName }) as Promise<{
+      success: boolean;
+      filePath?: string;
+      canceled?: boolean;
+      error?: string;
+    }>,
+
   // App lifecycle
   quit: () => ipcRenderer.invoke('app:quit'),
 });

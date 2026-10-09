@@ -8,5 +8,6 @@ release
 .env
 .env.local
 .claude/
+.antigravitycli/
 .DS_Store
 

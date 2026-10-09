@@ -905,11 +905,10 @@ export function registerDbHandlers() {
   });
 
   ipcMain.handle('generateImage', async (_e, prompt: string, inputBase64?: string, overrideModelId?: string) => {
-    const row = db().prepare('SELECT * FROM api_keys WHERE slot = ?').get('image_gen') as any;
-    if (!row) return { error: 'No image generation API key configured' };
+    let row = db().prepare('SELECT * FROM api_keys WHERE slot = ?').get('image_gen') as any;
 
     let apiKey = '';
-    if (row.encrypted_key) {
+    if (row?.encrypted_key) {
       try {
         if (safeStorage.isEncryptionAvailable()) {
           apiKey = safeStorage.decryptString(row.encrypted_key);
@@ -920,11 +919,68 @@ export function registerDbHandlers() {
         return { error: 'Failed to decrypt image generation API key' };
       }
     }
-    if (!apiKey) return { error: 'Image generation API key is empty' };
 
-    // overrideModelId comes from the per-generation model picker in the UI;
-    // falls back to whatever is saved in settings, then the hardcoded default.
-    const modelId = overrideModelId || row.model_id || 'imagen-3.0-generate-001';
+    const modelId = overrideModelId || row?.model_id || 'imagen-3.0-generate-001';
+    const isOpenAI = (row && row.provider === 'openai') || /^(gpt-image|dall-e)/i.test(modelId);
+
+    // Fallback: If OpenAI image model or provider, and no key in image_gen slot, check chat or transcription slot for an OpenAI key
+    if (!apiKey && isOpenAI) {
+      const fallbackRow = db().prepare("SELECT * FROM api_keys WHERE slot = 'chat' AND provider = 'openai'").get() as any
+        || db().prepare("SELECT * FROM api_keys WHERE slot = 'transcription' AND provider = 'openai'").get() as any;
+      if (fallbackRow?.encrypted_key) {
+        try {
+          if (safeStorage.isEncryptionAvailable()) {
+            apiKey = safeStorage.decryptString(fallbackRow.encrypted_key);
+          } else {
+            apiKey = fallbackRow.encrypted_key.toString('utf-8');
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    if (!apiKey) return { error: 'No image generation API key configured' };
+
+    // ── OpenAI image generation pathway ─────────────────────────────────────
+    if (isOpenAI) {
+      const url = 'https://api.openai.com/v1/images/generations';
+      try {
+        const bodyPayload: Record<string, unknown> = {
+          model: modelId,
+          prompt,
+          n: 1,
+          response_format: 'b64_json',
+        };
+        if (modelId === 'dall-e-3' || modelId === 'gpt-image-2') {
+          bodyPayload.size = '1024x1024';
+        }
+        const r = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify(bodyPayload),
+        });
+        if (!r.ok) {
+          const err = await r.text().catch(() => r.statusText);
+          return { error: `OpenAI image API error ${r.status}: ${err}` };
+        }
+        const data = await r.json() as { data?: Array<{ b64_json?: string; url?: string }> };
+        const b64 = data.data?.[0]?.b64_json;
+        if (!b64) {
+          return { error: 'OpenAI returned no image data' };
+        }
+        return {
+          imageData: b64,
+          mimeType: 'image/png',
+        };
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        return { error: msg };
+      }
+    }
 
     // ── Gemini generateContent pathway ──────────────────────────────────────
     // Gemini image-generation models (e.g. gemini-2.0-flash-preview-image-generation)

@@ -2,7 +2,7 @@
 // The Wall -- File Processing IPC Handlers (Context Column)
 // ============================================================================
 
-import { ipcMain, dialog, shell } from 'electron';
+import { ipcMain, dialog, shell, BrowserWindow } from 'electron';
 import fs from 'fs';
 import path from 'path';
 
@@ -90,6 +90,60 @@ export function registerFileHandlers(): void {
   ipcMain.handle('file:openPath', async (_e, filePath: string) => {
     return shell.openPath(filePath);
   });
+
+  // Export HTML as a formatted PDF file via Electron printToPDF
+  ipcMain.handle(
+    'export:pdf',
+    async (
+      _e,
+      { html, defaultFileName }: { html: string; defaultFileName: string },
+    ) => {
+      let printWindow: BrowserWindow | null = null;
+      try {
+        printWindow = new BrowserWindow({
+          show: false,
+          webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+          },
+        });
+
+        const encodedHtml = `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+        await printWindow.loadURL(encodedHtml);
+
+        const pdfBuffer = await printWindow.webContents.printToPDF({
+          printBackground: true,
+          margins: {
+            top: 0.6,
+            bottom: 0.6,
+            left: 0.6,
+            right: 0.6,
+          },
+          pageSize: 'A4',
+        });
+
+        const result = await dialog.showSaveDialog({
+          title: 'Export as PDF',
+          defaultPath: defaultFileName,
+          filters: [{ name: 'PDF Documents', extensions: ['pdf'] }],
+        });
+
+        if (result.canceled || !result.filePath) {
+          return { success: false, canceled: true };
+        }
+
+        fs.writeFileSync(result.filePath, pdfBuffer);
+        return { success: true, filePath: result.filePath };
+      } catch (err) {
+        console.error('Failed to export PDF:', err);
+        return { success: false, error: (err as Error).message };
+      } finally {
+        if (printWindow && !printWindow.isDestroyed()) {
+          printWindow.close();
+        }
+      }
+    },
+  );
 }
 
 // ---------------------------------------------------------------------------

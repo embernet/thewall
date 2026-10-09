@@ -3,6 +3,8 @@ import { SvgIcon } from '@/components/Icons';
 import {
   exportSessionToFile,
   exportSessionToFileCompact,
+  exportSessionStructuredMarkdown,
+  exportSessionPDF,
   exportSessionMarkdown,
   exportSessionCSV,
   exportSessionHTML,
@@ -56,8 +58,26 @@ export default function ExportMenu({ onClose }: ExportMenuProps) {
     },
     {
       icon: 'markdown',
-      label: 'Export as Markdown',
-      desc: 'Human-readable document with all columns and cards.',
+      label: 'Export as Synthesized Summary (Markdown)',
+      desc: 'Clean, deduplicated markdown document with column summaries, dialogue transcript, and structured paragraphs.',
+      fn: () => {
+        exportSessionStructuredMarkdown(state);
+        onClose();
+      },
+    },
+    {
+      icon: 'pdf',
+      label: 'Export as PDF Document',
+      desc: 'Formatted multi-page PDF with styled typography, dialogue badges, column summaries, and print layout.',
+      fn: () => {
+        exportSessionPDF(state);
+        onClose();
+      },
+    },
+    {
+      icon: 'markdown',
+      label: 'Export as Raw Markdown',
+      desc: 'Full card list with all columns and card numbers.',
       fn: () => {
         exportSessionMarkdown(state);
         onClose();

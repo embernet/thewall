@@ -43,19 +43,20 @@ export const SLOT_PROVIDERS: readonly SlotDef[] = [
     description: 'Powers AI agents, simulation, and inquiry',
     providers: [
       {
+        id: 'openai',
+        label: 'OpenAI',
+        models: [
+          { id: 'gpt-5.6', label: 'GPT-5.6', inputCost: 2.5 / 1_000_000, outputCost: 10.0 / 1_000_000 },
+          { id: 'gpt-4o', label: 'GPT-4o', inputCost: 2.5 / 1_000_000, outputCost: 10.0 / 1_000_000 },
+          { id: 'gpt-4o-mini', label: 'GPT-4o Mini', inputCost: 0.15 / 1_000_000, outputCost: 0.6 / 1_000_000 },
+        ],
+      },
+      {
         id: 'anthropic',
         label: 'Anthropic',
         models: [
           { id: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4.5', inputCost: 3.0 / 1_000_000, outputCost: 15.0 / 1_000_000 },
           { id: 'claude-opus-4-6-20250918', label: 'Claude Opus 4.6', inputCost: 15.0 / 1_000_000, outputCost: 75.0 / 1_000_000 },
-        ],
-      },
-      {
-        id: 'openai',
-        label: 'OpenAI',
-        models: [
-          { id: 'gpt-4o', label: 'GPT-4o', inputCost: 2.5 / 1_000_000, outputCost: 10.0 / 1_000_000 },
-          { id: 'gpt-4o-mini', label: 'GPT-4o Mini', inputCost: 0.15 / 1_000_000, outputCost: 0.6 / 1_000_000 },
         ],
       },
     ],
@@ -101,6 +102,14 @@ export const SLOT_PROVIDERS: readonly SlotDef[] = [
           { id: 'imagen-3.0-generate-001', label: 'Imagen 3', inputCost: 0, outputCost: 0.04 },
           { id: 'imagen-3.0-fast-generate-001', label: 'Imagen 3 Fast', inputCost: 0, outputCost: 0.02 },
           { id: 'gemini-2.0-flash-preview-image-generation', label: 'Gemini 2.0 Flash Image', inputCost: 0, outputCost: 0.04 },
+        ],
+      },
+      {
+        id: 'openai',
+        label: 'OpenAI',
+        models: [
+          { id: 'gpt-image-2', label: 'GPT Image 2', inputCost: 0, outputCost: 0.04 },
+          { id: 'dall-e-3', label: 'DALL-E 3', inputCost: 0, outputCost: 0.04 },
         ],
       },
     ],
@@ -219,14 +228,18 @@ export function getChatModels(provider: ApiProvider): readonly ModelDef[] {
 }
 
 /**
- * Get the best available model list for the image_gen slot (Google Imagen).
+ * Get the best available model list for the image_gen slot.
  * Returns fetched models if available, otherwise static fallback.
  */
-export function getImageGenModels(): readonly ModelDef[] {
-  const cached = fetchedModelCache.get('google');
-  if (cached && cached.length > 0) return cached;
-  const provDef = getProviderDef('image_gen', 'google');
-  return provDef?.models ?? [];
+export function getImageGenModels(provider?: ApiProvider): readonly ModelDef[] {
+  if (provider) {
+    const cached = fetchedModelCache.get(provider);
+    if (cached && cached.length > 0) return cached;
+    const provDef = getProviderDef('image_gen', provider);
+    return provDef?.models ?? [];
+  }
+  const slotDef = getSlotDef('image_gen');
+  return slotDef ? slotDef.providers.flatMap(p => p.models) : [];
 }
 
 /**
@@ -364,7 +377,7 @@ async function fetchGoogleImagenModels(apiKey: string): Promise<ModelDef[]> {
   }
 }
 // OpenAI model patterns for chat
-const OPENAI_CHAT_PATTERN = /^(gpt-4|gpt-3\.5|o[1-9]|chatgpt)/;
+const OPENAI_CHAT_PATTERN = /^(gpt-5|gpt-4|gpt-3\.5|o[1-9]|chatgpt)/;
 const OPENAI_SKIP_PATTERN = /-(realtime|audio|search)/;
 
 async function fetchOpenAIModels(apiKey: string): Promise<ModelDef[]> {
